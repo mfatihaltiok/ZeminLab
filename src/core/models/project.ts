@@ -8,6 +8,18 @@ export interface ProjectVisualDocuments {
   foundationStress?: string
 }
 
+export interface SoilParameters {
+  unitWeight: number
+  cohesion: number
+  frictionAngle: number
+}
+
+export interface FoundationParameters {
+  footingWidth: number
+  footingDepth: number
+  safetyFactor: number
+}
+
 export interface ProjectInfo {
   id: string
   title: string
@@ -25,6 +37,8 @@ export interface ProjectInfo {
   basementCount: number
   normalFloorCount: number
   unitSystem: UnitSystem
+  soilParameters: SoilParameters
+  foundationParameters: FoundationParameters
   visualDocuments: ProjectVisualDocuments
 }
 
@@ -45,5 +59,15 @@ export const defaultProjectInfo: ProjectInfo = {
   basementCount: 0,
   normalFloorCount: 0,
   unitSystem: 'kN-m',
+  soilParameters: {
+    unitWeight: 18,
+    cohesion: 10,
+    frictionAngle: 30
+  },
+  foundationParameters: {
+    footingWidth: 2,
+    footingDepth: 1,
+    safetyFactor: 3
+  },
   visualDocuments: {}
 }
