@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import './field-workspace.css'
+import '../assets/field-workspace.css'
 import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../../../core/models/field-data'
 
 type Props = { boreholes: BoreholeRecord[]; labs: LaboratoryRecord[]; onBoreholesChange: (rows: BoreholeRecord[]) => void; onLabsChange: (rows: LaboratoryRecord[]) => void }
