@@ -1,6 +1,7 @@
 ﻿import { useState, type ReactNode } from 'react'
 import './assets/main.css'
 import PlaceholderScreen from './screens/PlaceholderScreen'
+import BearingCapacity from './screens/analysis/BearingCapacity'
 import { screenDefinitions } from './screens/screen-definitions'
 import type { ScreenId } from './screens/screen-types'
 
@@ -114,6 +115,10 @@ function App() {
   }
 
   const renderWorkspace = () => {
+    if (activeScreen === 'bearing-capacity') {
+      return <BearingCapacity />
+    }
+
     if (activeScreen !== 'soil-profile') {
       const screen = screenDefinitions[activeScreen]
 
@@ -679,3 +684,4 @@ function App() {
 }
 
 export default App
+
