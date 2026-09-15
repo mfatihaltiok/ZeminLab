@@ -1,4 +1,4 @@
-import {useState} from 'react'
+import {useState,type ReactNode} from 'react'
 import './assets/main.css'
 import {WorkspaceShell,type ScreenId} from './workspace/WorkspaceShell'
 import {Dashboard,Earthquake,Bearing,FieldScreen,Foundation,JetGrout,Liquefaction,Profile,ProjectInfo,Report,Settlement,useDemoFieldData} from './screens/EngineeringScreens'
@@ -6,7 +6,7 @@ import {Dashboard,Earthquake,Bearing,FieldScreen,Foundation,JetGrout,Liquefactio
 export default function App(){
   const [screen,setScreen]=useState<ScreenId>('dashboard')
   const {boreholes,labs,setBoreholes,setLabs}=useDemoFieldData()
-  const content={
+  const content:Record<ScreenId,ReactNode>={
     dashboard:<Dashboard onNavigate={setScreen}/>,
     'project-info':<ProjectInfo/>,
     field:<FieldScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs}/>,
@@ -18,6 +18,6 @@ export default function App(){
     foundation:<Foundation/>,
     'jet-grout':<JetGrout/>,
     report:<Report/>
-  } satisfies Record<ScreenId,React.ReactNode>
+  }
   return <WorkspaceShell screen={screen} onScreenChange={setScreen}>{content[screen]}</WorkspaceShell>
 }
