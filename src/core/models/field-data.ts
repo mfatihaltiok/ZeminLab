@@ -1,0 +1,92 @@
+export type BoreholeId = string
+
+export type SptTestType = 'SPT' | 'UD'
+
+export interface SptRecord {
+  id: string
+  depth: number
+  testType: SptTestType
+  n1?: number
+  n2?: number
+  n3?: number
+  nSpt?: number
+  soilCode?: string
+  soilDescription?: string
+  notes?: string
+  source: 'manual' | 'image-review' | 'imported'
+  confirmed: boolean
+}
+
+export interface BoreholeRecord {
+  id: BoreholeId
+  name: string
+  totalDepth: number
+  groundwaterDepth?: number
+  elevation?: number
+  location?: string
+  lithology: Array<{
+    id: string
+    from: number
+    to: number
+    code: string
+    description: string
+    colorClass: 'fill' | 'clay' | 'silt' | 'sand' | 'gravel' | 'rock'
+  }>
+  spt: SptRecord[]
+}
+
+export interface LaboratoryRecord {
+  id: string
+  boreholeId: BoreholeId
+  sampleId: string
+  depth: number
+  sampleType: 'UD' | 'SPT' | 'Other'
+  waterContent?: number
+  unitWeight?: number
+  liquidLimit?: number
+  plasticLimit?: number
+  plasticityIndex?: number
+  c?: number
+  phi?: number
+  source: 'manual' | 'image-review' | 'imported'
+  confirmed: boolean
+  notes?: string
+}
+
+export const demoBoreholes: BoreholeRecord[] = [
+  {
+    id: 'BH-01', name: 'Sondaj-01', totalDepth: 15, groundwaterDepth: 6.2, elevation: 1012.4,
+    lithology: [
+      { id: 'l1', from: 0, to: 1.5, code: 'Mg', description: 'Dolgu', colorClass: 'fill' },
+      { id: 'l2', from: 1.5, to: 5, code: 'CIL', description: 'Düşük plastisiteli kil', colorClass: 'clay' },
+      { id: 'l3', from: 5, to: 9, code: 'siSa', description: 'Siltli kum', colorClass: 'silt' },
+      { id: 'l4', from: 9, to: 15, code: 'Sa', description: 'Kum', colorClass: 'sand' }
+    ],
+    spt: [
+      { id: 'bh1-s1', depth: 1.5, testType: 'SPT', n1: 4, n2: 6, n3: 8, nSpt: 14, soilCode: 'CIL', soilDescription: 'Kil', source: 'imported', confirmed: true },
+      { id: 'bh1-s2', depth: 3, testType: 'SPT', n1: 5, n2: 7, n3: 9, nSpt: 16, soilCode: 'CIL', soilDescription: 'Kil', source: 'imported', confirmed: true },
+      { id: 'bh1-s3', depth: 6, testType: 'SPT', n1: 6, n2: 9, n3: 11, nSpt: 20, soilCode: 'siSa', soilDescription: 'Siltli kum', source: 'imported', confirmed: true },
+      { id: 'bh1-s4', depth: 9, testType: 'SPT', n1: 8, n2: 12, n3: 14, nSpt: 26, soilCode: 'Sa', soilDescription: 'Kum', source: 'imported', confirmed: true },
+      { id: 'bh1-s5', depth: 12, testType: 'SPT', n1: 14, n2: 20, n3: 22, nSpt: 42, soilCode: 'Sa', soilDescription: 'Sıkı kum', source: 'imported', confirmed: true }
+    ]
+  },
+  {
+    id: 'BH-02', name: 'Sondaj-02', totalDepth: 12, groundwaterDepth: 5.4, elevation: 1011.9,
+    lithology: [
+      { id: 'l5', from: 0, to: 2, code: 'Mg', description: 'Dolgu', colorClass: 'fill' },
+      { id: 'l6', from: 2, to: 6, code: 'CIM', description: 'Orta plastisiteli kil', colorClass: 'clay' },
+      { id: 'l7', from: 6, to: 12, code: 'Sa', description: 'Orta sıkı kum', colorClass: 'sand' }
+    ],
+    spt: [
+      { id: 'bh2-s1', depth: 2, testType: 'SPT', n1: 4, n2: 5, n3: 7, nSpt: 12, soilCode: 'CIM', soilDescription: 'Kil', source: 'imported', confirmed: true },
+      { id: 'bh2-s2', depth: 5, testType: 'SPT', n1: 6, n2: 8, n3: 10, nSpt: 18, soilCode: 'CIM', soilDescription: 'Kil', source: 'imported', confirmed: true },
+      { id: 'bh2-s3', depth: 8, testType: 'SPT', n1: 9, n2: 12, n3: 14, nSpt: 26, soilCode: 'Sa', soilDescription: 'Kum', source: 'imported', confirmed: true }
+    ]
+  }
+]
+
+export const demoLaboratory: LaboratoryRecord[] = [
+  { id: 'LAB-01', boreholeId: 'BH-01', sampleId: 'UD-01', depth: 2.2, sampleType: 'UD', waterContent: 18.4, unitWeight: 18.2, liquidLimit: 38, plasticLimit: 21, plasticityIndex: 17, c: 18, phi: 24, source: 'imported', confirmed: true },
+  { id: 'LAB-02', boreholeId: 'BH-01', sampleId: 'UD-02', depth: 5.4, sampleType: 'UD', waterContent: 22.1, unitWeight: 18.7, liquidLimit: 42, plasticLimit: 23, plasticityIndex: 19, c: 20, phi: 22, source: 'imported', confirmed: true },
+  { id: 'LAB-03', boreholeId: 'BH-02', sampleId: 'UD-01', depth: 3.1, sampleType: 'UD', waterContent: 19.8, unitWeight: 18.5, liquidLimit: 35, plasticLimit: 20, plasticityIndex: 15, c: 16, phi: 25, source: 'imported', confirmed: true }
+]
