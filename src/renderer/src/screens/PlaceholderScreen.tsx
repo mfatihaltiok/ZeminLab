@@ -1,12 +1,15 @@
-﻿import type { ScreenDefinition } from './screen-types'
+import type { ScreenDefinition } from './screen-types'
+import ProjectInfo from './project/ProjectInfo'
 
 interface PlaceholderScreenProps {
   screen: ScreenDefinition
 }
 
-export default function PlaceholderScreen({
-  screen
-}: PlaceholderScreenProps) {
+export default function PlaceholderScreen({ screen }: PlaceholderScreenProps) {
+  if (screen.id === 'project-info') {
+    return <ProjectInfo />
+  }
+
   return (
     <section className="engineering-screen">
       <header className="engineering-header">
