@@ -10,14 +10,25 @@ export interface ProjectVisualDocuments {
 
 export interface SoilParameters {
   unitWeight: number
+  saturatedUnitWeight: number
   cohesion: number
   frictionAngle: number
+  groundwaterDepth: number
+  surfaceSlope: number
+  foundationBaseSlope: number
+  finesContent: number
 }
 
 export interface FoundationParameters {
   footingWidth: number
+  footingLength: number
   footingDepth: number
   safetyFactor: number
+  verticalLoad: number
+  horizontalLoad: number
+  momentX: number
+  momentY: number
+  resistanceFactorRv: number
 }
 
 export interface ProjectInfo {
@@ -61,13 +72,24 @@ export const defaultProjectInfo: ProjectInfo = {
   unitSystem: 'kN-m',
   soilParameters: {
     unitWeight: 18,
+    saturatedUnitWeight: 20,
     cohesion: 10,
-    frictionAngle: 30
+    frictionAngle: 30,
+    groundwaterDepth: 10,
+    surfaceSlope: 0,
+    foundationBaseSlope: 0,
+    finesContent: 0
   },
   foundationParameters: {
     footingWidth: 2,
+    footingLength: 2,
     footingDepth: 1,
-    safetyFactor: 3
+    safetyFactor: 3,
+    verticalLoad: 0,
+    horizontalLoad: 0,
+    momentX: 0,
+    momentY: 0,
+    resistanceFactorRv: 1.4
   },
   visualDocuments: {}
 }
