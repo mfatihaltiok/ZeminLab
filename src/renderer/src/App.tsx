@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import './assets/main.css'
 import { WorkspaceShell, type ScreenId } from './workspace/WorkspaceShell'
 import { Dashboard, FieldScreen, Foundation, JetGrout, Liquefaction, Report, Settlement, useDemoFieldData } from './screens/EngineeringScreens'
-import { ProjectInfoScreen } from './screens/ProjectInfoScreen'
+import { ProjectInfoScreenV2 } from './screens/ProjectInfoScreenV2'
 import { EarthquakeScreen } from './screens/EarthquakeScreen'
 import { SoilProfileScreen } from './screens/SoilProfileScreen'
 import { BearingCapacityScreen } from './screens/BearingCapacityScreen'
@@ -11,12 +11,7 @@ import { updateProjectInfo, useProjectInfo } from '../../core/state/project-stor
 import type { ProjectInfo as ProjectInfoModel } from '../../core/models/project'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
 
-type ProjectDocument = {
-  projectInfo: ProjectInfoModel
-  boreholes: BoreholeRecord[]
-  labs: LaboratoryRecord[]
-}
-
+type ProjectDocument = { projectInfo: ProjectInfoModel; boreholes: BoreholeRecord[]; labs: LaboratoryRecord[] }
 function isProjectDocument(value: unknown): value is ProjectDocument {
   if (!value || typeof value !== 'object') return false
   const data = value as Partial<ProjectDocument>
@@ -28,41 +23,12 @@ export default function App() {
   const project = useProjectInfo()
   const { boreholes, labs, setBoreholes, setLabs } = useDemoFieldData()
   const [projectPath, setProjectPath] = useState<string>()
-
-  const saveProject = async () => {
-    try {
-      const path = await window.api.project.save({ projectInfo: project, boreholes, labs }, projectPath)
-      if (path) setProjectPath(path)
-    } catch (error) {
-      console.error('ZeminLab proje kaydı başarısız:', error)
-    }
-  }
-
-  const openProject = async () => {
-    try {
-      const result = await window.api.project.open()
-      if (!result || !isProjectDocument(result.data)) return
-      updateProjectInfo(result.data.projectInfo)
-      setBoreholes(result.data.boreholes)
-      setLabs(result.data.labs)
-      setProjectPath(result.filePath)
-      setScreen('dashboard')
-    } catch (error) {
-      console.error('ZeminLab proje açma başarısız:', error)
-    }
-  }
-
-  const newProject = () => {
-    updateProjectInfo({ ...defaultProjectInfo, id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10) })
-    setProjectPath(undefined)
-    setBoreholes([])
-    setLabs([])
-    setScreen('dashboard')
-  }
-
+  const saveProject = async () => { try { const path = await window.api.project.save({ projectInfo: project, boreholes, labs }, projectPath); if (path) setProjectPath(path) } catch (error) { console.error('ZeminLab proje kaydı başarısız:', error) } }
+  const openProject = async () => { try { const result = await window.api.project.open(); if (!result || !isProjectDocument(result.data)) return; updateProjectInfo(result.data.projectInfo); setBoreholes(result.data.boreholes); setLabs(result.data.labs); setProjectPath(result.filePath); setScreen('dashboard') } catch (error) { console.error('ZeminLab proje açma başarısız:', error) } }
+  const newProject = () => { updateProjectInfo({ ...defaultProjectInfo, id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10) }); setProjectPath(undefined); setBoreholes([]); setLabs([]); setScreen('dashboard') }
   const content: Record<ScreenId, ReactNode> = {
     dashboard: <Dashboard onNavigate={setScreen} />,
-    'project-info': <ProjectInfoScreen />,
+    'project-info': <ProjectInfoScreenV2 />,
     field: <FieldScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />,
     profile: <SoilProfileScreen boreholes={boreholes} labs={labs} />,
     earthquake: <EarthquakeScreen />,
@@ -73,8 +39,5 @@ export default function App() {
     'jet-grout': <JetGrout />,
     report: <Report />
   }
-
-  return <WorkspaceShell screen={screen} onScreenChange={setScreen} onNewProject={newProject} onOpenProject={openProject} onSaveProject={saveProject}>
-    {content[screen]}
-  </WorkspaceShell>
+  return <WorkspaceShell screen={screen} onScreenChange={setScreen} onNewProject={newProject} onOpenProject={openProject} onSaveProject={saveProject}>{content[screen]}</WorkspaceShell>
 }
