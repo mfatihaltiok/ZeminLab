@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import './assets/main.css'
 import { WorkspaceShell, type ScreenId } from './workspace/WorkspaceShell'
-import { Dashboard, FieldScreen, Foundation, JetGrout, Liquefaction, Report, Settlement, useDemoFieldData } from './screens/EngineeringScreens'
+import { Dashboard, Foundation, JetGrout, Liquefaction, Report, Settlement } from './screens/EngineeringScreens'
+import { FieldInvestigation } from './screens/FieldInvestigation'
 import { ProjectInfoScreenV2 } from './screens/ProjectInfoScreenV2'
 import { EarthquakeScreen } from './screens/EarthquakeScreen'
 import { SoilProfileScreen } from './screens/SoilProfileScreen'
@@ -10,6 +11,7 @@ import { defaultProjectInfo } from '../../core/models/project'
 import { updateProjectInfo, useProjectInfo } from '../../core/state/project-store'
 import type { ProjectInfo as ProjectInfoModel } from '../../core/models/project'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
+import { demoBoreholes, demoLaboratory } from '../../core/models/field-data'
 
 type ProjectDocument = { projectInfo: ProjectInfoModel; boreholes: BoreholeRecord[]; labs: LaboratoryRecord[] }
 function isProjectDocument(value: unknown): value is ProjectDocument {
@@ -21,7 +23,8 @@ function isProjectDocument(value: unknown): value is ProjectDocument {
 export default function App() {
   const [screen, setScreen] = useState<ScreenId>('dashboard')
   const project = useProjectInfo()
-  const { boreholes, labs, setBoreholes, setLabs } = useDemoFieldData()
+  const [boreholes, setBoreholes] = useState<BoreholeRecord[]>(demoBoreholes)
+  const [labs, setLabs] = useState<LaboratoryRecord[]>(demoLaboratory)
   const [projectPath, setProjectPath] = useState<string>()
   const saveProject = async () => { try { const path = await window.api.project.save({ projectInfo: project, boreholes, labs }, projectPath); if (path) setProjectPath(path) } catch (error) { console.error('ZeminLab proje kaydı başarısız:', error) } }
   const openProject = async () => { try { const result = await window.api.project.open(); if (!result || !isProjectDocument(result.data)) return; updateProjectInfo(result.data.projectInfo); setBoreholes(result.data.boreholes); setLabs(result.data.labs); setProjectPath(result.filePath); setScreen('dashboard') } catch (error) { console.error('ZeminLab proje açma başarısız:', error) } }
@@ -29,7 +32,7 @@ export default function App() {
   const content: Record<ScreenId, ReactNode> = {
     dashboard: <Dashboard onNavigate={setScreen} />,
     'project-info': <ProjectInfoScreenV2 />,
-    field: <FieldScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />,
+    field: <FieldInvestigation boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />,
     profile: <SoilProfileScreen boreholes={boreholes} labs={labs} />,
     earthquake: <EarthquakeScreen />,
     'bearing-capacity': <BearingCapacityScreen />,
