@@ -23,14 +23,12 @@ export function classifyFineSoil(liquidLimit?: number, plasticityIndex?: number)
 
 export function laboratoryPlasticityIndex(record: LaboratoryRecord): number | undefined {
   if (Number.isFinite(record.plasticityIndex)) return record.plasticityIndex
-  if (Number.isFinite(record.liquidLimit) && Number.isFinite(record.plasticLimit)) {
-    return record.liquidLimit! - record.plasticLimit!
-  }
+  if (Number.isFinite(record.liquidLimit) && Number.isFinite(record.plasticLimit)) return record.liquidLimit! - record.plasticLimit!
   return undefined
 }
 
+/** SPT N30 is the sum of the second and third 15 cm penetration increments. */
 export function fieldN(record: SptRecord): number | undefined {
-  if (Number.isFinite(record.nSpt)) return record.nSpt
   if (Number.isFinite(record.n2) && Number.isFinite(record.n3)) return record.n2! + record.n3!
   return undefined
 }
@@ -60,8 +58,7 @@ const DEFAULT_SPT_CONFIG: SptCorrectionConfig = {
 }
 
 function layerAtDepth(borehole: BoreholeRecord, depth: number) {
-  return borehole.lithology.find((layer) => depth >= layer.from && depth < layer.to) ??
-    borehole.lithology.find((layer) => depth >= layer.from && depth <= layer.to)
+  return borehole.lithology.find((layer) => depth >= layer.from && depth < layer.to) ?? borehole.lithology.find((layer) => depth >= layer.from && depth <= layer.to)
 }
 
 export function deriveSptValues(borehole: BoreholeRecord, record: SptRecord, config: Partial<SptCorrectionConfig> = {}): SptDerivedValues {
