@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import './assets/main.css'
 import { WorkspaceShell, type ScreenId } from './workspace/WorkspaceShell'
-import { Dashboard, Earthquake, Bearing, FieldScreen, Foundation, JetGrout, Liquefaction, ProjectInfo, Report, Settlement, useDemoFieldData } from './screens/EngineeringScreens'
+import { Dashboard, Bearing, FieldScreen, Foundation, JetGrout, Liquefaction, ProjectInfo, Report, Settlement, useDemoFieldData } from './screens/EngineeringScreens'
+import { EarthquakeScreen } from './screens/EarthquakeScreen'
 import { SoilProfileScreen } from './screens/SoilProfileScreen'
 import { defaultProjectInfo } from '../../core/models/project'
 import { updateProjectInfo, useProjectInfo } from '../../core/state/project-store'
@@ -62,7 +63,7 @@ export default function App() {
     'project-info': <ProjectInfo />,
     field: <FieldScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />,
     profile: <SoilProfileScreen boreholes={boreholes} labs={labs} />,
-    earthquake: <Earthquake />,
+    earthquake: <EarthquakeScreen />,
     'bearing-capacity': <Bearing />,
     settlement: <Settlement />,
     liquefaction: <Liquefaction />,
@@ -71,9 +72,7 @@ export default function App() {
     report: <Report />
   }
 
-  return (
-    <WorkspaceShell screen={screen} onScreenChange={setScreen} onNewProject={newProject} onOpenProject={openProject} onSaveProject={saveProject}>
-      {content[screen]}
-    </WorkspaceShell>
-  )
+  return <WorkspaceShell screen={screen} onScreenChange={setScreen} onNewProject={newProject} onOpenProject={openProject} onSaveProject={saveProject}>
+    {content[screen]}
+  </WorkspaceShell>
 }
