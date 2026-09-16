@@ -49,6 +49,7 @@ export interface LithologyLayer {
 export interface BoreholeRecord {
   id: BoreholeId
   name: string
+  firstSptDepth: number
   totalDepth: number
   groundwaterDepth?: number
   elevation?: number
@@ -63,16 +64,34 @@ export interface LaboratoryRecord {
   sampleId: string
   depth: number
   sampleType: 'UD' | 'SPT' | 'Other'
+  soilCode?: string
+  soilDescription?: string
   waterContent?: number
-  unitWeight?: number
+  sieve10Passing?: number
+  sieve200Passing?: number
   liquidLimit?: number
   plasticLimit?: number
   plasticityIndex?: number
+  consistencyDensity?: string
+  pointLoadIs50?: number
+  unitWeight?: number
+  uniaxialRockStrength?: number
+  uuC?: number
+  uuPhi?: number
+  consolidationCc?: number
+  consolidationCs?: number
+  elasticModulus?: number
+  poissonRatio?: number
+  hydrometer075?: number
+  hydrometer002?: number
+  directShearC?: number
+  directShearPhi?: number
+  density?: number
+  porosity?: number
+  voidRatio?: number
   c?: number
   phi?: number
   finesContent?: number
-  soilCode?: string
-  soilDescription?: string
   source: FieldDataSource
   confirmed: boolean
   notes?: string
@@ -80,7 +99,7 @@ export interface LaboratoryRecord {
 
 export const demoBoreholes: BoreholeRecord[] = [
   {
-    id: 'BH-01', name: 'Sondaj-01', totalDepth: 15, groundwaterDepth: 6.2, elevation: 1012.4,
+    id: 'BH-01', name: 'Sondaj-01', firstSptDepth: 1.5, totalDepth: 15, groundwaterDepth: 6.2, elevation: 1012.4,
     lithology: [
       { id: 'l1', from: 0, to: 1.5, code: 'Mg', description: 'Dolgu', colorClass: 'fill' },
       { id: 'l2', from: 1.5, to: 5, code: 'CIL', description: 'Düşük plastisiteli kil', colorClass: 'clay' },
@@ -96,7 +115,7 @@ export const demoBoreholes: BoreholeRecord[] = [
     ]
   },
   {
-    id: 'BH-02', name: 'Sondaj-02', totalDepth: 12, groundwaterDepth: 5.4, elevation: 1011.9,
+    id: 'BH-02', name: 'Sondaj-02', firstSptDepth: 2, totalDepth: 12, groundwaterDepth: 5.4, elevation: 1011.9,
     lithology: [
       { id: 'l5', from: 0, to: 2, code: 'Mg', description: 'Dolgu', colorClass: 'fill' },
       { id: 'l6', from: 2, to: 6, code: 'CIM', description: 'Orta plastisiteli kil', colorClass: 'clay' },
