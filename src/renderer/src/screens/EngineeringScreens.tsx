@@ -9,15 +9,195 @@ import { useProjectInfo } from '../../core/state/project-store'
 import { Card, Field, Frame, Metric, Source, type ScreenId } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
 
-const finite=(v:number)=>Number.isFinite(v)&&v!==0
+const finite = (v: number) => Number.isFinite(v) && v !== 0
 
-export function Dashboard({onNavigate}:{onNavigate:(id:ScreenId)=>void}){const p=useProjectInfo();const items:[string,string,ScreenId][]=[['01','Proje bilgileri','project-info'],['02','Sondaj / SPT / Laboratuvar','field'],['03','Sondaj logları','borehole-log'],['04','Zemin profili','profile'],['05','Taşıma gücü','bearing-capacity'],['06','Oturma','settlement'],['07','Sıvılaşma','liquefaction'],['08','Temel tasarımı','foundation'],['09','Jet Grout','jet-grout'],['10','Mühendislik raporu','report']];return <Frame screen="dashboard"><div className="dashboard-grid"><Card title="PROJE DURUMU"><div className="form-grid"><Metric label="Proje" value={p.title||'Yeni Proje'}/><Metric label="Proje No" value={p.projectNo||'—'}/><Metric label="Birim Sistemi" value={p.unitSystem}/><Metric label="Jeofizik sınıf" value={p.geophysical.soilGroup||'—'}/></div></Card><Card title="MÜHENDİSLİK İŞ AKIŞI"><div className="workflow">{items.map(([n,label,id])=><button key={id} onClick={()=>onNavigate(id)}><b>{n}</b><span>{label}</span></button>)}</div></Card></div></Frame>}
-
-export function Settlement({boreholes=[]}:{boreholes?:BoreholeRecord[]}){const p=useProjectInfo();const s=p.soilParameters;const f=p.foundationParameters;const [selected,setSelected]=useState(boreholes[0]?.id??'');const b=boreholes.find(x=>x.id===selected)??boreholes[0];const spt=b?.spt.find(x=>x.testType==='SPT'&&Number.isFinite(x.n2)&&Number.isFinite(x.n3));const derived=b&&spt?deriveSptValues(b,spt):undefined;const soilType=(b&&s.finesContent>=15)?'sand-with-fines':'sand';const correlationId=defaultElasticModulusMethod(soilType);const correlation=derived?estimateElasticModulus(correlationId,derived.n60):undefined;const q=finite(f.verticalLoad)&&finite(f.footingWidth)?stressToBase(forceToBase(f.verticalLoad,p.unitSystem)/Math.max(f.footingWidth*f.footingLength,1e-9),p.unitSystem):0;const Es=correlation?correlation.value*98.0665:0;const ready=!!correlation&&q>0&&f.footingWidth>0;const result=useMemo(()=>ready?settlementEngine({B:f.footingWidth,q,Es,nu:.3}):undefined,[ready,f.footingWidth,q,Es]);const trace:CalculationStep[]=result?[{symbol:'N₆₀',title:'SPT ile düzeltilmiş değer',formula:'N₆₀ = N·Cₑ·Cᵦ·Cₛ·Cᵣ',value:derived!.n60},{symbol:'Eₛ',title:`Korelasyondan elastisite modülü · ${correlation!.name}`,formula:correlation!.formula,value:Es,unit:'base stress'},{symbol:'q',title:'Temel etkime basıncı',formula:'q = N / (B·L)',value:stressFromBase(q,p.unitSystem),unit:PROJECT_UNIT_LABELS.stress},{symbol:'sᵢ',title:'Elastik oturma',formula:'sᵢ = q·B·(1−ν²)/Eₛ',value:result!.value.immediate*1000,unit:'mm'},{symbol:'sₜ',title:'Toplam mevcut oturma',formula:'sₜ = sᵢ + s꜀ ; s꜀ = 0 çünkü Cc/e₀/σ′₀/Δσ′ verisi seçilmedi',value:result!.value.total*1000,unit:'mm'}]:[];return <Frame screen="settlement"><Source>{SOURCE_NOTES.settlement} Korelasyonlar gizli varsayım olarak değil, seçilebilir ve raporlanabilir kaynak olarak kullanılır.</Source>{boreholes.length>0&&<Card title="SAHA VERİSİ"><label>Sondaj<select value={b?.id??''} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>{spt&&<div className="metric-strip"><Metric label="SPT" value={`${spt.depth.toFixed(2)} m`}/><Metric label="N60" value={derived!.n60.toFixed(2)}/><Metric label="Eₛ korelasyonu" value={correlation?.name??'—'}/></div>}</Card>}{!ready?<Card title="HESAP İÇİN VERİ DURUMU"><div className="inline-empty">Elastik oturma için yük, temel geometrisi ve SPT'den türetilen elastisite parametresi gereklidir. Uygulanan korelasyon: {correlation?.name??'SPT verisi bekleniyor'}.</div></Card>:<><div className="metric-strip"><Metric label="Elastik" value={(result!.value.immediate*1000).toFixed(2)} unit="mm"/><Metric label="Toplam" value={(result!.value.total*1000).toFixed(2)} unit="mm" tone="primary"/></div><CalculationTrace title="Oturma hesap zinciri" rows={trace} source={`${correlation!.source} · ${SOURCE_NOTES.settlement}`}/></>}</Frame>}
-
-export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[];labs?:LaboratoryRecord[]}){const p=useProjectInfo();const [selected,setSelected]=useState(boreholes[0]?.id??'');const b=boreholes.find(x=>x.id===selected)??boreholes[0];const spt=b?.spt.find(x=>x.testType==='SPT'&&Number.isFinite(x.n2)&&Number.isFinite(x.n3));const depth=spt?.depth??0;const layer=b?.lithology.find(l=>depth>=l.from&&depth<=l.to);const stress=useMemo(()=>b?stressAtDepth(depth,b.lithology.map(l=>({top:l.from,bottom:l.to,soil:l.code,gamma:l.unitWeight??0,gammaSat:l.saturatedUnitWeight??l.unitWeight??0,cohesion:l.cohesion??0,phi:l.frictionAngle??0,fines:l.finesContent??0})),b.groundwaterDepth??-1):undefined,[b,depth]);const derived=b&&spt?deriveSptValues(b,spt):undefined;const sds=p.seismic.ss&&p.seismic.fs?p.seismic.ss*p.seismic.fs:undefined;const result=derived&&stress&&sds&&p.seismic.magnitude?liquefaction({Mw:p.seismic.magnitude,Sds:sds,depth,N160f:derived.n1_60_dilatancy??derived.n1_60,sigmaV:stress.sigmaV,sigmaVPrime:stress.sigmaVPrime}):undefined;return <Frame screen="liquefaction"><Source>{SOURCE_NOTES.liquefaction} Nihai yöntem doğrulaması tamamlanmadan sonuç “ön değerlendirme” olarak işaretlenir.</Source>{!b?<Card title="SONDAJ VERİSİ BEKLENİYOR"><div className="inline-empty">Sıvılaşma hesabı için en az bir sondaj ve hesaplanabilir SPT kaydı gerekir.</div></Card>:<><Card title="HESAP KATMANI"><div className="form-grid"><label>Sondaj<select value={b.id} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><Metric label="SPT" value={spt?`${spt.depth.toFixed(2)} m`:'—'}/><Metric label="Laboratuvar" value={labs.filter(x=>x.boreholeId===b.id).length}/><Metric label="Zemin" value={layer?.code||'—'}/><Metric label="Mw" value={p.seismic.magnitude??'—'}/></div></Card>{!result?<Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">SPT düzeltmesi, etkin gerilme, Ss/Fs ve sıvılaşma için proje deprem büyüklüğü birlikte sağlanmalıdır.</div></Card>:<><div className="metric-strip"><Metric label="N60" value={derived!.n60.toFixed(2)}/><Metric label="(N1)60" value={derived!.n1_60.toFixed(2)}/><Metric label="CRR" value={result.value.CRM75.toFixed(3)}/><Metric label="Talep" value={result.value.tau.toFixed(3)}/><Metric label="Oran" value={result.value.ratio.toFixed(3)} tone={result.value.safe?'primary':''}/></div><CalculationTrace title="Sıvılaşma hesap zinciri" source={result.source} rows={result.steps}/></>}</>}</Frame>}
-
-export function Foundation(){const p=useProjectInfo();const f=p.foundationParameters;const ready=finite(f.footingWidth)&&finite(f.footingLength)&&finite(f.verticalLoad);const r=ready?foundationChecks({B:f.footingWidth,L:f.footingLength,N:forceToBase(f.verticalLoad,p.unitSystem),V:forceToBase(f.horizontalLoad,p.unitSystem),Mx:forceToBase(f.momentX,p.unitSystem),My:forceToBase(f.momentY,p.unitSystem)}):undefined;return <Frame screen="foundation"><Source>{SOURCE_NOTES.foundation}</Source>{!ready?<Card title="TEMEL VERİSİ BEKLENİYOR"><div className="inline-empty">Geometri ve yükler Proje Bilgileri / temel tanımından bağlanmalıdır.</div></Card>:<><div className="metric-strip"><Metric label="eX" value={r!.ex.toFixed(3)} unit="m"/><Metric label="eY" value={r!.ey.toFixed(3)} unit="m"/><Metric label="qort" value={stressFromBase(r!.qAvg,p.unitSystem).toFixed(3)} unit={PROJECT_UNIT_LABELS.stress}/><Metric label="qmax" value={stressFromBase(r!.qMax,p.unitSystem).toFixed(3)} unit={PROJECT_UNIT_LABELS.stress}/><Metric label="qmin" value={stressFromBase(r!.qMin,p.unitSystem).toFixed(3)} unit={PROJECT_UNIT_LABELS.stress}/></div><CalculationTrace title="Temel gerilme ve eksantriklik hesabı" source={SOURCE_NOTES.foundation} rows={[{symbol:'eₓ',title:'Eksantriklik',formula:'eₓ = Mᵧ / N',value:r!.ex,unit:'m'},{symbol:'eᵧ',title:'Eksantriklik',formula:'eᵧ = Mₓ / N',value:r!.ey,unit:'m'},{symbol:'q̄',title:'Ortalama taban gerilmesi',formula:'q̄ = N / (B·L)',value:stressFromBase(r!.qAvg,p.unitSystem),unit:PROJECT_UNIT_LABELS.stress},{symbol:'qmax',title:'Maksimum taban gerilmesi',formula:'qmax = q̄[1 + 6eₓ/L + 6eᵧ/B]',value:stressFromBase(r!.qMax,p.unitSystem),unit:PROJECT_UNIT_LABELS.stress},{symbol:'qmin',title:'Minimum taban gerilmesi',formula:'qmin = q̄[1 − 6eₓ/L − 6eᵧ/B]',value:stressFromBase(r!.qMin,p.unitSystem),unit:PROJECT_UNIT_LABELS.stress},{symbol:'FSv',title:'Kayma güvenliği',formula:'FS = R / V',value:r!.slidingFS}]}/></>}
+export function Dashboard({ onNavigate }: { onNavigate: (id: ScreenId) => void }) {
+  const p = useProjectInfo()
+  const items: [string, string, ScreenId][] = [
+    ['01', 'Proje bilgileri', 'project-info'], ['02', 'Sondaj / SPT / Laboratuvar', 'field'],
+    ['03', 'Sondaj logları', 'borehole-log'], ['04', 'Zemin profili', 'profile'],
+    ['05', 'Taşıma gücü', 'bearing-capacity'], ['06', 'Oturma', 'settlement'],
+    ['07', 'Sıvılaşma', 'liquefaction'], ['08', 'Temel tasarımı', 'foundation'],
+    ['09', 'Jet Grout', 'jet-grout'], ['10', 'Mühendislik raporu', 'report']
+  ]
+  return (
+    <Frame screen="dashboard">
+      <div className="dashboard-grid">
+        <Card title="PROJE DURUMU">
+          <div className="form-grid">
+            <Metric label="Proje" value={p.title || 'Yeni Proje'} />
+            <Metric label="Proje No" value={p.projectNo || '—'} />
+            <Metric label="Birim Sistemi" value={p.unitSystem} />
+            <Metric label="Jeofizik sınıf" value={p.geophysical.soilGroup || '—'} />
+          </div>
+        </Card>
+        <Card title="MÜHENDİSLİK İŞ AKIŞI">
+          <div className="workflow">
+            {items.map(([n, label, id]) => <button key={id} onClick={() => onNavigate(id)}><b>{n}</b><span>{label}</span></button>)}
+          </div>
+        </Card>
+      </div>
+    </Frame>
+  )
 }
 
-export function JetGrout(){const [d,setD]=useState(''),[spacing,setSpacing]=useState(''),[soil,setSoil]=useState(''),[column,setColumn]=useState(''),[factor,setFactor]=useState(''),[fs,setFs]=useState('');const ready=[d,spacing,soil,column,factor,fs].every(x=>x!==''&&Number(x)>0);const r=ready?jetGrout({columnDiameter:Number(d),spacing:Number(spacing),qultSoil:Number(soil),qultColumn:Number(column),improvementFactor:Number(factor),FS:Number(fs),columnStrength:Number(column)}):undefined;return <Frame screen="jet-grout"><Source>{SOURCE_NOTES.jetGrout}</Source><Card title="JET GROUT TANIMI"><div className="form-grid"><Field label="Kolon çapı (m)" value={d} onChange={setD}/><Field label="Aks aralığı (m)" value={spacing} onChange={setSpacing}/><Field label="Zemin taşıma kapasitesi" value={soil} onChange={setSoil}/><Field label="Kolon dayanımı" value={column} onChange={setColumn}/><Field label="İyileştirme katsayısı" value={factor} onChange={setFactor}/><Field label="FS" value={fs} onChange={setFs}/></div></Card>{r&&<CalculationTrace title="Jet Grout kompozit model" source={SOURCE_NOTES.jetGrout} rows={[{symbol:'A꜀',title:'Kolon alanı',formula:'A꜀ = πd²/4',value:r.Ac,unit:'m²'},{symbol:'ρ',title:'İyileştirme oranı',formula:'ρ = A꜀ / s²',value:r.ratio},{symbol:'qcomp',title:'Kompozit taşıma gücü',formula:'(1−ρ)qsoil + ρ·qcolumn·η',value:r.composite},{symbol:'qallow',title:'İzin verilen değer',formula:'qallow = qcomp / FS',value:r.allowable}]}/>} </Frame>}
+export function Settlement({ boreholes = [] }: { boreholes?: BoreholeRecord[] }) {
+  const p = useProjectInfo()
+  const s = p.soilParameters
+  const f = p.foundationParameters
+  const [selected, setSelected] = useState(boreholes[0]?.id ?? '')
+  const b = boreholes.find(x => x.id === selected) ?? boreholes[0]
+  const spt = b?.spt.find(x => x.testType === 'SPT' && Number.isFinite(x.n2) && Number.isFinite(x.n3))
+  const derived = b && spt ? deriveSptValues(b, spt) : undefined
+  const soilType = b && s.finesContent >= 15 ? 'sand-with-fines' : 'sand'
+  const correlationId = defaultElasticModulusMethod(soilType)
+  const correlation = derived ? estimateElasticModulus(correlationId, derived.n60) : undefined
+  const q = finite(f.verticalLoad) && finite(f.footingWidth)
+    ? stressToBase(forceToBase(f.verticalLoad, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9), p.unitSystem)
+    : 0
+  const Es = correlation ? correlation.value * 98.0665 : 0
+  const ready = !!correlation && q > 0 && f.footingWidth > 0
+  const result = useMemo(() => ready ? settlementEngine({ B: f.footingWidth, q, Es, nu: 0.3 }) : undefined, [ready, f.footingWidth, q, Es])
+  const trace: CalculationStep[] = result ? [
+    { symbol: 'N₆₀', title: 'SPT ile düzeltilmiş değer', formula: 'N₆₀ = N·Cₑ·Cᵦ·Cₛ·Cᵣ', value: derived!.n60 },
+    { symbol: 'Eₛ', title: `Korelasyondan elastisite modülü · ${correlation!.name}`, formula: correlation!.formula, value: Es, unit: 'base stress' },
+    { symbol: 'q', title: 'Temel etkime basıncı', formula: 'q = N / (B·L)', value: stressFromBase(q, p.unitSystem), unit: PROJECT_UNIT_LABELS.stress },
+    { symbol: 'sᵢ', title: 'Elastik oturma', formula: 'sᵢ = q·B·(1−ν²)/Eₛ', value: result.value.immediate * 1000, unit: 'mm' },
+    { symbol: 'sₜ', title: 'Toplam mevcut oturma', formula: 'sₜ = sᵢ + s꜀ ; s꜀ = 0 çünkü Cc/e₀/σ′₀/Δσ′ verisi seçilmedi', value: result.value.total * 1000, unit: 'mm' }
+  ] : []
+
+  return (
+    <Frame screen="settlement">
+      <Source>{SOURCE_NOTES.settlement} Korelasyonlar gizli varsayım olarak değil, seçilebilir ve raporlanabilir kaynak olarak kullanılır.</Source>
+      {boreholes.length > 0 && (
+        <Card title="SAHA VERİSİ">
+          <label>Sondaj<select value={b?.id ?? ''} onChange={e => setSelected(e.target.value)}>{boreholes.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+          {spt && <div className="metric-strip"><Metric label="SPT" value={`${spt.depth.toFixed(2)} m`} /><Metric label="N60" value={derived!.n60.toFixed(2)} /><Metric label="Eₛ korelasyonu" value={correlation?.name ?? '—'} /></div>}
+        </Card>
+      )}
+      {!ready ? (
+        <Card title="HESAP İÇİN VERİ DURUMU"><div className="inline-empty">Elastik oturma için yük, temel geometrisi ve SPT'den türetilen elastisite parametresi gereklidir. Uygulanan korelasyon: {correlation?.name ?? 'SPT verisi bekleniyor'}.</div></Card>
+      ) : (
+        <>
+          <div className="metric-strip"><Metric label="Elastik" value={(result!.value.immediate * 1000).toFixed(2)} unit="mm" /><Metric label="Toplam" value={(result!.value.total * 1000).toFixed(2)} unit="mm" tone="primary" /></div>
+          <CalculationTrace title="Oturma hesap zinciri" rows={trace} source={`${correlation!.source} · ${SOURCE_NOTES.settlement}`} />
+        </>
+      )}
+    </Frame>
+  )
+}
+
+export function Liquefaction({ boreholes = [], labs = [] }: { boreholes?: BoreholeRecord[]; labs?: LaboratoryRecord[] }) {
+  const p = useProjectInfo()
+  const [selected, setSelected] = useState(boreholes[0]?.id ?? '')
+  const b = boreholes.find(x => x.id === selected) ?? boreholes[0]
+  const spt = b?.spt.find(x => x.testType === 'SPT' && Number.isFinite(x.n2) && Number.isFinite(x.n3))
+  const depth = spt?.depth ?? 0
+  const layer = b?.lithology.find(l => depth >= l.from && depth <= l.to)
+  const stress = useMemo(() => b ? stressAtDepth(depth, b.lithology.map(l => ({ top: l.from, bottom: l.to, gamma: l.unitWeight ?? 0, gammaSat: l.saturatedUnitWeight ?? l.unitWeight ?? 0 })), b.groundwaterDepth ?? -1) : undefined, [b, depth])
+  const derived = b && spt ? deriveSptValues(b, spt) : undefined
+  const sds = p.seismic.ss != null && p.seismic.fs != null ? p.seismic.ss * p.seismic.fs : undefined
+  const result = derived && stress && sds && p.seismic.magnitude
+    ? liquefaction({ Mw: p.seismic.magnitude, Sds: sds, depth, N160f: derived.n1_60_dilatancy ?? derived.n1_60, sigmaV: stress.sigmaV, sigmaVPrime: stress.sigmaVPrime })
+    : undefined
+
+  return (
+    <Frame screen="liquefaction">
+      <Source>{SOURCE_NOTES.liquefaction} Nihai yöntem doğrulaması tamamlanmadan sonuç “ön değerlendirme” olarak işaretlenir.</Source>
+      {!b ? (
+        <Card title="SONDAJ VERİSİ BEKLENİYOR"><div className="inline-empty">Sıvılaşma hesabı için en az bir sondaj ve hesaplanabilir SPT kaydı gerekir.</div></Card>
+      ) : (
+        <>
+          <Card title="HESAP KATMANI">
+            <div className="form-grid">
+              <label>Sondaj<select value={b.id} onChange={e => setSelected(e.target.value)}>{boreholes.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+              <Metric label="SPT" value={spt ? `${spt.depth.toFixed(2)} m` : '—'} />
+              <Metric label="Laboratuvar" value={labs.filter(x => x.boreholeId === b.id).length} />
+              <Metric label="Zemin" value={layer?.code || '—'} />
+              <Metric label="Mw" value={p.seismic.magnitude ?? '—'} />
+            </div>
+          </Card>
+          {!result ? (
+            <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">SPT düzeltmesi, etkin gerilme, Ss/Fs ve sıvılaşma için proje deprem büyüklüğü birlikte sağlanmalıdır.</div></Card>
+          ) : (
+            <>
+              <div className="metric-strip">
+                <Metric label="N60" value={derived!.n60.toFixed(2)} />
+                <Metric label="(N1)60" value={derived!.n1_60.toFixed(2)} />
+                <Metric label="CRR" value={result.value.CRRM75.toFixed(3)} />
+                <Metric label="Talep" value={result.value.tau.toFixed(3)} />
+                <Metric label="FS" value={result.value.ratio.toFixed(3)} tone={result.value.safe ? 'primary' : ''} />
+              </div>
+              <CalculationTrace title="Sıvılaşma hesap zinciri" source={result.source} rows={result.steps} />
+            </>
+          )}
+        </>
+      )}
+    </Frame>
+  )
+}
+
+export function Foundation() {
+  const p = useProjectInfo()
+  const f = p.foundationParameters
+  const ready = finite(f.footingWidth) && finite(f.footingLength) && finite(f.verticalLoad)
+  const r = ready ? foundationChecks({ B: f.footingWidth, L: f.footingLength, N: forceToBase(f.verticalLoad, p.unitSystem), V: forceToBase(f.horizontalLoad, p.unitSystem), Mx: forceToBase(f.momentX, p.unitSystem), My: forceToBase(f.momentY, p.unitSystem) }) : undefined
+  return (
+    <Frame screen="foundation">
+      <Source>{SOURCE_NOTES.foundation}</Source>
+      {!ready ? (
+        <Card title="TEMEL VERİSİ BEKLENİYOR"><div className="inline-empty">Geometri ve yükler Proje Bilgileri / temel tanımından bağlanmalıdır.</div></Card>
+      ) : (
+        <>
+          <div className="metric-strip">
+            <Metric label="eX" value={r!.ex.toFixed(3)} unit="m" />
+            <Metric label="eY" value={r!.ey.toFixed(3)} unit="m" />
+            <Metric label="qort" value={stressFromBase(r!.qAvg, p.unitSystem).toFixed(3)} unit={PROJECT_UNIT_LABELS.stress} />
+            <Metric label="qmax" value={stressFromBase(r!.qMax, p.unitSystem).toFixed(3)} unit={PROJECT_UNIT_LABELS.stress} />
+            <Metric label="qmin" value={stressFromBase(r!.qMin, p.unitSystem).toFixed(3)} unit={PROJECT_UNIT_LABELS.stress} />
+          </div>
+          <CalculationTrace title="Temel gerilme ve eksantriklik hesabı" source={SOURCE_NOTES.foundation} rows={[
+            { symbol: 'eₓ', title: 'Eksantriklik', formula: 'eₓ = Mᵧ / N', value: r!.ex, unit: 'm' },
+            { symbol: 'eᵧ', title: 'Eksantriklik', formula: 'eᵧ = Mₓ / N', value: r!.ey, unit: 'm' },
+            { symbol: 'q̄', title: 'Ortalama taban gerilmesi', formula: 'q̄ = N / (B·L)', value: stressFromBase(r!.qAvg, p.unitSystem), unit: PROJECT_UNIT_LABELS.stress },
+            { symbol: 'qmax', title: 'Maksimum taban gerilmesi', formula: 'qmax = q̄[1 + 6eₓ/L + 6eᵧ/B]', value: stressFromBase(r!.qMax, p.unitSystem), unit: PROJECT_UNIT_LABELS.stress },
+            { symbol: 'qmin', title: 'Minimum taban gerilmesi', formula: 'qmin = q̄[1 − 6eₓ/L − 6eᵧ/B]', value: stressFromBase(r!.qMin, p.unitSystem), unit: PROJECT_UNIT_LABELS.stress },
+            { symbol: 'FSv', title: 'Kayma güvenliği', formula: 'FS = R / V', value: r!.slidingFS }
+          ]} />
+        </>
+      )}
+    </Frame>
+  )
+}
+
+export function JetGrout() {
+  const [d, setD] = useState('')
+  const [spacing, setSpacing] = useState('')
+  const [soil, setSoil] = useState('')
+  const [column, setColumn] = useState('')
+  const [factor, setFactor] = useState('')
+  const [fs, setFs] = useState('')
+  const ready = [d, spacing, soil, column, factor, fs].every(x => x !== '' && Number(x) > 0)
+  const r = ready ? jetGrout({ columnDiameter: Number(d), spacing: Number(spacing), qultSoil: Number(soil), qultColumn: Number(column), improvementFactor: Number(factor), FS: Number(fs), columnStrength: Number(column) }) : undefined
+  return (
+    <Frame screen="jet-grout">
+      <Source>{SOURCE_NOTES.jetGrout}</Source>
+      <Card title="JET GROUT TANIMI">
+        <div className="form-grid">
+          <Field label="Kolon çapı (m)" value={d} onChange={setD} />
+          <Field label="Aks aralığı (m)" value={spacing} onChange={setSpacing} />
+          <Field label="Zemin taşıma kapasitesi" value={soil} onChange={setSoil} />
+          <Field label="Kolon dayanımı" value={column} onChange={setColumn} />
+          <Field label="İyileştirme katsayısı" value={factor} onChange={setFactor} />
+          <Field label="FS" value={fs} onChange={setFs} />
+        </div>
+      </Card>
+      {r && <CalculationTrace title="Jet Grout kompozit model" source={SOURCE_NOTES.jetGrout} rows={[
+        { symbol: 'A꜀', title: 'Kolon alanı', formula: 'A꜀ = πd²/4', value: r.Ac, unit: 'm²' },
+        { symbol: 'ρ', title: 'İyileştirme oranı', formula: 'ρ = A꜀ / s²', value: r.ratio },
+        { symbol: 'qcomp', title: 'Kompozit taşıma gücü', formula: '(1−ρ)qsoil + ρ·qcolumn·η', value: r.composite },
+        { symbol: 'qallow', title: 'İzin verilen değer', formula: 'qallow = qcomp / FS', value: r.allowable }
+      ]} />}
+    </Frame>
+  )
+}
