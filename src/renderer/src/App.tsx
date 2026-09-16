@@ -3,6 +3,7 @@ import './assets/main.css'
 import { WorkspaceShell, type ScreenId } from './workspace/WorkspaceShell'
 import { Dashboard, Foundation, JetGrout, Liquefaction, Report, Settlement } from './screens/EngineeringScreens'
 import FieldInvestigation from './screens/FieldInvestigation'
+import BoreholeLogScreen from './screens/BoreholeLogScreen'
 import { ProjectInfoScreenV2 } from './screens/ProjectInfoScreenV2'
 import { SoilProfileScreen } from './screens/SoilProfileScreen'
 import { BearingCapacityScreen } from './screens/BearingCapacityScreen'
@@ -21,8 +22,7 @@ export default function App() {
   const openProject = async () => { try { const result = await window.api.project.open(); if (!result || !isProjectDocument(result.data)) return; updateProjectInfo(result.data.projectInfo); setBoreholes(result.data.boreholes); setLabs(result.data.labs); setProjectPath(result.filePath); setScreen('dashboard') } catch (error) { console.error('ZeminLab proje açma başarısız:', error) } }
   const newProject = () => { updateProjectInfo({ ...defaultProjectInfo, id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10) }); setProjectPath(undefined); setBoreholes([]); setLabs([]); setScreen('dashboard') }
   const content: Record<ScreenId, ReactNode> = {
-    dashboard: <Dashboard onNavigate={setScreen} />, 'project-info': <ProjectInfoScreenV2 />, field: <FieldInvestigation boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />, profile: <SoilProfileScreen boreholes={boreholes} labs={labs} />,
-    'bearing-capacity': <BearingCapacityScreen />, settlement: <Settlement />, liquefaction: <Liquefaction />, foundation: <Foundation />, 'jet-grout': <JetGrout />, report: <Report />, 'unit-converter': <UnitConverterScreen />
+    dashboard: <Dashboard onNavigate={setScreen} />, 'project-info': <ProjectInfoScreenV2 />, field: <FieldInvestigation boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />, 'borehole-log': <BoreholeLogScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} />, profile: <SoilProfileScreen boreholes={boreholes} labs={labs} />, 'bearing-capacity': <BearingCapacityScreen />, settlement: <Settlement />, liquefaction: <Liquefaction />, foundation: <Foundation />, 'jet-grout': <JetGrout />, report: <Report />, 'unit-converter': <UnitConverterScreen />
   }
   return <WorkspaceShell screen={screen} onScreenChange={setScreen} onNewProject={newProject} onOpenProject={openProject} onSaveProject={saveProject}>{content[screen]}</WorkspaceShell>
 }
