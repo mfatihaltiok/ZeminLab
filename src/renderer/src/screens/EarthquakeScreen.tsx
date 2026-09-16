@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import '../assets/seismic.css'
 import { designSpectrum, spectrumTable } from '../../../core/calculations/seismic'
 import { Card, Field, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
 
