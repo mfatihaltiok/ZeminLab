@@ -47,12 +47,13 @@ export function SoilProfileScreen({ boreholes, labs }: { boreholes: BoreholeReco
   const sptValues = selected.spt.map(sptN).filter((value): value is number => value != null)
   const averageSpt = sptValues.length ? sptValues.reduce((sum, value) => sum + value, 0) / sptValues.length : 0
   const resolvedForStress = layers.map((layer) => ({ ...layer, gammaSat: layer.gammaSat || layer.gamma }))
-  const stressRows = layers.map((layer) => {
+  const stressRows: Array<Array<string | number>> = layers.map((layer) => {
     const requiresSaturatedWeight = groundwater != null && layer.bottom > groundwater
     const complete = layer.gammaSource !== 'missing' && (!requiresSaturatedWeight || layer.gammaSatSource !== 'missing')
     const result = complete ? stressAtDepth(layer.bottom, resolvedForStress, groundwater ?? depth) : undefined
     return [layer.soil, `${layer.top.toFixed(2)}–${layer.bottom.toFixed(2)}`, formatValue(layer.gamma), formatValue(layer.cohesion), formatValue(layer.phi), result ? result.sigmaV.toFixed(1) : '—', result ? result.sigmaVPrime.toFixed(1) : '—']
   })
+  const parameterRows: Array<Array<string | number>> = layers.map((layer) => [layer.soil, layer.gammaSource, layer.gammaSatSource, layer.cSource, layer.phiSource, layer.finesSource, layer.labSample ?? '—'])
   const missingCount = layers.filter((layer) => layer.gammaSource === 'missing' || (groundwater != null && layer.bottom > groundwater && layer.gammaSatSource === 'missing')).length
   return <Frame screen="profile">
     <Source>{SOURCE_NOTES.investigation} Profil seçilen sondajın litolojisini ve aynı derinlik aralığındaki laboratuvar numunelerini kullanır. YASS kuyu verisinden gelir; mühendislik parametresi varsayılmaz.</Source>
@@ -73,6 +74,6 @@ export function SoilProfileScreen({ boreholes, labs }: { boreholes: BoreholeReco
       </div>
     </Card>
     <Card title="KATMAN / GERİLME TABLOSU"><Table headers={['Zemin', 'Derinlik', 'γ', 'c', 'φ', 'σv', 'σ′v']} rows={stressRows} />{missingCount > 0 && <Source>Gerilme hesabı için gerekli γ veya YAS altında γsat verisi eksik olan katmanlar “—” gösterilir. Uygulama mühendislik parametresi uydurmaz.</Source>}</Card>
-    <Card title="PARAMETRE KAYNAĞI"><Table headers={['Katman', 'γ', 'γsat', 'c', 'φ', 'İnce dane', 'Laboratuvar']} rows={layers.map((layer) => [layer.soil, layer.gammaSource, layer.gammaSatSource, layer.cSource, layer.phiSource, layer.finesSource, layer.labSample ?? '—'])} /></Card>
+    <Card title="PARAMETRE KAYNAĞI"><Table headers={['Katman', 'γ', 'γsat', 'c', 'φ', 'İnce dane', 'Laboratuvar']} rows={parameterRows} /></Card>
   </Frame>
 }
