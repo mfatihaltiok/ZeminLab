@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
-import type { BoreholeRecord } from '../../../core/models/field-data'
-import { stressAtDepth, SOURCE_NOTES, type SoilLayerInput } from '../../../core/calculations/engineering'
+import { useEffect, useMemo, useState } from 'react'
+import type { BoreholeRecord } from '../../core/models/field-data'
+import { stressAtDepth, SOURCE_NOTES, type SoilLayerInput } from '../../core/calculations/engineering'
 import { Card, Field, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
 
 function toLayers(borehole: BoreholeRecord): SoilLayerInput[] {
@@ -22,14 +22,26 @@ function toLayers(borehole: BoreholeRecord): SoilLayerInput[] {
 export function SoilProfileScreen({ boreholes }: { boreholes: BoreholeRecord[] }) {
   const [selectedId, setSelectedId] = useState(boreholes[0]?.id ?? '')
   const [gwt, setGwt] = useState<number | undefined>(boreholes[0]?.groundwaterDepth)
-  const selected = boreholes.find((b) => b.id === selectedId) ?? boreholes[0]
+
+  useEffect(() => {
+    if (!boreholes.some((borehole) => borehole.id === selectedId)) {
+      setSelectedId(boreholes[0]?.id ?? '')
+    }
+  }, [boreholes, selectedId])
+
+  const selected = boreholes.find((borehole) => borehole.id === selectedId) ?? boreholes[0]
   const layers = useMemo(() => selected ? toLayers(selected) : [], [selected])
+
+  useEffect(() => {
+    setGwt(selected?.groundwaterDepth)
+  }, [selected])
+
   if (!selected) return <Frame screen="profile"><div className="empty-state"><strong>Profil oluşturmak için önce sondaj tanımlayın.</strong></div></Frame>
 
   const depth = Math.max(selected.totalDepth, 1)
   const groundwater = gwt == null || Number.isNaN(gwt) ? undefined : Math.max(0, Math.min(gwt, depth))
   const stressRows = layers.map((layer) => {
-    const result = stressAtDepth(layer.bottom, layers, groundwater)
+    const result = stressAtDepth(layer.bottom, layers, groundwater ?? depth)
     return [layer.soil, `${layer.top.toFixed(2)}–${layer.bottom.toFixed(2)}`, layer.gamma, layer.cohesion, layer.phi, result.sigmaV.toFixed(1), result.sigmaVPrime.toFixed(1)]
   })
   const averageSpt = selected.spt.length ? selected.spt.reduce((sum, row) => sum + (row.nSpt ?? 0), 0) / selected.spt.length : 0
@@ -37,9 +49,9 @@ export function SoilProfileScreen({ boreholes }: { boreholes: BoreholeRecord[] }
   return <Frame screen="profile">
     <Source>{SOURCE_NOTES.investigation}. Katman sınırları seçilen sondaj kaydından alınır; γ, c ve φ değerleri hesap girdisi olarak ayrıca doğrulanmalıdır.</Source>
     <div className="form-grid">
-      <label><span>Sondaj</span><select value={selected.id} onChange={(e) => { setSelectedId(e.target.value); const b = boreholes.find((item) => item.id === e.target.value); setGwt(b?.groundwaterDepth) }}>{boreholes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+      <label><span>Sondaj</span><select value={selected.id} onChange={(e) => { const borehole = boreholes.find((item) => item.id === e.target.value); setSelectedId(e.target.value); setGwt(borehole?.groundwaterDepth) }}>{boreholes.map((borehole) => <option key={borehole.id} value={borehole.id}>{borehole.name}</option>)}</select></label>
       <Field label="Toplam derinlik (m)" value={selected.totalDepth} onChange={() => {}} />
-      <Field label="Yeraltı su seviyesi (m)" value={gwt ?? ''} onChange={(v) => setGwt(v === '' ? undefined : Number(v))} />
+      <Field label="Yeraltı su seviyesi (m)" value={gwt ?? ''} onChange={(value) => setGwt(value === '' ? undefined : Number(value))} />
     </div>
     <div className="metric-strip">
       <Metric label="Katman" value={layers.length} />
