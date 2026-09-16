@@ -3,7 +3,7 @@ export type SoilClassificationSystem='TS EN ISO 14688-2'|'TBDY 2018'
 export type SoilClassificationCode='CIL'|'CIM'|'CIH'|'SiL'|'SiM'|'SiH'|'ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF'
 export interface ProjectVisualDocuments{aerialPhoto?:string;layoutPlan?:string;architecturalSection?:string;foundationPlan?:string;foundationStress?:string}
 export interface GeophysicalParameters{vs30?:number;soilGroup?:'ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF';source?:string;notes?:string}
-export interface SeismicParameters{ss?:number;s1?:number;fs?:number;f1?:number;sds?:number;sd1?:number;ta?:number;tb?:number;tl?:number}
+export interface SeismicParameters{ss?:number;s1?:number;fs?:number;f1?:number;sds?:number;sd1?:number;ta?:number;tb?:number;tl?:number;magnitude?:number}
 export interface SoilClassification{system:SoilClassificationSystem;code?:SoilClassificationCode}
 export interface SoilParameters{unitWeight:number;saturatedUnitWeight:number;cohesion:number;frictionAngle:number;groundwaterDepth?:number;surfaceSlope:number;foundationBaseSlope:number;finesContent:number;classification:SoilClassification}
 export interface FoundationParameters{footingWidth:number;footingLength:number;footingDepth:number;safetyFactor:number;verticalLoad:number;horizontalLoad:number;momentX:number;momentY:number;resistanceFactorRv:number}
