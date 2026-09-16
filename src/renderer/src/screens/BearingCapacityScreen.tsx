@@ -1,81 +1,89 @@
-import { useMemo, useState } from 'react'
-import { bearingCapacity, SOURCE_NOTES, type BearingMethod } from '../../../core/calculations/engineering'
-import { Card, Field, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
-
-const methods: BearingMethod[] = ['Terzaghi', 'Meyerhof', 'Hansen', 'Vesic']
+import { useMemo } from 'react'
+import { tbdyBearingCapacity, SOURCE_NOTES } from '../../../core/calculations/engineering'
+import { useProjectInfo } from '../../../core/state/project-store'
+import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
 
 export function BearingCapacityScreen() {
-  const [method, setMethod] = useState<BearingMethod>('Terzaghi')
-  const [B, setB] = useState(2.5)
-  const [L, setL] = useState(2.5)
-  const [Df, setDf] = useState(1.5)
-  const [gamma, setGamma] = useState(18)
-  const [c, setC] = useState(25)
-  const [phi, setPhi] = useState(30)
-  const [fs, setFs] = useState(3)
-
-  const result = useMemo(() => bearingCapacity({ B, L, Df, gamma, c, phi, FS: fs, method }), [B, L, Df, gamma, c, phi, fs, method])
-  const ratio = B / Math.max(L, B)
+  const p = useProjectInfo()
+  const soil = p.soilParameters
+  const f = p.foundationParameters
+  const result = useMemo(() => tbdyBearingCapacity({
+    B: f.footingWidth,
+    L: f.footingLength,
+    Df: f.footingDepth,
+    gamma1: soil.unitWeight,
+    gamma2: Math.max(soil.saturatedUnitWeight - 9.81, 0),
+    c: soil.cohesion,
+    phi: soil.frictionAngle,
+    verticalLoad: f.verticalLoad,
+    horizontalLoad: f.horizontalLoad,
+    momentX: f.momentX,
+    momentY: f.momentY,
+    groundSlope: soil.surfaceSlope,
+    baseSlope: soil.foundationBaseSlope,
+    resistanceFactor: f.resistanceFactorRv
+  }), [soil, f])
 
   return <Frame screen="bearing-capacity">
-    <Source>{SOURCE_NOTES.bearing} Bu ekran yöntem karşılaştırması için hazırlanmıştır; nihai tasarımda zemin parametreleri, temel geometrisi, yeraltı suyu ve TBDY 2018 Bölüm 16 tasarım etkileri ayrıca doğrulanmalıdır. citeturn0search12</Source>
+    <Source>{SOURCE_NOTES.bearing} TBDY 2018 16.8.3.2'de karakteristik taşıma gücü qk, ardından 16.7 ve Tablo 16.2 kapsamında tasarım dayanımı qt değerlendirilir. Resmî uygulama örneklerinde de qk ve qt ayrımı açıkça gösterilmektedir. citeturn1search12turn1search13</Source>
+
+    <div className="metric-strip">
+      <Metric label="qk · karakteristik" value={result.qk.toFixed(1)} unit="kPa" tone="primary" />
+      <Metric label="qt · tasarım dayanımı" value={result.qt.toFixed(1)} unit="kPa" tone="primary" />
+      <Metric label="q0 · temel basıncı" value={result.qo.toFixed(1)} unit="kPa" />
+      <Metric label="Kullanım oranı" value={(result.utilization * 100).toFixed(1)} unit="%" />
+      <Metric label="Sonuç" value={result.adequate ? 'UYGUN' : 'YETERSİZ'} tone={result.adequate ? 'primary' : undefined} />
+    </div>
 
     <div className="dashboard-grid">
       <div>
-        <Card title="TEMEL VE ZEMİN GİRDİLERİ">
-          <div className="form-grid">
-            <Field label="B · temel genişliği (m)" value={B} onChange={(v) => setB(Number(v))} />
-            <Field label="L · temel uzunluğu (m)" value={L} onChange={(v) => setL(Number(v))} />
-            <Field label="Df · temel derinliği (m)" value={Df} onChange={(v) => setDf(Number(v))} />
-            <Field label="γ · birim hacim ağırlık (kN/m³)" value={gamma} onChange={(v) => setGamma(Number(v))} />
-            <Field label="c · kohezyon (kPa)" value={c} onChange={(v) => setC(Number(v))} />
-            <Field label="φ · içsel sürtünme açısı (°)" value={phi} onChange={(v) => setPhi(Number(v))} />
-            <Field label="FS · güvenlik katsayısı" value={fs} onChange={(v) => setFs(Number(v))} />
-            <label><span>Hesap yöntemi</span><select value={method} onChange={(e) => setMethod(e.target.value as BearingMethod)}>{methods.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-          </div>
+        <Card title="PROJE VERİSİ · SADECE OKUMA">
+          <Table headers={['Girdi', 'Değer', 'Birim']} rows={[
+            ['B', f.footingWidth.toFixed(3), 'm'],
+            ['L', f.footingLength.toFixed(3), 'm'],
+            ['Df', f.footingDepth.toFixed(3), 'm'],
+            ['γ doğal', soil.unitWeight.toFixed(3), 'kN/m³'],
+            ['γsat', soil.saturatedUnitWeight.toFixed(3), 'kN/m³'],
+            ['c / cu', soil.cohesion.toFixed(3), 'kPa'],
+            ['φ′', soil.frictionAngle.toFixed(3), '°'],
+            ['YASS', soil.groundwaterDepth.toFixed(3), 'm'],
+            ['Fz', f.verticalLoad.toFixed(3), 'kN'],
+            ['V', f.horizontalLoad.toFixed(3), 'kN'],
+            ['Mx / My', `${f.momentX.toFixed(3)} / ${f.momentY.toFixed(3)}`, 'kNm']
+          ]} />
         </Card>
 
-        <Card title="TEMEL GEOMETRİSİ">
-          <div style={{ padding: '18px', background: '#fafafa' }}>
-            <svg viewBox="0 0 620 230" width="100%" height="230" role="img" aria-label="Yüzeysel temel geometrisi">
-              <defs><pattern id="soil-grid" width="18" height="18" patternUnits="userSpaceOnUse"><path d="M0 18L18 0M-9 9L9 -9M9 27L27 9" stroke="#d5d7d9" strokeWidth="1" /></pattern></defs>
-              <rect x="30" y="118" width="560" height="82" fill="url(#soil-grid)" stroke="#a7aaad" />
-              <rect x="210" y="55" width="200" height="63" fill="#e3e9ee" stroke="#315f86" strokeWidth="2" />
-              <line x1="210" y1="42" x2="410" y2="42" stroke="#315f86" />
-              <line x1="210" y1="37" x2="210" y2="47" stroke="#315f86" /><line x1="410" y1="37" x2="410" y2="47" stroke="#315f86" />
-              <text x="310" y="34" textAnchor="middle" fontSize="13" fill="#315f86">B = {B.toFixed(2)} m</text>
-              <line x1="430" y1="55" x2="430" y2="118" stroke="#315f86" />
-              <line x1="425" y1="55" x2="435" y2="55" stroke="#315f86" /><line x1="425" y1="118" x2="435" y2="118" stroke="#315f86" />
-              <text x="446" y="91" fontSize="13" fill="#315f86">Df = {Df.toFixed(2)} m</text>
-              <text x="310" y="157" textAnchor="middle" fontSize="12" fill="#555">Zemin tabakası</text>
-              <text x="310" y="179" textAnchor="middle" fontSize="11" fill="#777">γ = {gamma.toFixed(1)} kN/m³ · c = {c.toFixed(1)} kPa · φ = {phi.toFixed(1)}°</text>
-            </svg>
-          </div>
+        <Card title="TBDY 16.8 HESAP AKIŞI">
+          <Table headers={['Adım', 'Hesaplanan büyüklük', 'Değer']} rows={[
+            ['01', 'Eksantriklik ex / ey', `${result.ex.toFixed(4)} / ${result.ey.toFixed(4)} m`],
+            ['02', 'Etkin temel boyutları B′ / L′', `${result.Be.toFixed(3)} / ${result.Le.toFixed(3)} m`],
+            ['03', 'Taşıma gücü katsayıları Nc / Nq / Nγ', `${result.Nc.toFixed(3)} / ${result.Nq.toFixed(3)} / ${result.Ngamma.toFixed(3)}`],
+            ['04', 'Şekil katsayıları sc / sq / sγ', `${result.sc.toFixed(3)} / ${result.sq.toFixed(3)} / ${result.sg.toFixed(3)}`],
+            ['05', 'Derinlik katsayıları dc / dq / dγ', `${result.dc.toFixed(3)} / ${result.dq.toFixed(3)} / ${result.dg.toFixed(3)}`],
+            ['06', 'Yük eğikliği ic / iq / iγ', `${result.ic.toFixed(3)} / ${result.iq.toFixed(3)} / ${result.ig.toFixed(3)}`],
+            ['07', 'Zemin eğimi gc / gq / gγ', `${result.gc.toFixed(3)} / ${result.gq.toFixed(3)} / ${result.gg.toFixed(3)}`],
+            ['08', 'Taban eğimi bc / bq / bγ', `${result.bc.toFixed(3)} / ${result.bq.toFixed(3)} / ${result.bg.toFixed(3)}`],
+            ['09', 'Sürşarj q', result.surcharge.toFixed(3) + ' kPa'],
+            ['10', 'Karakteristik dayanım qk', result.qk.toFixed(3) + ' kPa'],
+            ['11', 'Tasarım dayanımı qt', result.qt.toFixed(3) + ' kPa'],
+            ['12', 'Temel taban basıncı q0', result.qo.toFixed(3) + ' kPa']
+          ]} />
         </Card>
       </div>
 
       <div>
-        <div className="metric-strip">
-          <Metric label="Nc" value={result.Nc.toFixed(2)} />
-          <Metric label="Nq" value={result.Nq.toFixed(2)} />
-          <Metric label="Nγ" value={result.Ngamma.toFixed(2)} />
-          <Metric label="qult" value={result.ultimate.toFixed(1)} unit="kPa" tone="primary" />
-          <Metric label="qallow" value={result.allowableGross.toFixed(1)} unit="kPa" tone="primary" />
-        </div>
-
-        <Card title="HESAP SONUÇLARI">
-          <Table headers={['Parametre', 'Değer', 'Birim']} rows={[
-            ['Net taşıma gücü', result.netUltimate.toFixed(2), 'kPa'],
-            ['İzin verilebilir net', result.allowableNet.toFixed(2), 'kPa'],
-            ['İzin verilebilir brüt', result.allowableGross.toFixed(2), 'kPa'],
-            ['B / L oranı', ratio.toFixed(3), '—'],
-            ['Yöntem', result.method, '—']
-          ]} />
+        <Card title="TBDY 2018 · DENKLEM 16.8">
+          <div className="formula-large">qk = c·Nc·sc·dc·ic·gc·bc + q·Nq·sq·dq·iq·gq·bq + ½·γ₂·B′·Nγ·sγ·dγ·iγ·gγ·bγ</div>
+          <Source>Bu ekran dört ayrı Terzaghi/Meyerhof/Hansen/Vesic sonucu seçtirmez. Projenin temel taşıma gücü hesabı TBDY 2018 Denklem 16.8'in katsayıları ve proje girdileri üzerinden yürütülür. Literatür bağıntıları yalnızca TBDY'nin izin verdiği boyutsuz düzeltme katsayılarının hesabında kullanılır. citeturn1search14turn2search4</Source>
         </Card>
 
-        <Card title="TAŞIMA GÜCÜ İFADESİ">
-          <div className="formula-large">qᵤₗₜ = c·Nc·sc + γ·Df·Nq·sq + 0.5·γ·B·Nγ·sγ</div>
-          <Source>Buradaki katsayılar seçilen yöntem için hesap çekirdeğinden gelir. Bu ekran henüz TBDY 2018'in tüm tasarım etkileri ve dayanım katsayılarını otomatik olarak uygulayan nihai temel tasarım modülü değildir.</Source>
+        <Card title="TASARIM KONTROLÜ">
+          <Table headers={['Kontrol', 'Değer', 'Durum']} rows={[
+            ['q0 ≤ qt', `${result.qo.toFixed(2)} ≤ ${result.qt.toFixed(2)} kPa`, result.adequate ? 'UYGUN' : 'YETERSİZ'],
+            ['γRv', f.resistanceFactorRv.toFixed(3), 'TBDY tasarım katsayısı'],
+            ['Etkin alan B′·L′', `${(result.Be * result.Le).toFixed(2)} m²`, 'Hesaplandı'],
+            ['Sürşarj q = Df·γ', `${result.surcharge.toFixed(2)} kPa`, 'Hesaplandı']
+          ]} />
         </Card>
       </div>
     </div>
