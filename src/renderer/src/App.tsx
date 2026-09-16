@@ -61,7 +61,7 @@ export default function App() {
     dashboard: <Dashboard onNavigate={setScreen} />,
     'project-info': <ProjectInfo />,
     field: <FieldScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />,
-    profile: <SoilProfileScreen boreholes={boreholes} />,
+    profile: <SoilProfileScreen boreholes={boreholes} labs={labs} />,
     earthquake: <Earthquake />,
     'bearing-capacity': <Bearing />,
     settlement: <Settlement />,
