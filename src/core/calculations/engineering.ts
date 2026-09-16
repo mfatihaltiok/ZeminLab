@@ -3,12 +3,61 @@ export type SptInput={depth:number;nField:number;energyRatio?:number;boreholeDia
 export type BearingMethod='Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
 const clamp=(x:number,a:number,b:number)=>Math.max(a,Math.min(b,x))
 const rad=(x:number)=>x*Math.PI/180
+const deg=(x:number)=>x*180/Math.PI
+
 export function classifySoilISO14688(ll?:number,pi?:number){if(ll==null||pi==null||!Number.isFinite(ll)||!Number.isFinite(pi)||ll<=0)return null;const a=.73*(ll-20),clay=pi>=a&&pi>=4,group=ll<35?'L':ll<=50?'M':'H';return{code:clay?`CI${group}`:`Si${group}`,description:clay?'Kil':'Silt',plasticity:group,isClay:clay,aLine:a}}
-export function stressAtDepth(depth:number,layers:SoilLayerInput[],gwt:number){let sigmaV=0,u=Math.max(0,depth-gwt)*9.81;for(const l of [...layers].sort((a,b)=>a.top-b.top)){const z0=Math.max(l.top,0),z1=Math.min(l.bottom,depth);if(z1<=z0)continue;const above=Math.max(0,Math.min(z1,gwt)-z0),below=z1-z0-above;sigmaV+=above*l.gamma+below*l.gammaSat}if(layers.length){const last=Math.max(...layers.map(x=>x.bottom));if(depth>last){const above=Math.max(0,Math.min(depth,gwt)-last),below=depth-last-above;sigmaV+=above*18+below*19.5}}return{sigmaV,sigmaVPrime:Math.max(.01,sigmaV-u),u}}
+
+export function stressAtDepth(depth:number,layers:SoilLayerInput[],gwt:number){let sigmaV=0,u=Math.max(0,depth-gwt)*9.81;for(const l of [...layers].sort((a,b)=>a.top-b.top)){const z0=Math.max(l.top,0),z1=Math.min(l.bottom,depth);if(z1<=z0)continue;const above=Math.max(0,Math.min(z1,gwt)-z0),below=z1-z0-above;sigmaV+=above*l.gamma+below*l.gammaSat}return{sigmaV,sigmaVPrime:Math.max(.01,sigmaV-u),u}}
+
 export function sptCorrection(x:SptInput,sigmaVPrime:number){const CE=(x.energyRatio??60)/60,CB=x.boreholeDiameter==null?1:x.boreholeDiameter>=200?1.15:x.boreholeDiameter>=150?1.05:1,CS=x.sampler==='without-liner'?1.2:1,CR=x.depth<4?.75:x.depth<6?.85:x.depth<10?.95:1,CN=Math.min(1.7,9.78/Math.sqrt(Math.max(sigmaVPrime,.01))),N60=x.nField*CE*CB*CS*CR,N160=N60*CN,f=clamp(x.fines??0,0,100);let alpha=0,beta=1;if(f>5&&f<35){alpha=Math.exp(1.76-190/(f*f));beta=.99+f*f/1000}else if(f>=35){alpha=5;beta=1.2}return{CE,CB,CS,CR,CN,N60,N160,N160f:alpha+beta*N160,alpha,beta,sigmaVPrime}}
+
 export function bearingCapacity(i:{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS:number;method:BearingMethod;waterReduction?:number}){const p=rad(i.phi),t=Math.tan(p),Nq=Math.exp(Math.PI*t)*Math.tan(Math.PI/4+p/2)**2,Nc=Math.abs(i.phi)<1e-8?5.14:(Nq-1)/t,Ng=i.method==='Terzaghi'?2*(Nq+1)*t:i.method==='Meyerhof'?1.5*(Nq-1)*t:2*(Nq+1)*t,r=i.B/Math.max(i.L,i.B),sc=i.method==='Terzaghi'?1:1+.2*r,sq=i.method==='Terzaghi'?1:1+.1*r,sg=i.method==='Terzaghi'?1:Math.max(.6,1-.4*r),q=i.c*Nc*sc+i.gamma*i.Df*Nq*sq+.5*i.gamma*i.B*Ng*sg*(i.waterReduction??1);return{Nq,Nc,Ngamma:Ng,sc,sq,sg,ultimate:q,netUltimate:q-i.gamma*i.Df,allowableGross:q/i.FS,allowableNet:(q-i.gamma*i.Df)/i.FS,method:i.method}}
+
+export interface TbdyBearingInput{B:number;L:number;Df:number;gamma1:number;gamma2:number;c:number;phi:number;verticalLoad:number;horizontalLoad:number;momentX:number;momentY:number;groundSlope:number;baseSlope:number;resistanceFactor:number}
+export function tbdyBearingCapacity(i:TbdyBearingInput){
+  const phi=clamp(i.phi,0,89.9),t=Math.tan(rad(phi)),s=Math.sin(rad(phi))
+  const Nq=Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
+  const Nc=phi<1e-8?5.14:(Nq-1)/t
+  const Ngamma=2*(Nq-1)*t
+  const P=Math.max(i.verticalLoad,1e-9),V=Math.abs(i.horizontalLoad),A=Math.max(i.B*i.L,1e-9)
+  const ex=i.momentY/P,ey=i.momentX/P
+  const Be=Math.max(i.B-2*Math.abs(ex),0),Le=Math.max(i.L-2*Math.abs(ey),0)
+  const B=Math.min(Be,Le),L=Math.max(Be,Le)
+  const ratio=L>0?B/L:0
+  const sc=1+ratio*(Nq/Math.max(Nc,1e-9))
+  const sq=1+ratio*t
+  const sg=Math.max(0,1-.4*ratio)
+  const k=Math.atan2(i.Df,Math.max(i.B,1e-9))
+  const dc=1+.4*k
+  const dq=1+2*k*t*(1-s)**2
+  const dg=1
+  const loadAngle=V/P
+  const m=(2+ratio)/(1+ratio)
+  const common=Math.max(0,1-loadAngle)
+  const ic=phi<1e-8?1:Math.max(0,1-V/(A*Math.max(i.c*Nc,1e-9)))
+  const iq=phi<1e-8?1:Math.max(0,common**m)
+  const ig=phi<1e-8?1:Math.max(0,common**(m+1))
+  const beta=rad(Math.abs(i.groundSlope))
+  const gq=Math.max(0,(1-Math.tan(beta)**2)**2)
+  const gc=Math.max(0,1-Math.abs(i.groundSlope)/147)
+  const gg=Math.max(0,1-Math.abs(i.groundSlope)/147)
+  const eta=rad(Math.abs(i.baseSlope))
+  const bq=Math.max(0,(1-Math.tan(eta)*t)**2)
+  const bc=Math.max(0,1-Math.abs(i.baseSlope)/147)
+  const bg=bq
+  const surcharge=Math.max(0,i.Df*i.gamma1)
+  const qk=i.c*Nc*sc*dc*ic*gc*bc+surcharge*Nq*sq*dq*iq*gq*bq+.5*i.gamma2*B*Ngamma*sg*dg*ig*gg*bg
+  const qt=qk/Math.max(i.resistanceFactor,1e-9)
+  const qo=P/Math.max(Be*Le,1e-9)
+  return{Nq,Nc,Ngamma,ex,ey,Be,Le,sc,sq,sg,dc,dq,dg,ic,iq,ig,gc,gq,gg,bc,bq,bg,surcharge,qk,qt,qo,utilization:qo/Math.max(qt,1e-9),adequate:qo<=qt}
+}
+
 export function settlement(i:{B:number;q:number;Es:number;nu:number;layers?:{thickness:number;Cc?:number;e0?:number;sigma0?:number;dSigma?:number}[]}){const immediate=i.q*i.B*(1-i.nu*i.nu)/Math.max(i.Es,1),consolidation=(i.layers??[]).reduce((s,l)=>l.Cc!=null&&l.e0!=null&&l.sigma0!=null&&l.dSigma!=null?s+l.thickness*l.Cc/(1+l.e0)*Math.log10((l.sigma0+l.dSigma)/Math.max(l.sigma0,.01)):s,0);return{immediate,consolidation,total:immediate+consolidation}}
+
 export function liquefaction(i:{Mw:number;Sds:number;depth:number;N160f:number;sigmaV:number;sigmaVPrime:number}){const z=i.depth,rd=z<=9.15?1-.00765*z:z<=23?1.174-.0267*z:z<=30?.744-.008*z:.5,CRRM75=1/(34-i.N160f)+i.N160f/135+50/(10*i.N160f+45)**2-1/200,CM=10**(2.24/i.Mw**2.56),Rtau=CRRM75*CM*i.sigmaVPrime,tau=.65*i.sigmaV*(i.Sds/.4)*rd;return{rd,CRRM75,CM,Rtau,tau,ratio:Rtau/Math.max(tau,.0001),safe:Rtau>=1.1*tau}}
-export function foundationChecks(i:{B:number;L:number;N:number;V:number;Mx:number;My:number;delta?:number;cu?:number;area?:number}){const ex=i.My/Math.max(Math.abs(i.N),1e-9),ey=i.Mx/Math.max(Math.abs(i.N),1e-9),qAvg=i.N/(i.B*i.L),qMax=qAvg*(1+6*Math.abs(ex)/i.L+6*Math.abs(ey)/i.B),qMin=qAvg*(1-6*Math.abs(ex)/i.L-6*Math.abs(ey)/i.B),delta=i.delta??Math.atan(.6),resistance=Math.max(0,i.N)*Math.tan(delta)+(i.cu??0)*(i.area??i.B*i.L);return{ex,ey,qAvg,qMax,qMin,contactRatio:qMin>=0?1:Math.max(0,1-6*Math.abs(ex)/i.L)*Math.max(0,1-6*Math.abs(ey)/i.B),slidingFS:Math.abs(i.V)>0?resistance/Math.abs(i.V):Infinity}}
+
+export function foundationChecks(i:{B:number;L:number;N:number;V:number;Mx:number;My:number;delta?:number;cu?:number;area?:number}){const ex=i.My/Math.max(Math.abs(i.N),1e-9),ey=i.Mx/Math.max(Math.abs(i.N),1e-9),qAvg=i.N/(i.B*i.L),qMax=qAvg*(1+6*Math.abs(ex)/i.L+6*Math.abs(ey)/i.B),qMin=qAvg*(1-6*Math.abs(ex)/i.L-6*Math.abs(ey)/i.B),delta=i.delta??0,resistance=Math.max(0,i.N)*Math.tan(delta)+(i.cu??0)*(i.area??i.B*i.L);return{ex,ey,qAvg,qMax,qMin,contactRatio:qMin>=0?1:Math.max(0,1-6*Math.abs(ex)/i.L)*Math.max(0,1-6*Math.abs(ey)/i.B),slidingFS:Math.abs(i.V)>0?resistance/Math.abs(i.V):Infinity}}
+
 export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number}){const Ac=Math.PI*i.columnDiameter**2/4,ratio=Math.min(1,Ac/(i.spacing*i.spacing)),composite=(1-ratio)*i.qultSoil+ratio*i.qultColumn*i.improvementFactor;return{Ac,ratio,composite,allowable:composite/i.FS,columnLoad:Ac*i.columnStrength/i.FS}}
-export const SOURCE_NOTES={investigation:'TBDY 2018 Bölüm 16 ve Ek 16A: zemin araştırmaları, SPT/laboratuvar verileri ve raporlama.',liquefaction:'TBDY 2018 16.6 ve Ek 16B: N1,60 düzeltmesi, ince dane düzeltmesi, CRR, CM ve τdeprem hesabı.',bearing:'TBDY 2018 16.8.3, Denk. 16.8 ve genel kabul görmüş katsayılar. Terzaghi/Meyerhof/Hansen/Vesic yöntem parametresidir.',settlement:'TBDY 2018 16.7 ve 16.8.3.4 kapsamında izin verilebilir yerdeğiştirmeler; sayısal oturma modeli zemin parametreleriyle doğrulanır.',foundation:'TBDY 2018 16.7 ve 16.8.4: taşıma gücü ve kayma kontrolleri. Betonarme kesit tasarımı ayrıca ilgili standarda göre doğrulanır.',jetGrout:'TBDY 2018 Bölüm 16 / Ek 16D çerçevesinde zemin iyileştirmesi; kolon dayanımı ve iyileştirme katsayıları proje deneyleriyle belirlenmelidir.'}
+
+export const SOURCE_NOTES={investigation:'TBDY 2018 Bölüm 16 ve Ek 16A: zemin araştırmaları, SPT/laboratuvar verileri ve raporlama.',liquefaction:'TBDY 2018 16.6 ve Ek 16B: sıvılaşma değerlendirmesinde saha/SPT ve zemin parametreleri esas alınır.',bearing:'TBDY 2018 16.8.3.2 ve Denklem 16.8: karakteristik taşıma gücü qk; tasarım dayanımı qt = qk/γRv. Boyutsuz şekil, derinlik, yük eğikliği, zemin eğimi ve temel taban eğimi katsayıları literatürdeki bağıntılarla belirlenir.',settlement:'TBDY 2018 Bölüm 16 kapsamında temel tasarımında taşıma gücü ve yerdeğiştirme koşulları birlikte değerlendirilir; oturma modeli zemin araştırması verileriyle kurulmalıdır.',foundation:'TBDY 2018 16.7 ve 16.8.4 kapsamında temel tasarımı; düşey yük, yatay yük, momentler ve zemin dayanım parametreleri birlikte değerlendirilir.',jetGrout:'TBDY 2018 Bölüm 16 / Ek 16D kapsamında zemin iyileştirmesi; proje deneyleri ve iyileştirme parametreleriyle doğrulanmalıdır.'}
