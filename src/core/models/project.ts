@@ -83,35 +83,16 @@ export interface ProjectInfo {
 }
 
 export const defaultProjectInfo: ProjectInfo = {
-  id: '',
-  title: '',
-  projectNo: '',
-  date: '',
-  location: '',
-  province: '',
-  district: '',
-  address: '',
-  parcelInfo: '',
-  engineer: '',
-  clientName: '',
-  firmName: '',
-  buildingType: '',
-  basementCount: undefined,
-  normalFloorCount: undefined,
-  unitSystem: 'ton-m',
-  geophysical: {},
-  seismic: {},
-  soilParameters: {},
-  foundationParameters: {},
-  visualDocuments: {}
+  id: '', title: '', projectNo: '', date: '', location: '', province: '', district: '', address: '', parcelInfo: '', engineer: '', clientName: '', firmName: '', buildingType: '',
+  basementCount: undefined, normalFloorCount: undefined, unitSystem: 'ton-m', geophysical: {}, seismic: {}, soilParameters: {}, foundationParameters: {}, visualDocuments: {}
 }
 
+/** TBDY 2018 Table 16.1 style Vs30 boundaries. ZF is a special site class and is not inferred from Vs30 alone. */
 export function classifyVs30(vs30?: number): GeophysicalParameters['soilGroup'] {
   if (vs30 === undefined || !Number.isFinite(vs30) || vs30 <= 0) return undefined
   if (vs30 >= 1500) return 'ZA'
   if (vs30 >= 760) return 'ZB'
   if (vs30 >= 360) return 'ZC'
   if (vs30 >= 180) return 'ZD'
-  if (vs30 >= 150) return 'ZE'
-  return 'ZF'
+  return 'ZE'
 }
