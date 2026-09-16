@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { updateProjectInfo, useProjectInfo } from '../../core/state/project-store'
 import { bearingCapacity, foundationChecks, jetGrout, liquefaction, settlement, sptCorrection, stressAtDepth, SOURCE_NOTES, type BearingMethod, type SoilLayerInput } from '../../core/calculations/engineering'
-import { demoBoreholes, demoLaboratory, type BoreholeRecord, type LaboratoryRecord } from '../../core/models/field-data'
+import { type BoreholeRecord, type LaboratoryRecord } from '../../core/models/field-data'
 import FieldInvestigation from './FieldInvestigation'
 import { Card, Field, Frame, Metric, Source, Table, type ScreenId } from '../workspace/WorkspaceShell'
 
