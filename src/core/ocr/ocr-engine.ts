@@ -80,7 +80,7 @@ async function renderPdfPages(file: File, options: OcrOptions, worker: Awaited<R
     canvas.height = Math.ceil(viewport.height)
     const context = canvas.getContext('2d')
     if (!context) throw new Error(`PDF ${pageNumber}. sayfa için çizim bağlamı oluşturulamadı.`)
-    await page.render({ canvasContext: context, viewport }).promise
+    await page.render({ canvas, canvasContext: context, viewport }).promise
     pages.push(await recognizeCanvas(canvas, pageNumber, worker, (completedPage) => options.onProgress?.(completedPage / Math.max(end - start + 1, 1))))
   }
   return pages
