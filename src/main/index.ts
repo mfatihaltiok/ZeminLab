@@ -13,6 +13,7 @@ function createWindow(): void {
     minWidth: 1180,
     minHeight: 720,
     show: false,
+    frame: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
