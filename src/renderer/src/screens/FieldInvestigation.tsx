@@ -2,44 +2,245 @@ import { useEffect, useMemo, useState } from 'react'
 import '../assets/field-workspace.css'
 import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../../core/models/field-data'
 
-type Props = { boreholes: BoreholeRecord[]; labs: LaboratoryRecord[]; onBoreholesChange: (rows: BoreholeRecord[]) => void; onLabsChange: (rows: LaboratoryRecord[]) => void }
+type Props = {
+  boreholes: BoreholeRecord[]
+  labs: LaboratoryRecord[]
+  onBoreholesChange: (rows: BoreholeRecord[]) => void
+  onLabsChange: (rows: LaboratoryRecord[]) => void
+}
+
 const numericSpt = new Set<keyof SptRecord>(['depth', 'n1', 'n2', 'n3', 'nSpt'])
 const numericLab = new Set<keyof LaboratoryRecord>(['depth', 'waterContent', 'unitWeight', 'liquidLimit', 'plasticLimit', 'plasticityIndex', 'c', 'phi'])
 const colorClasses: BoreholeRecord['lithology'][number]['colorClass'][] = ['fill', 'clay', 'silt', 'sand', 'gravel', 'rock']
-function sourceLabel(source: string, confirmed?: boolean) { if (confirmed) return 'Onaylandı'; if (source === 'image-review') return 'Görsel inceleme'; if (source === 'imported') return 'İçe aktarıldı'; return 'Manuel' }
-function blankBorehole(index: number): BoreholeRecord { return { id: crypto.randomUUID(), name: `Sondaj-${String(index).padStart(2, '0')}`, totalDepth: 10, groundwaterDepth: undefined, elevation: undefined, location: '', lithology: [{ id: crypto.randomUUID(), from: 0, to: 10, code: '', description: 'Tanımlanmamış zemin', colorClass: 'fill' }], spt: [] } }
+
+function sourceLabel(source: string, confirmed?: boolean) {
+  if (confirmed) return 'Onaylandı'
+  if (source === 'image-review') return 'Görsel inceleme'
+  if (source === 'imported') return 'İçe aktarıldı'
+  return 'Manuel'
+}
+
+function blankBorehole(index: number): BoreholeRecord {
+  return {
+    id: crypto.randomUUID(),
+    name: `Sondaj-${String(index).padStart(2, '0')}`,
+    totalDepth: 10,
+    groundwaterDepth: undefined,
+    elevation: undefined,
+    location: '',
+    lithology: [{ id: crypto.randomUUID(), from: 0, to: 10, code: '', description: 'Tanımlanmamış zemin', colorClass: 'fill' }],
+    spt: []
+  }
+}
 
 function BoreholeVisual({ borehole }: { borehole: BoreholeRecord }) {
   const depth = Math.max(borehole.totalDepth, 1)
-  const layers = [...borehole.lithology].filter((l) => l.to > l.from).sort((a, b) => a.from - b.from)
-  return <div className="borehole-visual"><div className="depth-ruler">{Array.from({ length: Math.floor(depth) + 1 }, (_, i) => i).filter((d) => d % 2 === 0 || d === depth).map((d) => <span key={d} style={{ top: `${Math.min(100, d / depth * 100)}%` }}>{d.toFixed(0)} m</span>)}</div><div className="lithology-column">{layers.map((layer) => <div key={layer.id} className={`lithology-layer ${layer.colorClass}`} style={{ top: `${layer.from / depth * 100}%`, height: `${Math.max(1, (layer.to - layer.from) / depth * 100)}%` }}><b>{layer.code || '—'}</b><span>{layer.description || 'Tanımlanmamış'}</span></div>)}{borehole.spt.map((spt) => <div key={spt.id} className="spt-marker" style={{ top: `${Math.min(100, Math.max(0, spt.depth / depth * 100))}%` }}>N={spt.nSpt ?? '—'}</div>)}{borehole.groundwaterDepth !== undefined && <div className="gwl-line" style={{ top: `${Math.min(100, Math.max(0, borehole.groundwaterDepth / depth * 100))}%` }}><span>YAS {borehole.groundwaterDepth.toFixed(2)} m</span></div>}</div></div>
+  const layers = [...borehole.lithology].filter((layer) => layer.to > layer.from).sort((a, b) => a.from - b.from)
+
+  return (
+    <div className="borehole-visual">
+      <div className="depth-ruler">
+        {Array.from({ length: Math.floor(depth) + 1 }, (_, i) => i)
+          .filter((d) => d % 2 === 0 || d === depth)
+          .map((d) => (
+            <span key={d} style={{ top: `${Math.min(100, (d / depth) * 100)}%` }}>
+              {d.toFixed(0)} m
+            </span>
+          ))}
+      </div>
+      <div className="lithology-column">
+        {layers.map((layer) => (
+          <div
+            key={layer.id}
+            className={`lithology-layer ${layer.colorClass}`}
+            style={{
+              top: `${(layer.from / depth) * 100}%`,
+              height: `${Math.max(1, ((layer.to - layer.from) / depth) * 100)}%`
+            }}
+          >
+            <b>{layer.code || '—'}</b>
+            <span>{layer.description || 'Tanımlanmamış'}</span>
+          </div>
+        ))}
+        {borehole.spt.map((spt) => (
+          <div
+            key={spt.id}
+            className="spt-marker"
+            style={{ top: `${Math.min(100, Math.max(0, (spt.depth / depth) * 100))}%` }}
+          >
+            N={spt.nSpt ?? '—'}
+          </div>
+        ))}
+        {borehole.groundwaterDepth !== undefined && (
+          <div
+            className="gwl-line"
+            style={{ top: `${Math.min(100, Math.max(0, (borehole.groundwaterDepth / depth) * 100))}%` }}
+          >
+            <span>YAS {borehole.groundwaterDepth.toFixed(2)} m</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (row: BoreholeRecord) => void }) {
+  const update = (id: string, key: keyof SptRecord, raw: string) => {
+    const value = numericSpt.has(key) ? (raw === '' ? undefined : Number(raw)) : raw
+    onChange({ ...borehole, spt: borehole.spt.map((row) => (row.id === id ? { ...row, [key]: value } : row)) })
+  }
+
+  const add = () =>
+    onChange({
+      ...borehole,
+      spt: [...borehole.spt, { id: crypto.randomUUID(), depth: 1, testType: 'SPT', source: 'manual', confirmed: false }]
+    })
+
+  return (
+    <div className="engineering-grid-wrap">
+      <div className="grid-toolbar">
+        <b>SPT / ARAZİ DENEYLERİ</b>
+        <span>{borehole.spt.length} kayıt</span>
+        <button onClick={add}>+ SPT</button>
+      </div>
+      <table className="engineering-grid">
+        <thead>
+          <tr><th>Derinlik</th><th>Tip</th><th>N1</th><th>N2</th><th>N3</th><th>N-SPT</th><th>Zemin</th><th>Kaynak</th><th /></tr>
+        </thead>
+        <tbody>
+          {borehole.spt.map((row) => (
+            <tr key={row.id}>
+              <td><input type="number" value={row.depth} onChange={(e) => update(row.id, 'depth', e.target.value)} /></td>
+              <td><select value={row.testType} onChange={(e) => update(row.id, 'testType', e.target.value)}><option>SPT</option><option>UD</option></select></td>
+              {(['n1', 'n2', 'n3', 'nSpt'] as const).map((key) => (
+                <td key={key}><input type="number" value={row[key] ?? ''} onChange={(e) => update(row.id, key, e.target.value)} /></td>
+              ))}
+              <td><input value={row.soilCode ?? ''} onChange={(e) => update(row.id, 'soilCode', e.target.value)} /></td>
+              <td className={row.confirmed ? 'source-confirmed' : 'source-review'}>{sourceLabel(row.source, row.confirmed)}</td>
+              <td><button onClick={() => onChange({ ...borehole, spt: borehole.spt.filter((item) => item.id !== row.id) })}>×</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {borehole.spt.length === 0 && <div className="empty-state">Bu sondaj için henüz SPT kaydı yok.</div>}
+    </div>
+  )
 }
 
 function BoreholeEditor({ borehole, onChange, onDelete }: { borehole: BoreholeRecord; onChange: (row: BoreholeRecord) => void; onDelete: () => void }) {
   const patch = <K extends keyof BoreholeRecord>(key: K, value: BoreholeRecord[K]) => onChange({ ...borehole, [key]: value })
-  const updateLayer = (id: string, key: keyof BoreholeRecord['lithology'][number], value: unknown) => onChange({ ...borehole, lithology: borehole.lithology.map((layer) => layer.id === id ? { ...layer, [key]: value } : layer) })
-  const addLayer = () => { const last = borehole.lithology.at(-1); const from = last?.to ?? 0; onChange({ ...borehole, lithology: [...borehole.lithology, { id: crypto.randomUUID(), from, to: Math.max(from + 1, borehole.totalDepth), code: '', description: '', colorClass: 'fill' }] }) }
+  const updateLayer = (id: string, key: keyof BoreholeRecord['lithology'][number], value: unknown) =>
+    onChange({ ...borehole, lithology: borehole.lithology.map((layer) => (layer.id === id ? { ...layer, [key]: value } : layer)) })
+  const addLayer = () => {
+    const last = borehole.lithology.at(-1)
+    const from = last?.to ?? 0
+    onChange({
+      ...borehole,
+      lithology: [...borehole.lithology, { id: crypto.randomUUID(), from, to: Math.max(from + 1, borehole.totalDepth), code: '', description: '', colorClass: 'fill' }]
+    })
+  }
   const removeLayer = (id: string) => onChange({ ...borehole, lithology: borehole.lithology.filter((layer) => layer.id !== id) })
-  const addSpt = () => onChange({ ...borehole, spt: [...borehole.spt, { id: crypto.randomUUID(), depth: 1, testType: 'SPT', source: 'manual', confirmed: false }] })
-  const updateSpt = (id: string, key: keyof SptRecord, raw: string) => { const value = numericSpt.has(key) ? (raw === '' ? undefined : Number(raw)) : raw; onChange({ ...borehole, spt: borehole.spt.map((row) => row.id === id ? { ...row, [key]: value } : row) }) }
-  const removeSpt = (id: string) => onChange({ ...borehole, spt: borehole.spt.filter((row) => row.id !== id) })
-  return <><div className="module-header"><div><div className="module-kicker">SONDAJ KAYDI</div><h2>{borehole.name}</h2><p>Log, litoloji ve arazi deneyleri</p></div><div className="module-actions"><button onClick={onDelete}>Sondajı Sil</button></div></div><BoreholeVisual borehole={borehole} /><div className="form-grid"><label><span>Sondaj adı</span><input value={borehole.name} onChange={(e) => patch('name', e.target.value)} /></label><label><span>Toplam derinlik (m)</span><input type="number" value={borehole.totalDepth} onChange={(e) => patch('totalDepth', Number(e.target.value))} /></label><label><span>YAS (m)</span><input type="number" value={borehole.groundwaterDepth ?? ''} onChange={(e) => patch('groundwaterDepth', e.target.value === '' ? undefined : Number(e.target.value))} /></label><label><span>Kot (m)</span><input type="number" value={borehole.elevation ?? ''} onChange={(e) => patch('elevation', e.target.value === '' ? undefined : Number(e.target.value))} /></label><label className="wide"><span>Konum / açıklama</span><input value={borehole.location ?? ''} onChange={(e) => patch('location', e.target.value)} /></label></div><div className="engineering-grid-wrap"><div className="grid-toolbar"><b>LİTOLOJİ</b><span>{borehole.lithology.length} katman</span><button onClick={addLayer}>+ Katman</button></div><table className="engineering-grid"><thead><tr><th>Başlangıç</th><th>Bitiş</th><th>Kod</th><th>Açıklama</th><th>Sınıf</th><th /></tr></thead><tbody>{borehole.lithology.map((layer) => <tr key={layer.id}><td><input type="number" value={layer.from} onChange={(e) => updateLayer(layer.id, 'from', Number(e.target.value))} /></td><td><input type="number" value={layer.to} onChange={(e) => updateLayer(layer.id, 'to', Number(e.target.value))} /></td><td><input value={layer.code} onChange={(e) => updateLayer(layer.id, 'code', e.target.value)} /></td><td><input value={layer.description} onChange={(e) => updateLayer(layer.id, 'description', e.target.value)} /></td><td><select value={layer.colorClass} onChange={(e) => updateLayer(layer.id, 'colorClass', e.target.value as BoreholeRecord['lithology'][number]['colorClass'])}>{colorClasses.map((item) => <option key={item}>{item}</option>)}</select></td><td><button onClick={() => removeLayer(layer.id)}>×</button></td></tr>)}</tbody></table></div><div className="engineering-grid-wrap"><div className="grid-toolbar"><b>SPT / ARAZİ DENEYLERİ</b><span>{borehole.spt.length} kayıt</span><button onClick={addSpt}>+ SPT</button></div><table className="engineering-grid"><thead><tr><th>Derinlik</th><th>Tip</th><th>N1</th><th>N2</th><th>N3</th><th>N-SPT</th><th>Zemin</th><th>Durum</th><th /></tr></thead><tbody>{borehole.spt.map((row) => <tr key={row.id}><td><input type="number" value={row.depth} onChange={(e) => updateSpt(row.id, 'depth', e.target.value)} /></td><td><select value={row.testType} onChange={(e) => updateSpt(row.id, 'testType', e.target.value)}><option>SPT</option><option>UD</option></select></td>{(['n1', 'n2', 'n3', 'nSpt'] as const).map((key) => <td key={key}><input type="number" value={row[key] ?? ''} onChange={(e) => updateSpt(row.id, key, e.target.value)} /></td>)}<td><input value={row.soilCode ?? ''} onChange={(e) => updateSpt(row.id, 'soilCode', e.target.value)} /></td><td className={row.confirmed ? 'source-confirmed' : 'source-review'}>{sourceLabel(row.source, row.confirmed)}</td><td><button onClick={() => removeSpt(row.id)}>×</button></td></tr>)}</tbody></table></div></>
+
+  return (
+    <>
+      <div className="module-header">
+        <div><div className="module-kicker">SONDAJ KAYDI</div><h2>{borehole.name}</h2><p>Log ve litoloji bilgileri</p></div>
+        <div className="module-actions"><button onClick={onDelete}>Sondajı Sil</button></div>
+      </div>
+      <BoreholeVisual borehole={borehole} />
+      <div className="form-grid">
+        <label><span>Sondaj adı</span><input value={borehole.name} onChange={(e) => patch('name', e.target.value)} /></label>
+        <label><span>Toplam derinlik (m)</span><input type="number" value={borehole.totalDepth} onChange={(e) => patch('totalDepth', Number(e.target.value))} /></label>
+        <label><span>YAS (m)</span><input type="number" value={borehole.groundwaterDepth ?? ''} onChange={(e) => patch('groundwaterDepth', e.target.value === '' ? undefined : Number(e.target.value))} /></label>
+        <label><span>Kot (m)</span><input type="number" value={borehole.elevation ?? ''} onChange={(e) => patch('elevation', e.target.value === '' ? undefined : Number(e.target.value))} /></label>
+        <label className="wide"><span>Konum / açıklama</span><input value={borehole.location ?? ''} onChange={(e) => patch('location', e.target.value)} /></label>
+      </div>
+      <div className="engineering-grid-wrap">
+        <div className="grid-toolbar"><b>LİTOLOJİ</b><span>{borehole.lithology.length} katman</span><button onClick={addLayer}>+ Katman</button></div>
+        <table className="engineering-grid">
+          <thead><tr><th>Başlangıç</th><th>Bitiş</th><th>Kod</th><th>Açıklama</th><th>Sınıf</th><th /></tr></thead>
+          <tbody>{borehole.lithology.map((layer) => (
+            <tr key={layer.id}>
+              <td><input type="number" value={layer.from} onChange={(e) => updateLayer(layer.id, 'from', Number(e.target.value))} /></td>
+              <td><input type="number" value={layer.to} onChange={(e) => updateLayer(layer.id, 'to', Number(e.target.value))} /></td>
+              <td><input value={layer.code} onChange={(e) => updateLayer(layer.id, 'code', e.target.value)} /></td>
+              <td><input value={layer.description} onChange={(e) => updateLayer(layer.id, 'description', e.target.value)} /></td>
+              <td><select value={layer.colorClass} onChange={(e) => updateLayer(layer.id, 'colorClass', e.target.value as BoreholeRecord['lithology'][number]['colorClass'])}>{colorClasses.map((item) => <option key={item}>{item}</option>)}</select></td>
+              <td><button onClick={() => removeLayer(layer.id)}>×</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </>
+  )
 }
 
-function LaboratoryGrid({ boreholes, labs, onChange }: { boreholes: BoreholeRecord[]; labs: LaboratoryRecord[]; onChange: (rows: LaboratoryRecord[]) => void }) {
-  const add = () => onChange([...labs, { id: crypto.randomUUID(), boreholeId: boreholes[0]?.id ?? '', sampleId: `UD-${labs.length + 1}`, depth: 1, sampleType: 'UD', source: 'manual', confirmed: false }])
-  const update = (id: string, key: keyof LaboratoryRecord, raw: string) => { const value = numericLab.has(key) ? (raw === '' ? undefined : Number(raw)) : raw; onChange(labs.map((row) => row.id === id ? { ...row, [key]: value } : row)) }
-  return <div className="engineering-grid-wrap"><div className="grid-toolbar"><b>LABORATUVAR</b><span>{labs.length} numune</span><button onClick={add}>+ Numune</button></div><table className="engineering-grid"><thead><tr><th>Sondaj</th><th>Numune</th><th>Derinlik</th><th>w %</th><th>γ</th><th>LL</th><th>PL</th><th>PI</th><th>c</th><th>φ</th><th>Durum</th><th /></tr></thead><tbody>{labs.map((row) => <tr key={row.id}><td><select value={row.boreholeId} onChange={(e) => update(row.id, 'boreholeId', e.target.value)}>{boreholes.map((borehole) => <option key={borehole.id} value={borehole.id}>{borehole.name}</option>)}</select></td><td><input value={row.sampleId} onChange={(e) => update(row.id, 'sampleId', e.target.value)} /></td>{(['depth', 'waterContent', 'unitWeight', 'liquidLimit', 'plasticLimit', 'plasticityIndex', 'c', 'phi'] as const).map((key) => <td key={key}><input type="number" value={row[key] ?? ''} onChange={(e) => update(row.id, key, e.target.value)} /></td>)}<td className={row.confirmed ? 'source-confirmed' : 'source-review'}>{sourceLabel(row.source, row.confirmed)}</td><td><button onClick={() => onChange(labs.filter((item) => item.id !== row.id))}>×</button></td></tr>)}</tbody></table></div>
+function LaboratoryGrid({ boreholeId, boreholes, labs, onChange }: { boreholeId: string; boreholes: BoreholeRecord[]; labs: LaboratoryRecord[]; onChange: (rows: LaboratoryRecord[]) => void }) {
+  const add = () =>
+    onChange([...labs, { id: crypto.randomUUID(), boreholeId, sampleId: `UD-${labs.length + 1}`, depth: 1, sampleType: 'UD', source: 'manual', confirmed: false }])
+  const update = (id: string, key: keyof LaboratoryRecord, raw: string) => {
+    const value = numericLab.has(key) ? (raw === '' ? undefined : Number(raw)) : raw
+    onChange(labs.map((row) => (row.id === id ? { ...row, [key]: value } : row)))
+  }
+
+  return (
+    <div className="engineering-grid-wrap">
+      <div className="grid-toolbar"><b>LABORATUVAR</b><span>{labs.length} numune</span><button onClick={add}>+ Numune</button></div>
+      <table className="engineering-grid">
+        <thead><tr><th>Sondaj</th><th>Numune</th><th>Derinlik</th><th>w %</th><th>γ</th><th>LL</th><th>PL</th><th>PI</th><th>c</th><th>φ</th><th>Durum</th><th /></tr></thead>
+        <tbody>{labs.map((row) => (
+          <tr key={row.id}>
+            <td><select value={row.boreholeId} onChange={(e) => update(row.id, 'boreholeId', e.target.value)}>{boreholes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></td>
+            <td><input value={row.sampleId} onChange={(e) => update(row.id, 'sampleId', e.target.value)} /></td>
+            {(['depth', 'waterContent', 'unitWeight', 'liquidLimit', 'plasticLimit', 'plasticityIndex', 'c', 'phi'] as const).map((key) => <td key={key}><input type="number" value={row[key] ?? ''} onChange={(e) => update(row.id, key, e.target.value)} /></td>)}
+            <td className={row.confirmed ? 'source-confirmed' : 'source-review'}>{sourceLabel(row.source, row.confirmed)}</td>
+            <td><button onClick={() => onChange(labs.filter((item) => item.id !== row.id))}>×</button></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {labs.length === 0 && <div className="empty-state">Bu sondaj için laboratuvar numunesi yok.</div>}
+    </div>
+  )
 }
 
 export function FieldInvestigation({ boreholes, labs, onBoreholesChange, onLabsChange }: Props) {
   const [selectedId, setSelectedId] = useState(boreholes[0]?.id ?? '')
   const [tab, setTab] = useState<'overview' | 'spt' | 'lab'>('overview')
-  useEffect(() => { if (!boreholes.some((borehole) => borehole.id === selectedId)) setSelectedId(boreholes[0]?.id ?? '') }, [boreholes, selectedId])
+
+  useEffect(() => {
+    if (!boreholes.some((borehole) => borehole.id === selectedId)) setSelectedId(boreholes[0]?.id ?? '')
+  }, [boreholes, selectedId])
+
   const selected = boreholes.find((borehole) => borehole.id === selectedId)
   const selectedLabs = useMemo(() => labs.filter((lab) => lab.boreholeId === selectedId), [labs, selectedId])
-  const addBorehole = () => { const next = blankBorehole(boreholes.length + 1); onBoreholesChange([...boreholes, next]); setSelectedId(next.id); setTab('overview') }
-  const updateBorehole = (row: BoreholeRecord) => onBoreholesChange(boreholes.map((item) => item.id === row.id ? row : item))
-  const deleteBorehole = () => { if (!selected) return; onBoreholesChange(boreholes.filter((item) => item.id !== selected.id)); onLabsChange(labs.filter((lab) => lab.boreholeId !== selected.id)); setSelectedId(boreholes.find((item) => item.id !== selected.id)?.id ?? '') }
-  return <div className="field-workspace"><div className="module-header"><div><div className="module-kicker">SAHA ARAŞTIRMASI</div><h2>Sondaj / SPT / Laboratuvar</h2><p>Sondaj logları, litoloji, arazi deneyleri ve laboratuvar numuneleri</p></div><div className="module-actions"><button onClick={addBorehole}>+ Yeni Sondaj</button></div></div><div className="borehole-selector">{boreholes.map((borehole) => <button key={borehole.id} className={borehole.id === selectedId ? 'active' : ''} onClick={() => setSelectedId(borehole.id)}><b>{borehole.name}</b><small>{borehole.totalDepth.toFixed(1)} m · YAS {borehole.groundwaterDepth?.toFixed(1) ?? '—'} m · {borehole.spt.length} SPT</small></button>)}</div><div className="module-tabs"><button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>Sondaj Logu</button><button className={tab === 'spt' ? 'active' : ''} onClick={() => setTab('spt')}>SPT</button><button className={tab === 'lab' ? 'active' : ''} onClick={() => setTab('lab')}>Laboratuvar</button></div>{!selected ? <div className="empty-state">Henüz sondaj kaydı yok. <button onClick={addBorehole}>Yeni Sondaj</button></div> : tab === 'lab' ? <LaboratoryGrid boreholes={boreholes} labs={selectedLabs} onChange={(rows) => { const ids = new Set(rows.map((row) => row.id)); onLabsChange([...labs.filter((row) => row.boreholeId !== selected.id || ids.has(row.id)), ...rows.filter((row) => row.boreholeId === selected.id)]) }} /> : <BoreholeEditor borehole={selected} onChange={updateBorehole} onDelete={deleteBorehole} />}</div>
+  const addBorehole = () => {
+    const next = blankBorehole(boreholes.length + 1)
+    onBoreholesChange([...boreholes, next])
+    setSelectedId(next.id)
+    setTab('overview')
+  }
+  const updateBorehole = (row: BoreholeRecord) => onBoreholesChange(boreholes.map((item) => (item.id === row.id ? row : item)))
+  const deleteBorehole = () => {
+    if (!selected) return
+    onBoreholesChange(boreholes.filter((item) => item.id !== selected.id))
+    onLabsChange(labs.filter((lab) => lab.boreholeId !== selected.id))
+    setSelectedId(boreholes.find((item) => item.id !== selected.id)?.id ?? '')
+  }
+
+  const updateSelectedLabs = (rows: LaboratoryRecord[]) => {
+    const selectedIds = new Set(rows.map((row) => row.id))
+    onLabsChange([
+      ...labs.filter((row) => row.boreholeId !== selectedId || selectedIds.has(row.id)),
+      ...rows.filter((row) => row.boreholeId === selectedId && !labs.some((old) => old.id === row.id))
+    ])
+  }
+
+  return (
+    <div className="field-workspace">
+      <div className="module-header"><div><div className="module-kicker">SAHA ARAŞTIRMASI</div><h2>Sondaj / SPT / Laboratuvar</h2><p>Sondaj logları, litoloji, arazi deneyleri ve laboratuvar numuneleri</p></div><div className="module-actions"><button onClick={addBorehole}>+ Yeni Sondaj</button></div></div>
+      <div className="borehole-selector">{boreholes.map((borehole) => <button key={borehole.id} className={borehole.id === selectedId ? 'active' : ''} onClick={() => setSelectedId(borehole.id)}><b>{borehole.name}</b><small>{borehole.totalDepth.toFixed(1)} m · YAS {borehole.groundwaterDepth?.toFixed(1) ?? '—'} m · {borehole.spt.length} SPT</small></button>)}</div>
+      <div className="module-tabs"><button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>Sondaj Logu</button><button className={tab === 'spt' ? 'active' : ''} onClick={() => setTab('spt')}>SPT</button><button className={tab === 'lab' ? 'active' : ''} onClick={() => setTab('lab')}>Laboratuvar</button></div>
+      {!selected ? <div className="empty-state">Henüz sondaj kaydı yok. <button onClick={addBorehole}>Yeni Sondaj</button></div> : tab === 'lab' ? <LaboratoryGrid boreholeId={selected.id} boreholes={boreholes} labs={selectedLabs} onChange={updateSelectedLabs} /> : tab === 'spt' ? <SptGrid borehole={selected} onChange={updateBorehole} /> : <BoreholeEditor borehole={selected} onChange={updateBorehole} onDelete={deleteBorehole} />}
+    </div>
+  )
 }
