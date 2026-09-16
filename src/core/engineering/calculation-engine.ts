@@ -65,7 +65,10 @@ export interface TbdyBearingInput {
 }
 
 export function tbdyBearingCapacity(i: TbdyBearingInput): CalculationResult<{
-  Nq: number; Nc: number; Ngamma: number; ex: number; ey: number; Be: number; Le: number
+  Nq: number; Nc: number; Ngamma: number; sc: number; sq: number; sg: number
+  dc: number; dq: number; dg: number; ic: number; iq: number; ig: number
+  gc: number; gq: number; gg: number; bc: number; bq: number; bg: number; surcharge: number
+  ex: number; ey: number; Be: number; Le: number
   qk: number; qt: number; qo: number; utilization: number; adequate: boolean
 }> {
   const phi = clamp(i.phi, 0, 89.9)
@@ -82,7 +85,6 @@ export function tbdyBearingCapacity(i: TbdyBearingInput): CalculationResult<{
   const Bp = Math.min(Be, Le)
   const Lp = Math.max(Be, Le)
   const ratio = Bp / Math.max(Lp, 1e-9)
-
   const sc = 1 + ratio * (Nq / Math.max(Nc, 1e-9))
   const sq = 1 + ratio * t
   const sg = Math.max(0, 1 - 0.4 * ratio)
@@ -96,7 +98,6 @@ export function tbdyBearingCapacity(i: TbdyBearingInput): CalculationResult<{
   const ic = phi < 1e-8 ? 1 : Math.max(0, 1 - V / Math.max(i.B * i.L * i.c * Nc, 1e-9))
   const iq = phi < 1e-8 ? 1 : common ** m
   const ig = phi < 1e-8 ? 1 : common ** (m + 1)
-
   const beta = rad(Math.abs(i.groundSlope))
   const eta = rad(Math.abs(i.baseSlope))
   const gq = Math.max(0, (1 - Math.tan(beta) ** 2) ** 2)
@@ -106,16 +107,11 @@ export function tbdyBearingCapacity(i: TbdyBearingInput): CalculationResult<{
   const bc = Math.max(0, 1 - Math.abs(i.baseSlope) / 147)
   const bg = bq
   const surcharge = Math.max(0, i.Df * i.gamma1)
-
-  const qk =
-    i.c * Nc * sc * dc * ic * gc * bc +
-    surcharge * Nq * sq * dq * iq * gq * bq +
-    0.5 * i.gamma2 * Bp * Ngamma * sg * dg * ig * gg * bg
+  const qk = i.c * Nc * sc * dc * ic * gc * bc + surcharge * Nq * sq * dq * iq * gq * bq + 0.5 * i.gamma2 * Bp * Ngamma * sg * dg * ig * gg * bg
   const qt = qk / Math.max(i.resistanceFactor, 1e-9)
   const qo = P / Math.max(Be * Le, 1e-9)
   const utilization = qo / Math.max(qt, 1e-9)
-
-  const value = { Nq, Nc, Ngamma, ex, ey, Be, Le, qk, qt, qo, utilization, adequate: qo <= qt }
+  const value = { Nq, Nc, Ngamma, sc, sq, sg, dc, dq, dg, ic, iq, ig, gc, gq, gg, bc, bq, bg, surcharge, ex, ey, Be, Le, qk, qt, qo, utilization, adequate: qo <= qt }
   return {
     value,
     method: 'TBDY 2018 Denklem 16.8 tabanlı yüzeysel temel taşıma gücü',
@@ -124,7 +120,13 @@ export function tbdyBearingCapacity(i: TbdyBearingInput): CalculationResult<{
       { symbol: 'eₓ', title: 'Yük eksantrikliği', formula: 'eₓ = Mᵧ / N', value: ex, unit: 'm' },
       { symbol: 'eᵧ', title: 'Yük eksantrikliği', formula: 'eᵧ = Mₓ / N', value: ey, unit: 'm' },
       { symbol: 'Bₑ,Lₑ', title: 'Etkin temel boyutları', formula: 'Bₑ = B − 2|eₓ| ; Lₑ = L − 2|eᵧ|', value: Math.min(Be, Le), unit: 'm' },
-      { symbol: 'qₖ', title: 'Karakteristik taşıma gücü', formula: 'TBDY 2018 Denklem 16.8a', value: qk },
+      { symbol: 's', title: 'Şekil katsayıları', formula: 's꜀, sq, sᵧ', value: sc },
+      { symbol: 'd', title: 'Derinlik katsayıları', formula: 'd꜀, dq, dᵧ', value: dc },
+      { symbol: 'i', title: 'Yük eğikliği katsayıları', formula: 'i꜀, iq, iᵧ', value: ic },
+      { symbol: 'g', title: 'Zemin eğimi katsayıları', formula: 'g꜀, gq, gᵧ', value: gc },
+      { symbol: 'b', title: 'Temel tabanı eğimi katsayıları', formula: 'b꜀, bq, bᵧ', value: bc },
+      { symbol: 'q', title: 'Sürşarj', formula: 'q = Df · γ₁', value: surcharge },
+      { symbol: 'qₖ', title: 'Karakteristik taşıma gücü', formula: 'Denklem 16.8 katsayılarıyla', value: qk },
       { symbol: 'qₜ', title: 'Tasarım taşıma gücü', formula: 'qₜ = qₖ / γRv', value: qt },
       { symbol: 'q₀', title: 'Temel tabanındaki tasarım etkisi', formula: 'q₀ = N / (BₑLₑ)', value: qo },
       { symbol: 'η', title: 'Kullanım oranı', formula: 'η = q₀ / qₜ', value: utilization }
