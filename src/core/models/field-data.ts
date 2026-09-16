@@ -21,7 +21,6 @@ export interface SptRecord {
   n1?: number
   n2?: number
   n3?: number
-  nSpt?: number
   soilCode?: string
   soilDescription?: string
   correction?: Partial<SptCorrectionConfig>
@@ -89,11 +88,11 @@ export const demoBoreholes: BoreholeRecord[] = [
       { id: 'l4', from: 9, to: 15, code: 'Sa', description: 'Kum', colorClass: 'sand' }
     ],
     spt: [
-      { id: 'bh1-s1', depth: 1.5, testType: 'SPT', n1: 4, n2: 6, n3: 8, nSpt: 14, soilCode: 'CIL', soilDescription: 'Kil', source: 'imported', confirmed: true },
-      { id: 'bh1-s2', depth: 3, testType: 'SPT', n1: 5, n2: 7, n3: 9, nSpt: 16, soilCode: 'CIL', soilDescription: 'Kil', source: 'imported', confirmed: true },
-      { id: 'bh1-s3', depth: 6, testType: 'SPT', n1: 6, n2: 9, n3: 11, nSpt: 20, soilCode: 'siSa', soilDescription: 'Siltli kum', source: 'imported', confirmed: true },
-      { id: 'bh1-s4', depth: 9, testType: 'SPT', n1: 8, n2: 12, n3: 14, nSpt: 26, soilCode: 'Sa', soilDescription: 'Kum', source: 'imported', confirmed: true },
-      { id: 'bh1-s5', depth: 12, testType: 'SPT', n1: 14, n2: 20, n3: 22, nSpt: 42, soilCode: 'Sa', soilDescription: 'Sıkı kum', source: 'imported', confirmed: true }
+      { id: 'bh1-s1', depth: 1.5, testType: 'SPT', n1: 4, n2: 6, n3: 8, soilCode: 'CIL', soilDescription: 'Düşük plastisiteli Kil', source: 'imported', confirmed: true },
+      { id: 'bh1-s2', depth: 3, testType: 'SPT', n1: 5, n2: 7, n3: 9, soilCode: 'CIL', soilDescription: 'Düşük plastisiteli Kil', source: 'imported', confirmed: true },
+      { id: 'bh1-s3', depth: 6, testType: 'SPT', n1: 6, n2: 9, n3: 11, soilCode: 'siSa', soilDescription: 'Siltli Kum', source: 'imported', confirmed: true },
+      { id: 'bh1-s4', depth: 9, testType: 'SPT', n1: 8, n2: 12, n3: 14, soilCode: 'Sa', soilDescription: 'Kum', source: 'imported', confirmed: true },
+      { id: 'bh1-s5', depth: 12, testType: 'SPT', n1: 14, n2: 20, n3: 22, soilCode: 'Sa', soilDescription: 'Kum', source: 'imported', confirmed: true }
     ]
   },
   {
@@ -104,9 +103,9 @@ export const demoBoreholes: BoreholeRecord[] = [
       { id: 'l7', from: 6, to: 12, code: 'Sa', description: 'Orta sıkı kum', colorClass: 'sand' }
     ],
     spt: [
-      { id: 'bh2-s1', depth: 2, testType: 'SPT', n1: 4, n2: 5, n3: 7, nSpt: 12, soilCode: 'CIM', soilDescription: 'Kil', source: 'imported', confirmed: true },
-      { id: 'bh2-s2', depth: 5, testType: 'SPT', n1: 6, n2: 8, n3: 10, nSpt: 18, soilCode: 'CIM', soilDescription: 'Kil', source: 'imported', confirmed: true },
-      { id: 'bh2-s3', depth: 8, testType: 'SPT', n1: 9, n2: 12, n3: 14, nSpt: 26, soilCode: 'Sa', soilDescription: 'Kum', source: 'imported', confirmed: true }
+      { id: 'bh2-s1', depth: 2, testType: 'SPT', n1: 4, n2: 5, n3: 7, soilCode: 'CIM', soilDescription: 'Orta plastisiteli Kil', source: 'imported', confirmed: true },
+      { id: 'bh2-s2', depth: 5, testType: 'SPT', n1: 6, n2: 8, n3: 10, soilCode: 'CIM', soilDescription: 'Orta plastisiteli Kil', source: 'imported', confirmed: true },
+      { id: 'bh2-s3', depth: 8, testType: 'SPT', n1: 9, n2: 12, n3: 14, soilCode: 'Sa', soilDescription: 'Kum', source: 'imported', confirmed: true }
     ]
   }
 ]
