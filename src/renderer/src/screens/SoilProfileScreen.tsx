@@ -28,7 +28,7 @@ function toLayers(borehole: BoreholeRecord, labs: LaboratoryRecord[]): ResolvedL
     const cSource = valueSource(layer.cohesion, lab?.c)
     const phiSource = valueSource(layer.frictionAngle, lab?.phi)
     const finesSource = valueSource(layer.finesContent, lab?.finesContent)
-    return { top: layer.from, bottom: layer.to, soil: layer.description || layer.code, gamma: layer.unitWeight ?? lab?.unitWeight ?? 0, gammaSat: layer.saturatedUnitWeight ?? 0, cohesion: layer.cohesion ?? lab?.c ?? 0, phi: layer.frictionAngle ?? lab?.phi ?? 0, fines: layer.finesContent ?? lab?.finesContent ?? 0, gammaSource, gammaSatSource, cSource, phiSource, finesSource, labSample: lab?.sampleId }
+    return { top: layer.from, bottom: layer.to, soil: layer.description || layer.code || '—', gamma: layer.unitWeight ?? lab?.unitWeight ?? 0, gammaSat: layer.saturatedUnitWeight ?? 0, cohesion: layer.cohesion ?? lab?.c ?? 0, phi: layer.frictionAngle ?? lab?.phi ?? 0, fines: layer.finesContent ?? lab?.finesContent ?? 0, gammaSource, gammaSatSource, cSource, phiSource, finesSource, labSample: lab?.sampleId }
   })
 }
 function formatValue(value: number | undefined, digits = 1) { return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—' }
@@ -51,9 +51,9 @@ export function SoilProfileScreen({ boreholes, labs }: { boreholes: BoreholeReco
     const requiresSaturatedWeight = groundwater != null && layer.bottom > groundwater
     const complete = layer.gammaSource !== 'missing' && (!requiresSaturatedWeight || layer.gammaSatSource !== 'missing')
     const result = complete ? stressAtDepth(layer.bottom, resolvedForStress, groundwater ?? depth) : undefined
-    return [layer.soil, `${layer.top.toFixed(2)}–${layer.bottom.toFixed(2)}`, formatValue(layer.gamma), formatValue(layer.cohesion), formatValue(layer.phi), result ? result.sigmaV.toFixed(1) : '—', result ? result.sigmaVPrime.toFixed(1) : '—']
+    return [String(layer.soil ?? '—'), `${layer.top.toFixed(2)}–${layer.bottom.toFixed(2)}`, formatValue(layer.gamma), formatValue(layer.cohesion), formatValue(layer.phi), result ? formatValue(result.sigmaV) : '—', result ? formatValue(result.sigmaVPrime) : '—']
   })
-  const parameterRows: Array<Array<string | number>> = layers.map((layer) => [layer.soil, layer.gammaSource, layer.gammaSatSource, layer.cSource, layer.phiSource, layer.finesSource, layer.labSample ?? '—'])
+  const parameterRows: Array<Array<string | number>> = layers.map((layer) => [String(layer.soil ?? '—'), String(layer.gammaSource ?? 'missing'), String(layer.gammaSatSource ?? 'missing'), String(layer.cSource ?? 'missing'), String(layer.phiSource ?? 'missing'), String(layer.finesSource ?? 'missing'), String(layer.labSample ?? '—')])
   const missingCount = layers.filter((layer) => layer.gammaSource === 'missing' || (groundwater != null && layer.bottom > groundwater && layer.gammaSatSource === 'missing')).length
   return <Frame screen="profile">
     <Source>{SOURCE_NOTES.investigation} Profil seçilen sondajın litolojisini ve aynı derinlik aralığındaki laboratuvar numunelerini kullanır. YASS kuyu verisinden gelir; mühendislik parametresi varsayılmaz.</Source>
