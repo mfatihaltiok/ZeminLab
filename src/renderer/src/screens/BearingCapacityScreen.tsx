@@ -1,59 +1,26 @@
 import { useMemo } from 'react'
 import { tbdyBearingCapacity, SOURCE_NOTES } from '../../../core/calculations/engineering'
 import { useProjectInfo } from '../../../core/state/project-store'
+import { forceFromBase, forceToBase, momentToBase, stressFromBase, stressToBase, unitWeightFromBase, unitWeightToBase, PROJECT_UNIT_LABELS } from '../../../core/units/project-units'
 import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
+import { CalculationTrace } from '../components/CalculationTrace'
 
 export function BearingCapacityScreen() {
-  const p = useProjectInfo()
-  const soil = p.soilParameters
-  const f = p.foundationParameters
-  const result = useMemo(() => tbdyBearingCapacity({
-    B: f.footingWidth, L: f.footingLength, Df: f.footingDepth,
-    gamma1: soil.unitWeight, gamma2: Math.max(soil.saturatedUnitWeight - 9.81, 0),
-    c: soil.cohesion, phi: soil.frictionAngle, verticalLoad: f.verticalLoad,
-    horizontalLoad: f.horizontalLoad, momentX: f.momentX, momentY: f.momentY,
-    groundSlope: soil.surfaceSlope, baseSlope: soil.foundationBaseSlope,
-    resistanceFactor: f.resistanceFactorRv
-  }), [soil, f])
-
-  return <Frame screen="bearing-capacity">
-    <Source>{SOURCE_NOTES.bearing}</Source>
-    <div className="metric-strip">
-      <Metric label="qk · karakteristik" value={result.qk.toFixed(1)} unit="kPa" tone="primary" />
-      <Metric label="qt · tasarım dayanımı" value={result.qt.toFixed(1)} unit="kPa" tone="primary" />
-      <Metric label="q0 · temel basıncı" value={result.qo.toFixed(1)} unit="kPa" />
-      <Metric label="Kullanım oranı" value={(result.utilization * 100).toFixed(1)} unit="%" />
-      <Metric label="Sonuç" value={result.adequate ? 'UYGUN' : 'YETERSİZ'} tone={result.adequate ? 'primary' : undefined} />
-    </div>
-    <div className="dashboard-grid">
-      <div>
-        <Card title="PROJE VERİSİ · SADECE OKUMA"><Table headers={['Girdi', 'Değer', 'Birim']} rows={[
-          ['B', f.footingWidth.toFixed(3), 'm'], ['L', f.footingLength.toFixed(3), 'm'], ['Df', f.footingDepth.toFixed(3), 'm'],
-          ['γ doğal', soil.unitWeight.toFixed(3), 'kN/m³'], ['γsat', soil.saturatedUnitWeight.toFixed(3), 'kN/m³'],
-          ['c / cu', soil.cohesion.toFixed(3), 'kPa'], ['φ′', soil.frictionAngle.toFixed(3), '°'],
-          ['Fz', f.verticalLoad.toFixed(3), 'kN'], ['V', f.horizontalLoad.toFixed(3), 'kN'], ['Mx / My', `${f.momentX.toFixed(3)} / ${f.momentY.toFixed(3)}`, 'kNm']
-        ]} /></Card>
-        <Card title="TBDY 16.8 HESAP AKIŞI"><Table headers={['Adım', 'Hesaplanan büyüklük', 'Değer']} rows={[
-          ['01', 'Eksantriklik ex / ey', `${result.ex.toFixed(4)} / ${result.ey.toFixed(4)} m`],
-          ['02', 'Etkin temel boyutları B′ / L′', `${result.Be.toFixed(3)} / ${result.Le.toFixed(3)} m`],
-          ['03', 'Nc / Nq / Nγ', `${result.Nc.toFixed(3)} / ${result.Nq.toFixed(3)} / ${result.Ngamma.toFixed(3)}`],
-          ['04', 'sc / sq / sγ', `${result.sc.toFixed(3)} / ${result.sq.toFixed(3)} / ${result.sg.toFixed(3)}`],
-          ['05', 'dc / dq / dγ', `${result.dc.toFixed(3)} / ${result.dq.toFixed(3)} / ${result.dg.toFixed(3)}`],
-          ['06', 'ic / iq / iγ', `${result.ic.toFixed(3)} / ${result.iq.toFixed(3)} / ${result.ig.toFixed(3)}`],
-          ['07', 'gc / gq / gγ', `${result.gc.toFixed(3)} / ${result.gq.toFixed(3)} / ${result.gg.toFixed(3)}`],
-          ['08', 'bc / bq / bγ', `${result.bc.toFixed(3)} / ${result.bq.toFixed(3)} / ${result.bg.toFixed(3)}`],
-          ['09', 'Sürşarj q', `${result.surcharge.toFixed(3)} kPa`], ['10', 'Karakteristik dayanım qk', `${result.qk.toFixed(3)} kPa`],
-          ['11', 'Tasarım dayanımı qt', `${result.qt.toFixed(3)} kPa`], ['12', 'Temel taban basıncı q0', `${result.qo.toFixed(3)} kPa`]
-        ]} /></Card>
-      </div>
-      <div>
-        <Card title="TBDY 2018 · DENKLEM 16.8"><div className="formula-large">qk = c·Nc·sc·dc·ic·gc·bc + q·Nq·sq·dq·iq·gq·bq + ½·γ₂·B′·Nγ·sγ·dγ·iγ·gγ·bγ</div><Source>{SOURCE_NOTES.bearing}</Source></Card>
-        <Card title="TASARIM KONTROLÜ"><Table headers={['Kontrol', 'Değer', 'Durum']} rows={[
-          ['q0 ≤ qt', `${result.qo.toFixed(2)} ≤ ${result.qt.toFixed(2)} kPa`, result.adequate ? 'UYGUN' : 'YETERSİZ'],
-          ['γRv', f.resistanceFactorRv.toFixed(3), 'Proje verisi'], ['Etkin alan B′·L′', `${(result.Be * result.Le).toFixed(2)} m²`, 'Hesaplandı'],
-          ['Sürşarj q = Df·γ', `${result.surcharge.toFixed(2)} kPa`, 'Hesaplandı']
-        ]} /></Card>
-      </div>
-    </div>
-  </Frame>
+  const p=useProjectInfo(); const soil=p.soilParameters; const f=p.foundationParameters; const result=useMemo(()=>tbdyBearingCapacity({B:f.footingWidth,L:f.footingLength,Df:f.footingDepth,gamma1:unitWeightToBase(soil.unitWeight,p.unitSystem),gamma2:Math.max(unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem)-9.80665,0),c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,verticalLoad:forceToBase(f.verticalLoad,p.unitSystem),horizontalLoad:forceToBase(f.horizontalLoad,p.unitSystem),momentX:momentToBase(f.momentX,p.unitSystem),momentY:momentToBase(f.momentY,p.unitSystem),groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:f.resistanceFactorRv||1}),[p.unitSystem,soil,f])
+  const stress=(v:number)=>stressFromBase(v,p.unitSystem); const force=(v:number)=>forceFromBase(v,p.unitSystem); const gamma=(v:number)=>unitWeightFromBase(v,p.unitSystem)
+  const trace=[
+    {symbol:'eₓ / eᵧ',title:'Yük eksantriklikleri',formula:'eₓ = Mᵧ / N  ·  eᵧ = Mₓ / N',value:`${result.ex.toFixed(4)} / ${result.ey.toFixed(4)} m`,note:'Moment ve düşey yükten elde edilir.'},
+    {symbol:'B′ / L′',title:'Etkin temel boyutları',formula:'B′ = B − 2|eₓ|  ·  L′ = L − 2|eᵧ|',value:`${result.Be.toFixed(3)} / ${result.Le.toFixed(3)} m`},
+    {symbol:'N꜀ / Nq / Nᵧ',title:'Taşıma gücü katsayıları',formula:'φ′ bağıntılarından N꜀, Nq, Nᵧ',value:`${result.Nc.toFixed(3)} / ${result.Nq.toFixed(3)} / ${result.Ngamma.toFixed(3)}`},
+    {symbol:'s',title:'Şekil katsayıları',formula:'s꜀, sq, sᵧ',value:`${result.sc.toFixed(3)} / ${result.sq.toFixed(3)} / ${result.sg.toFixed(3)}`},
+    {symbol:'d',title:'Derinlik katsayıları',formula:'d꜀, dq, dᵧ',value:`${result.dc.toFixed(3)} / ${result.dq.toFixed(3)} / ${result.dg.toFixed(3)}`},
+    {symbol:'i',title:'Yük eğikliği katsayıları',formula:'i꜀, iq, iᵧ',value:`${result.ic.toFixed(3)} / ${result.iq.toFixed(3)} / ${result.ig.toFixed(3)}`},
+    {symbol:'g',title:'Zemin eğimi katsayıları',formula:'g꜀, gq, gᵧ',value:`${result.gc.toFixed(3)} / ${result.gq.toFixed(3)} / ${result.gg.toFixed(3)}`},
+    {symbol:'b',title:'Temel tabanı eğimi katsayıları',formula:'b꜀, bq, bᵧ',value:`${result.bc.toFixed(3)} / ${result.bq.toFixed(3)} / ${result.bg.toFixed(3)}`},
+    {symbol:'q',title:'Sürşarj',formula:'q = Df · γ₁',value:gamma(result.surcharge),unit:PROJECT_UNIT_LABELS.unitWeight.replace('³','²')},
+    {symbol:'qₖ',title:'Karakteristik taşıma gücü',formula:'qₖ = cNcscdcicgc bc + qNqsqdqiqgqbq + ½γ₂B′Nᵧsᵧdᵧiᵧgᵧbᵧ',value:stress(result.qk),unit:PROJECT_UNIT_LABELS.stress},
+    {symbol:'qₜ',title:'Tasarım taşıma gücü',formula:'qₜ = qₖ / γRv',value:stress(result.qt),unit:PROJECT_UNIT_LABELS.stress},
+    {symbol:'q₀',title:'Temel taban basıncı',formula:'q₀ = N / (B′ · L′)',value:stress(result.qo),unit:PROJECT_UNIT_LABELS.stress}
+  ]
+  return <Frame screen="bearing-capacity"><Source>{SOURCE_NOTES.bearing}</Source><div className="metric-strip"><Metric label="qk · karakteristik" value={stress(result.qk).toFixed(2)} unit={PROJECT_UNIT_LABELS.stress} tone="primary"/><Metric label="qt · tasarım" value={stress(result.qt).toFixed(2)} unit={PROJECT_UNIT_LABELS.stress} tone="primary"/><Metric label="q0 · taban basıncı" value={stress(result.qo).toFixed(2)} unit={PROJECT_UNIT_LABELS.stress}/><Metric label="Kullanım oranı" value={(result.utilization*100).toFixed(1)} unit="%"/><Metric label="Sonuç" value={result.adequate?'UYGUN':'YETERSİZ'} tone={result.adequate?'primary':undefined}/></div><div className="dashboard-grid"><div><Card title="PROJE VERİSİ · OKUMA"><Table headers={['Girdi','Değer','Birim']} rows={[[ 'B',f.footingWidth.toFixed(3),'m'],['L',f.footingLength.toFixed(3),'m'],['Df',f.footingDepth.toFixed(3),'m'],['γ doğal',gamma(unitWeightToBase(soil.unitWeight,p.unitSystem)).toFixed(3),PROJECT_UNIT_LABELS.unitWeight],['γsat',gamma(unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem)).toFixed(3),PROJECT_UNIT_LABELS.unitWeight],['c / cu',stress( stressToBase(soil.cohesion,p.unitSystem)).toFixed(3),PROJECT_UNIT_LABELS.stress],['φ′',soil.frictionAngle.toFixed(3),'°'],['Fz',force(forceToBase(f.verticalLoad,p.unitSystem)).toFixed(3),PROJECT_UNIT_LABELS.force],['V',force(forceToBase(f.horizontalLoad,p.unitSystem)).toFixed(3),PROJECT_UNIT_LABELS.force],['Mx / My',`${force(momentToBase(f.momentX,p.unitSystem)).toFixed(3)} / ${force(momentToBase(f.momentY,p.unitSystem)).toFixed(3)}`,PROJECT_UNIT_LABELS.moment]]}/></Card><CalculationTrace title="TBDY 16.8 hesap zinciri" rows={trace} source={SOURCE_NOTES.bearing}/></div><div><Card title="FORMÜL"><div className="formula-large">qₖ = c·N꜀·s꜀·d꜀·i꜀·g꜀·b꜀ + q·Nq·sq·dq·iq·gq·bq + ½·γ₂·B′·Nᵧ·sᵧ·dᵧ·iᵧ·gᵧ·bᵧ</div></Card><Card title="KONTROLLER"><Table headers={['Kontrol','Değer','Durum']} rows={[[`q₀ ≤ qₜ`,`${stress(result.qo).toFixed(2)} ≤ ${stress(result.qt).toFixed(2)} ${PROJECT_UNIT_LABELS.stress}`,result.adequate?'UYGUN':'YETERSİZ'],['γRv',f.resistanceFactorRv.toFixed(3),'Proje verisi'],['B′·L′',`${(result.Be*result.Le).toFixed(2)} m²`,'Hesaplandı']]}/></Card></div></div></Frame>
 }
