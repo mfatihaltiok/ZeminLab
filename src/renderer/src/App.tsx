@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from 'react'
 import './assets/main.css'
 import { WorkspaceShell, type ScreenId } from './workspace/WorkspaceShell'
-import { Dashboard, Bearing, FieldScreen, Foundation, JetGrout, Liquefaction, ProjectInfo, Report, Settlement, useDemoFieldData } from './screens/EngineeringScreens'
+import { Dashboard, FieldScreen, Foundation, JetGrout, Liquefaction, ProjectInfo, Report, Settlement, useDemoFieldData } from './screens/EngineeringScreens'
 import { EarthquakeScreen } from './screens/EarthquakeScreen'
 import { SoilProfileScreen } from './screens/SoilProfileScreen'
+import { BearingCapacityScreen } from './screens/BearingCapacityScreen'
 import { defaultProjectInfo } from '../../core/models/project'
 import { updateProjectInfo, useProjectInfo } from '../../core/state/project-store'
 import type { ProjectInfo as ProjectInfoModel } from '../../core/models/project'
@@ -64,7 +65,7 @@ export default function App() {
     field: <FieldScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />,
     profile: <SoilProfileScreen boreholes={boreholes} labs={labs} />,
     earthquake: <EarthquakeScreen />,
-    'bearing-capacity': <Bearing />,
+    'bearing-capacity': <BearingCapacityScreen />,
     settlement: <Settlement />,
     liquefaction: <Liquefaction />,
     foundation: <Foundation />,
