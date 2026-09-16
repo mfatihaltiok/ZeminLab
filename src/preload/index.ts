@@ -1,12 +1,18 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
-// Custom APIs for renderer
-const api = {}
+const api = {
+  project: {
+    save: (payload: unknown, currentPath?: string) => ipcRenderer.invoke('project:save', payload, currentPath) as Promise<string | null>,
+    open: () => ipcRenderer.invoke('project:open') as Promise<{ filePath: string; data: unknown } | null>
+  },
+  window: {
+    minimize: () => ipcRenderer.invoke('window:minimize') as Promise<void>,
+    maximizeToggle: () => ipcRenderer.invoke('window:maximize-toggle') as Promise<boolean>,
+    close: () => ipcRenderer.invoke('window:close') as Promise<void>
+  }
+}
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
@@ -15,8 +21,8 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // @ts-ignore (define in dts)
+  // @ts-ignore Electron's non-isolated fallback is only used by the template configuration.
   window.electron = electronAPI
-  // @ts-ignore (define in dts)
+  // @ts-ignore
   window.api = api
 }
