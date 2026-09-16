@@ -44,6 +44,27 @@ export interface LithologyLayer {
   liquidLimit?: number
   plasticLimit?: number
   plasticityIndex?: number
+  userOverride?: boolean
+  notes?: string
+}
+
+export interface BoreholeLogObservation {
+  id: string
+  depth: number
+  depthTo?: number
+  type: 'sample' | 'water' | 'drilling' | 'remark' | 'refusal' | 'rock'
+  text: string
+  source: FieldDataSource
+  confirmed: boolean
+}
+
+export interface BoreholeLogSettings {
+  scale: 50 | 100 | 200
+  showSpt: boolean
+  showLaboratory: boolean
+  showGroundwater: boolean
+  showSamples: boolean
+  showRemarks: boolean
 }
 
 export interface BoreholeRecord {
@@ -54,8 +75,16 @@ export interface BoreholeRecord {
   groundwaterDepth?: number
   elevation?: number
   location?: string
+  drillingMethod?: string
+  drillingDiameter?: number
+  casingDiameter?: number
+  startDate?: string
+  endDate?: string
+  operator?: string
   lithology: LithologyLayer[]
   spt: SptRecord[]
+  logObservations?: BoreholeLogObservation[]
+  logSettings?: BoreholeLogSettings
 }
 
 export interface LaboratoryRecord {
@@ -97,3 +126,5 @@ export interface LaboratoryRecord {
   confirmed: boolean
   notes?: string
 }
+
+export const DEFAULT_BOREHOLE_LOG_SETTINGS: BoreholeLogSettings = { scale: 100, showSpt: true, showLaboratory: true, showGroundwater: true, showSamples: true, showRemarks: true }
