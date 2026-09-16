@@ -3,7 +3,6 @@ export type SptInput={depth:number;nField:number;energyRatio?:number;boreholeDia
 export type BearingMethod='Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
 const clamp=(x:number,a:number,b:number)=>Math.max(a,Math.min(b,x))
 const rad=(x:number)=>x*Math.PI/180
-const deg=(x:number)=>x*180/Math.PI
 
 export function classifySoilISO14688(ll?:number,pi?:number){if(ll==null||pi==null||!Number.isFinite(ll)||!Number.isFinite(pi)||ll<=0)return null;const a=.73*(ll-20),clay=pi>=a&&pi>=4,group=ll<35?'L':ll<=50?'M':'H';return{code:clay?`CI${group}`:`Si${group}`,description:clay?'Kil':'Silt',plasticity:group,isClay:clay,aLine:a}}
 
