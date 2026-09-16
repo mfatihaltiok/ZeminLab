@@ -1,5 +1,11 @@
 export type UnitSystem = 'kN-m' | 'ton-m' | 'kPa-m'
 
+export type SoilClassificationSystem = 'TS EN ISO 14688-2' | 'TBDY 2018'
+
+export type SoilClassificationCode =
+  | 'CIL' | 'CIM' | 'CIH' | 'SiL' | 'SiM' | 'SiH'
+  | 'ZA' | 'ZB' | 'ZC' | 'ZD' | 'ZE' | 'ZF'
+
 export interface ProjectVisualDocuments {
   aerialPhoto?: string
   layoutPlan?: string
@@ -8,15 +14,20 @@ export interface ProjectVisualDocuments {
   foundationStress?: string
 }
 
+export interface SoilClassification {
+  system: SoilClassificationSystem
+  code: SoilClassificationCode
+}
+
 export interface SoilParameters {
   unitWeight: number
   saturatedUnitWeight: number
   cohesion: number
   frictionAngle: number
-  groundwaterDepth: number
   surfaceSlope: number
   foundationBaseSlope: number
   finesContent: number
+  classification: SoilClassification
 }
 
 export interface FoundationParameters {
@@ -75,10 +86,10 @@ export const defaultProjectInfo: ProjectInfo = {
     saturatedUnitWeight: 20,
     cohesion: 10,
     frictionAngle: 30,
-    groundwaterDepth: 10,
     surfaceSlope: 0,
     foundationBaseSlope: 0,
-    finesContent: 0
+    finesContent: 0,
+    classification: { system: 'TS EN ISO 14688-2', code: 'CIL' }
   },
   foundationParameters: {
     footingWidth: 2,
