@@ -1,10 +1,6 @@
 export type UnitSystem = 'kN-m' | 'ton-m' | 'kPa-m'
-
 export type SoilClassificationSystem = 'TS EN ISO 14688-2' | 'TBDY 2018'
-
-export type SoilClassificationCode =
-  | 'CIL' | 'CIM' | 'CIH' | 'SiL' | 'SiM' | 'SiH'
-  | 'ZA' | 'ZB' | 'ZC' | 'ZD' | 'ZE' | 'ZF'
+export type SoilClassificationCode = 'CIL' | 'CIM' | 'CIH' | 'SiL' | 'SiM' | 'SiH' | 'ZA' | 'ZB' | 'ZC' | 'ZD' | 'ZE' | 'ZF'
 
 export interface ProjectVisualDocuments {
   aerialPhoto?: string
@@ -13,23 +9,18 @@ export interface ProjectVisualDocuments {
   foundationPlan?: string
   foundationStress?: string
 }
-
-export interface SoilClassification {
-  system: SoilClassificationSystem
-  code: SoilClassificationCode
-}
-
+export interface SoilClassification { system: SoilClassificationSystem; code: SoilClassificationCode }
 export interface SoilParameters {
   unitWeight: number
   saturatedUnitWeight: number
   cohesion: number
   frictionAngle: number
+  groundwaterDepth?: number
   surfaceSlope: number
   foundationBaseSlope: number
   finesContent: number
   classification: SoilClassification
 }
-
 export interface FoundationParameters {
   footingWidth: number
   footingLength: number
@@ -41,7 +32,6 @@ export interface FoundationParameters {
   momentY: number
   resistanceFactorRv: number
 }
-
 export interface ProjectInfo {
   id: string
   title: string
@@ -63,44 +53,9 @@ export interface ProjectInfo {
   foundationParameters: FoundationParameters
   visualDocuments: ProjectVisualDocuments
 }
-
 export const defaultProjectInfo: ProjectInfo = {
-  id: 'proj_default_01',
-  title: 'Zemin Etüdü Projesi',
-  projectNo: '',
-  date: new Date().toISOString().slice(0, 10),
-  location: '',
-  province: '',
-  district: '',
-  address: '',
-  parcelInfo: '',
-  engineer: '',
-  clientName: '',
-  firmName: '',
-  buildingType: '',
-  basementCount: 0,
-  normalFloorCount: 0,
-  unitSystem: 'kN-m',
-  soilParameters: {
-    unitWeight: 18,
-    saturatedUnitWeight: 20,
-    cohesion: 10,
-    frictionAngle: 30,
-    surfaceSlope: 0,
-    foundationBaseSlope: 0,
-    finesContent: 0,
-    classification: { system: 'TS EN ISO 14688-2', code: 'CIL' }
-  },
-  foundationParameters: {
-    footingWidth: 2,
-    footingLength: 2,
-    footingDepth: 1,
-    safetyFactor: 3,
-    verticalLoad: 0,
-    horizontalLoad: 0,
-    momentX: 0,
-    momentY: 0,
-    resistanceFactorRv: 1.4
-  },
+  id: 'proj_default_01', title: 'Zemin Etüdü Projesi', projectNo: '', date: new Date().toISOString().slice(0, 10), location: '', province: '', district: '', address: '', parcelInfo: '', engineer: '', clientName: '', firmName: '', buildingType: '', basementCount: 0, normalFloorCount: 0, unitSystem: 'kN-m',
+  soilParameters: { unitWeight: 18, saturatedUnitWeight: 20, cohesion: 10, frictionAngle: 30, groundwaterDepth: undefined, surfaceSlope: 0, foundationBaseSlope: 0, finesContent: 0, classification: { system: 'TS EN ISO 14688-2', code: 'CIL' } },
+  foundationParameters: { footingWidth: 2, footingLength: 2, footingDepth: 1, safetyFactor: 3, verticalLoad: 0, horizontalLoad: 0, momentX: 0, momentY: 0, resistanceFactorRv: 1.4 },
   visualDocuments: {}
 }
