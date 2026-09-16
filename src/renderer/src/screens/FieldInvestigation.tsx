@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import '../assets/field-workspace.css'
 import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../../../core/models/field-data'
-import { classifyLaboratoryRecord, deriveSptValues } from '../../../core/engineering/field-calculations'
+import { deriveSptValues } from '../../../core/engineering/field-calculations'
+import { applyLaboratoryDerivedValues } from '../../../core/engineering/laboratory-calculations'
 
 type Props = {
   boreholes: BoreholeRecord[]
@@ -151,12 +152,12 @@ function LaboratoryGrid({ borehole, labs, onChange }: { borehole: BoreholeRecord
     const next = {...row,[key]:value} as LaboratoryRecord
     if (key==='liquidLimit' || key==='plasticLimit') next.plasticityIndex = next.liquidLimit !== undefined && next.plasticLimit !== undefined ? next.liquidLimit-next.plasticLimit : undefined
     next.soilDescription = next.soilCode ? soilMap.get(next.soilCode)?.description : next.soilDescription
-    const classified = classifyLaboratoryRecord(next)
-    onChange(labs.map(l=>l.id===row.id ? {...next,...classified} : l))
+    const calculated = applyLaboratoryDerivedValues(next)
+    onChange(labs.map(l=>l.id===row.id ? {...next,...calculated} : l))
   }
   const cell = (row: LaboratoryRecord,key: keyof LaboratoryRecord, width='w-16') => <input className={`lab-input ${width}`} type="number" value={(row[key] as number|undefined) ?? ''} onChange={e=>update(row,key,e.target.value)}/>
   return <div className="engineering-grid-wrap laboratory-wrap">
-    <div className="grid-toolbar"><b>LABORATUVAR</b><span>Derinlik ve deney tipi SPT ekranından otomatik gelir · laboratuvar sonuçları burada girilir</span></div>
+    <div className="grid-toolbar"><b>LABORATUVAR</b><span>Derinlik ve deney tipi SPT ekranından otomatik gelir · korelasyon hesapları ayrı hesap modülünde tutulur</span></div>
     <div className="lab-scroll"><table className="engineering-grid laboratory-grid">
       <thead><tr>
         <th rowSpan={2}>Kuyu</th><th colSpan={3}>Numunenin</th><th rowSpan={2}>Doğal Su (%)</th><th colSpan={2}>Elek Analizi</th><th colSpan={3}>Atterberg Limitleri</th><th rowSpan={2}>Nokta Yük. Is₅₀</th><th rowSpan={2}>Birim Hacim Ağırlık</th><th rowSpan={2}>Kaya Tek Eksenli</th><th colSpan={2}>Üç Eksenli (UU)</th><th colSpan={2}>Konsolidasyon</th><th colSpan={2}>Elastisite Modülü</th><th colSpan={2}>Hidrometre</th><th rowSpan={2}>Yoğunluk</th><th rowSpan={2}>Porozite</th><th rowSpan={2}>Boşluk Oranı</th><th colSpan={2}>Direkt Kesme</th><th rowSpan={2}>Otomatik İşlemler</th>
