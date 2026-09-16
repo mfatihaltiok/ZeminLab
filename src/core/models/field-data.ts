@@ -24,6 +24,7 @@ export interface SptRecord {
   soilCode?: string
   soilDescription?: string
   correction?: Partial<SptCorrectionConfig>
+  laboratoryLinked?: boolean
   notes?: string
   source: FieldDataSource
   confirmed: boolean
