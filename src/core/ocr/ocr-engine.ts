@@ -14,6 +14,7 @@ export interface OcrOptions {
 
 const numberPattern = /[-+]?\d+(?:[.,]\d+)?/g
 const normalizeNumber = (value: string) => Number(value.replace(',', '.'))
+const localOcrBase = `${import.meta.env.BASE_URL}tesseract`
 
 function numericTokens(text: string): number[] {
   return (text.match(numberPattern) ?? []).map(normalizeNumber).filter(Number.isFinite)
@@ -104,7 +105,12 @@ async function recognizeImage(file: File, worker: Awaited<ReturnType<typeof crea
 }
 
 export async function runOcr(file: File, options: OcrOptions = {}): Promise<{ document: OcrDocumentResult; candidates: OcrCandidate[] }> {
-  const worker = await createWorker('tur+eng', 1, { logger: (message) => options.onProgress?.(typeof message.progress === 'number' ? message.progress : 0) })
+  const worker = await createWorker('tur+eng', 1, {
+    workerPath: `${localOcrBase}/worker/worker.min.js`,
+    corePath: `${localOcrBase}/core`,
+    langPath: `${localOcrBase}/lang`,
+    logger: (message) => options.onProgress?.(typeof message.progress === 'number' ? message.progress : 0)
+  })
   try {
     const kind = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image'
     const pages = kind === 'pdf' ? await renderPdfPages(file, options, worker) : await recognizeImage(file, worker, options)
