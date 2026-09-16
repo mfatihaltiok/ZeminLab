@@ -1,0 +1,40 @@
+import { useMemo, useState } from 'react'
+import { Card, Field, Frame } from '../workspace/WorkspaceShell'
+import type { BoreholeLogObservation, BoreholeRecord, LaboratoryRecord, LithologyLayer } from '../../../core/models/field-data'
+import { DEFAULT_BOREHOLE_LOG_SETTINGS } from '../../../core/models/field-data'
+import './borehole-log.css'
+
+type Props = { boreholes: BoreholeRecord[]; labs: LaboratoryRecord[]; onBoreholesChange: (rows: BoreholeRecord[]) => void }
+const fmt = (v?: number) => v === undefined || !Number.isFinite(v) ? '—' : v.toFixed(2)
+const colorMap: Record<LithologyLayer['colorClass'], string> = { fill: '#b99a72', clay: '#d5a06f', silt: '#c6b66a', sand: '#e0c66a', gravel: '#9da5a8', rock: '#737b82' }
+
+export default function BoreholeLogScreen({ boreholes, labs, onBoreholesChange }: Props) {
+  const [selectedId, setSelectedId] = useState(boreholes[0]?.id ?? '')
+  const borehole = boreholes.find((b) => b.id === selectedId) ?? boreholes[0]
+  const labRows = useMemo(() => borehole ? labs.filter((l) => l.boreholeId === borehole.id).sort((a,b) => a.depth-b.depth) : [], [borehole, labs])
+  const update = (patch: Partial<BoreholeRecord>) => { if (!borehole) return; onBoreholesChange(boreholes.map((b) => b.id === borehole.id ? { ...b, ...patch } : b)) }
+  const updateLayer = (id: string, patch: Partial<LithologyLayer>) => update({ lithology: borehole!.lithology.map((l) => l.id === id ? { ...l, ...patch, userOverride: true } : l) })
+  const addLayer = () => { if (!borehole) return; const from = borehole.lithology.at(-1)?.to ?? 0; update({ lithology: [...borehole.lithology, { id: crypto.randomUUID(), from, to: from + 1, code: 'Mg', description: 'Kullanıcı tanımı', colorClass: 'fill', userOverride: true }] }) }
+  const removeLayer = (id: string) => update({ lithology: borehole!.lithology.filter((l) => l.id !== id) })
+  const addObservation = () => { if (!borehole) return; const row: BoreholeLogObservation = { id: crypto.randomUUID(), depth: 0, type: 'remark', text: '', source: 'manual', confirmed: false }; update({ logObservations: [...(borehole.logObservations ?? []), row] }) }
+  const updateObservation = (id: string, patch: Partial<BoreholeLogObservation>) => update({ logObservations: (borehole!.logObservations ?? []).map((o) => o.id === id ? { ...o, ...patch } : o) })
+  const removeObservation = (id: string) => update({ logObservations: (borehole!.logObservations ?? []).filter((o) => o.id !== id) })
+  if (!boreholes.length) return <Frame screen="borehole-log"><div className="empty-state"><b>Henüz sondaj bulunmuyor.</b><span>Sondaj oluşturulduğunda birleşik SPT + laboratuvar logu burada oluşur.</span></div></Frame>
+  return <Frame screen="borehole-log">
+    <div className="log-toolbar"><label>Sondaj<select value={borehole.id} onChange={(e) => setSelectedId(e.target.value)}>{boreholes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label><div className="log-toolbar-actions"><button onClick={addLayer}>+ Katman</button><button onClick={addObservation}>+ Not</button><button onClick={() => update({ logSettings: { ...(borehole.logSettings ?? DEFAULT_BOREHOLE_LOG_SETTINGS), showSpt: !(borehole.logSettings ?? DEFAULT_BOREHOLE_LOG_SETTINGS).showSpt } })}>SPT görünümü</button></div></div>
+    <div className="log-workspace">
+      <div className="log-preview-card"><div className="log-preview-header"><div><b>{borehole.name}</b><span>SONDAJ LOGU · Ölçek 1:{borehole.logSettings?.scale ?? 100}</span></div><div><span>Toplam {fmt(borehole.totalDepth)} m</span><span>YASS {fmt(borehole.groundwaterDepth)} m</span></div></div><div className="borehole-log-canvas">
+        <div className="depth-ruler"><div className="log-column-title">DERİNLİK</div>{Array.from({ length: Math.ceil(borehole.totalDepth) + 1 }, (_, i) => <div className="depth-mark" key={i} style={{ top: `${(i / Math.max(borehole.totalDepth, 1)) * 100}%` }}><span>{i.toFixed(0)}</span><i /></div>)}</div>
+        <div className="lithology-column"><div className="log-column-title">LİTOLOJİ</div><div className="lithology-stack">{borehole.lithology.map((layer) => <div key={layer.id} className="lithology-band" style={{ top: `${(layer.from / Math.max(borehole.totalDepth,1))*100}%`, height: `${Math.max(((layer.to-layer.from)/Math.max(borehole.totalDepth,1))*100,1)}%`, background: colorMap[layer.colorClass] }}><span>{layer.code}</span><small>{layer.description}</small></div>)}</div></div>
+        <div className="spt-column"><div className="log-column-title">SPT / UD</div><div className="test-stack">{borehole.spt.map((row) => <div className="test-marker" key={row.id} style={{ top: `${(row.depth / Math.max(borehole.totalDepth,1))*100}%` }}><b>{row.testType}</b><span>{row.testType === 'SPT' ? `${row.n1 ?? '—'} / ${row.n2 ?? '—'} / ${row.n3 ?? '—'}` : 'UD'}</span></div>)}</div></div>
+        <div className="lab-column"><div className="log-column-title">LABORATUVAR</div><div className="test-stack">{labRows.map((row) => <div className="lab-marker" key={row.id} style={{ top: `${(row.depth / Math.max(borehole.totalDepth,1))*100}%` }}><b>{row.sampleId}</b><span>{row.sampleType}</span></div>)}</div></div>
+        <div className="remarks-column"><div className="log-column-title">AÇIKLAMA / NOT</div><div className="test-stack">{(borehole.logObservations ?? []).map((row) => <div className="remark-marker" key={row.id} style={{ top: `${(row.depth / Math.max(borehole.totalDepth,1))*100}%` }}><b>{row.type}</b><span>{row.text || '—'}</span></div>)}</div></div>
+      </div></div>
+      <div className="log-editor-column">
+        <Card title="SONDAJ BİLGİLERİ"><div className="form-grid"><Field label="Kuyu adı" type="text" value={borehole.name} onChange={(v) => update({ name: v })} /><Field label="Kot" value={borehole.elevation ?? ''} onChange={(v) => update({ elevation: v === '' ? undefined : Number(v) })} /><Field label="Toplam derinlik (m)" value={borehole.totalDepth} onChange={(v) => update({ totalDepth: Number(v) || 0 })} /><Field label="YASS (m)" value={borehole.groundwaterDepth ?? ''} onChange={(v) => update({ groundwaterDepth: v === '' ? undefined : Number(v) })} /><Field label="Sondaj yöntemi" type="text" value={borehole.drillingMethod ?? ''} onChange={(v) => update({ drillingMethod: v })} /><Field label="Sondaj çapı (mm)" value={borehole.drillingDiameter ?? ''} onChange={(v) => update({ drillingDiameter: v === '' ? undefined : Number(v) })} /></div></Card>
+        <Card title="LİTOLOJİ · KULLANICI MÜDAHALESİ"><div className="log-layer-editor">{borehole.lithology.map((layer) => <div className="layer-edit-row" key={layer.id}><input type="number" value={layer.from} step="0.01" onChange={(e) => updateLayer(layer.id, { from: Number(e.target.value) })} /><input type="number" value={layer.to} step="0.01" onChange={(e) => updateLayer(layer.id, { to: Number(e.target.value) })} /><input value={layer.code} onChange={(e) => updateLayer(layer.id, { code: e.target.value })} /><input value={layer.description} onChange={(e) => updateLayer(layer.id, { description: e.target.value })} /><button onClick={() => removeLayer(layer.id)}>×</button></div>)}{!borehole.lithology.length && <div className="inline-empty">Litoloji katmanı henüz oluşturulmadı.</div>}</div></Card>
+        <Card title="SAHA NOTLARI"><div className="observation-editor">{(borehole.logObservations ?? []).map((row) => <div className="observation-row" key={row.id}><input type="number" value={row.depth} step="0.01" onChange={(e) => updateObservation(row.id, { depth: Number(e.target.value) })} /><select value={row.type} onChange={(e) => updateObservation(row.id, { type: e.target.value as BoreholeLogObservation['type'] })}><option value="remark">Not</option><option value="sample">Numune</option><option value="water">Su</option><option value="drilling">Sondaj</option><option value="refusal">Refü</option><option value="rock">Kaya</option></select><input value={row.text} placeholder="Açıklama" onChange={(e) => updateObservation(row.id, { text: e.target.value })} /><button onClick={() => removeObservation(row.id)}>×</button></div>)}</div></Card>
+      </div>
+    </div>
+  </Frame>
+}
