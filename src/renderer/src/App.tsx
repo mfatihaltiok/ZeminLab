@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import './assets/main.css'
+import './assets/workspace-polish.css'
 import { WorkspaceShell, type ScreenId } from './workspace/WorkspaceShell'
 import { Dashboard, Foundation, JetGrout, Liquefaction, Settlement } from './screens/EngineeringScreens'
 import FieldInvestigation from './screens/FieldInvestigation'
