@@ -1,6 +1,18 @@
 export type BoreholeId = string
 
 export type SptTestType = 'SPT' | 'UD'
+export type FieldDataSource = 'manual' | 'image-review' | 'imported'
+export type LithologyColorClass = 'fill' | 'clay' | 'silt' | 'sand' | 'gravel' | 'rock'
+
+export interface SptCorrectionConfig {
+  energyRatio: number
+  boreholeCorrection: number
+  samplerCorrection: number
+  rodLengthCorrection: number
+  applyOverburdenCorrection: boolean
+  applyDilatancyCorrection: boolean
+  fineContent?: number
+}
 
 export interface SptRecord {
   id: string
@@ -12,9 +24,27 @@ export interface SptRecord {
   nSpt?: number
   soilCode?: string
   soilDescription?: string
+  correction?: Partial<SptCorrectionConfig>
   notes?: string
-  source: 'manual' | 'image-review' | 'imported'
+  source: FieldDataSource
   confirmed: boolean
+}
+
+export interface LithologyLayer {
+  id: string
+  from: number
+  to: number
+  code: string
+  description: string
+  colorClass: LithologyColorClass
+  unitWeight?: number
+  saturatedUnitWeight?: number
+  cohesion?: number
+  frictionAngle?: number
+  finesContent?: number
+  liquidLimit?: number
+  plasticLimit?: number
+  plasticityIndex?: number
 }
 
 export interface BoreholeRecord {
@@ -24,14 +54,7 @@ export interface BoreholeRecord {
   groundwaterDepth?: number
   elevation?: number
   location?: string
-  lithology: Array<{
-    id: string
-    from: number
-    to: number
-    code: string
-    description: string
-    colorClass: 'fill' | 'clay' | 'silt' | 'sand' | 'gravel' | 'rock'
-  }>
+  lithology: LithologyLayer[]
   spt: SptRecord[]
 }
 
@@ -48,7 +71,10 @@ export interface LaboratoryRecord {
   plasticityIndex?: number
   c?: number
   phi?: number
-  source: 'manual' | 'image-review' | 'imported'
+  finesContent?: number
+  soilCode?: string
+  soilDescription?: string
+  source: FieldDataSource
   confirmed: boolean
   notes?: string
 }
