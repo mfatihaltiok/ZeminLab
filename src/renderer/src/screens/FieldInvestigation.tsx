@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import '../assets/field-workspace.css'
 import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../../../core/models/field-data'
 import { deriveSptValues } from '../../../core/engineering/field-calculations'
@@ -67,14 +67,20 @@ function blankBorehole(index: number): BoreholeRecord {
 function fmt(v?: number, d = 2) { return v === undefined || !Number.isFinite(v) ? '—' : v.toFixed(d) }
 function sourceLabel(source: string, confirmed: boolean) { return confirmed ? 'Onaylandı' : source === 'image-review' ? 'Görsel inceleme' : source === 'imported' ? 'İçe aktarıldı' : 'Manuel' }
 
-function nextExperimentDepth(borehole: BoreholeRecord) {
-  const depths = borehole.spt.map(r => r.depth).filter(Number.isFinite)
-  return depths.length ? Math.max(...depths) + 1.5 : borehole.firstSptDepth
+function experimentDepthTo(row: SptRecord) {
+  return row.depthTo ?? row.depth + (row.testType === 'UD' ? 0.5 : 0.45)
 }
+
+function nextExperimentDepth(borehole: BoreholeRecord) {
+  const sptRows = borehole.spt.filter(r => r.testType === 'SPT' && Number.isFinite(r.depth)).sort((a, b) => a.depth - b.depth)
+  return sptRows.length ? sptRows[sptRows.length - 1].depth + 1.5 : borehole.firstSptDepth
+}
+
 function addSptRow(borehole: BoreholeRecord): BoreholeRecord | null {
   const depth = nextExperimentDepth(borehole)
+  const depthTo = depth + 0.45
   if (depth > borehole.totalDepth + 1e-9) return null
-  const row: SptRecord = { id: crypto.randomUUID(), depth, testType: 'SPT', source: 'manual', confirmed: false }
+  const row: SptRecord = { id: crypto.randomUUID(), depth, depthTo, testType: 'SPT', source: 'manual', confirmed: false }
   return { ...borehole, spt: [...borehole.spt, row].sort((a,b) => a.depth-b.depth) }
 }
 function syncLabs(labs: LaboratoryRecord[], borehole: BoreholeRecord): LaboratoryRecord[] {
@@ -102,27 +108,55 @@ function syncLabs(labs: LaboratoryRecord[], borehole: BoreholeRecord): Laborator
 function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (b: BoreholeRecord) => void }) {
   const updateMeta = (key: 'firstSptDepth'|'totalDepth'|'groundwaterDepth', value: string) => {
     const n = value === '' ? undefined : Number(value)
-    if (key === 'firstSptDepth') onChange({ ...borehole, firstSptDepth: Number.isFinite(n) ? n! : borehole.firstSptDepth })
-    else if (key === 'totalDepth') onChange({ ...borehole, totalDepth: Number.isFinite(n) && n! > 0 ? n! : borehole.totalDepth, spt: borehole.spt.filter(r => r.depth <= (Number.isFinite(n) ? n! : borehole.totalDepth)) })
-    else onChange({ ...borehole, groundwaterDepth: Number.isFinite(n) ? n : undefined })
+    if (key === 'firstSptDepth') {
+      const firstDepth = Number.isFinite(n) ? n! : borehole.firstSptDepth
+      const firstRow = borehole.spt.slice().sort((a,b) => a.depth-b.depth)[0]
+      const spt = firstRow?.testType === 'SPT'
+        ? borehole.spt.map(row => row.id === firstRow.id ? { ...row, depth: firstDepth, depthTo: firstDepth + 0.45 } : row).sort((a,b) => a.depth-b.depth)
+        : borehole.spt
+      onChange({ ...borehole, firstSptDepth: firstDepth, spt })
+    } else if (key === 'totalDepth') {
+      const totalDepth = Number.isFinite(n) && n! > 0 ? n! : borehole.totalDepth
+      onChange({ ...borehole, totalDepth, spt: borehole.spt.filter(r => r.depth <= totalDepth + 1e-9) })
+    } else {
+      onChange({ ...borehole, groundwaterDepth: Number.isFinite(n) ? n : undefined })
+    }
   }
-  const updateRow = (id: string, patch: Partial<SptRecord>) => onChange({ ...borehole, spt: borehole.spt.map(r => r.id === id ? { ...r, ...patch } : r).sort((a,b) => a.depth-b.depth) })
+
+  const updateRow = (id: string, patch: Partial<SptRecord>) => {
+    const current = borehole.spt.find(row => row.id === id)
+    if (!current) return
+    const next = { ...current, ...patch }
+    if (patch.testType) next.depthTo = next.depth + (next.testType === 'UD' ? 0.5 : 0.45)
+    if (patch.depth !== undefined) next.depthTo = next.depth + (next.testType === 'UD' ? 0.5 : 0.45)
+    onChange({ ...borehole, spt: borehole.spt.map(r => r.id === id ? next : r).sort((a,b) => a.depth-b.depth) })
+  }
+
+  const updateUdDepth = (id: string, value: string) => {
+    const n = Number(value)
+    if (!Number.isFinite(n)) return
+    updateRow(id, { depth: n, depthTo: n + 0.5 })
+  }
+
   const add = () => { const next = addSptRow(borehole); if (next) onChange(next) }
   return <>
     <div className="field-meta-strip">
       <label>İlk deney derinliği (m)<input type="number" value={borehole.firstSptDepth} min="0" step="0.1" onChange={e => updateMeta('firstSptDepth', e.target.value)} /></label>
       <label>Kuyu toplam derinliği (m)<input type="number" value={borehole.totalDepth} min="0.1" step="0.1" onChange={e => updateMeta('totalDepth', e.target.value)} /></label>
       <label>YASS (m)<input type="number" value={borehole.groundwaterDepth ?? ''} min="0" step="0.01" placeholder="Ölçülmediyse boş" onChange={e => updateMeta('groundwaterDepth', e.target.value)} /></label>
-      <span className="field-rule-note">Eski yazılım kuralı: ilk deney → +1.50 m. SPT penetrasyonu 0.45 m, UD penetrasyonu 0.50 m.</span>
+      <span className="field-rule-note">SPT: 45 cm · UD: 50 cm · yeni SPT: son SPT başlangıç derinliği + 1.50 m</span>
     </div>
     <div className="engineering-grid-wrap spt-grid-wrap">
-      <div className="grid-toolbar"><b>SPT / ARAZİ DENEYLERİ</b><span>{borehole.spt.length} deney · son derinlik {fmt(borehole.spt.at(-1)?.depth)} m</span><button onClick={add}>+ Deney</button></div>
+      <div className="grid-toolbar"><b>SPT / ARAZİ DENEYLERİ</b><span>{borehole.spt.length} deney · son başlangıç {fmt(borehole.spt.at(-1)?.depth)} m</span><button onClick={add}>+ Deney</button></div>
       <table className="engineering-grid spt-grid"><colgroup><col className="col-depth"/><col className="col-type"/><col className="col-n"/><col className="col-n"/><col className="col-n"/><col className="col-n30"/><col className="col-soil"/><col className="col-description"/><col className="col-source"/><col className="col-confirm"/><col className="col-delete"/></colgroup>
         <thead><tr><th>Derinlik</th><th>Deney Tipi</th><th>n1</th><th>n2</th><th>n3</th><th>N30</th><th>Zemin Sınıfı</th><th>Zemin Açıklaması</th><th>Kaynak</th><th>Onay</th><th/></tr></thead>
         <tbody>{borehole.spt.map(row => {
           const n30 = row.testType === 'SPT' && row.n2 !== undefined && row.n3 !== undefined ? row.n2 + row.n3 : undefined
           return <tr key={row.id}>
-            <td><input className="depth-input" type="number" readOnly value={row.depth}/></td>
+            <td>{row.testType === 'UD'
+              ? <div className="depth-range"><input className="depth-input" type="number" value={row.depth} min="0" step="0.01" onChange={e=>updateUdDepth(row.id,e.target.value)}/><span>– {fmt(experimentDepthTo(row))}</span></div>
+              : <span className="depth-range locked-cell"><span>{fmt(row.depth)}</span><span>– {fmt(experimentDepthTo(row))}</span></span>}
+            </td>
             <td><select className={`test-type ${row.testType === 'UD' ? 'ud' : 'spt'}`} value={row.testType} onChange={e => updateRow(row.id,{testType:e.target.value as SptRecord['testType'],n1:e.target.value==='UD'?undefined:row.n1,n2:e.target.value==='UD'?undefined:row.n2,n3:e.target.value==='UD'?undefined:row.n3})}><option value="SPT">SPT</option><option value="UD">UD</option></select></td>
             <td><input className="n-input" type="number" value={row.n1 ?? ''} disabled={row.testType==='UD'} onChange={e=>updateRow(row.id,{n1:e.target.value===''?undefined:Number(e.target.value)})}/></td>
             <td><input className="n-input" type="number" value={row.n2 ?? ''} disabled={row.testType==='UD'} onChange={e=>updateRow(row.id,{n2:e.target.value===''?undefined:Number(e.target.value)})}/></td>
@@ -142,7 +176,7 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
 
 function SptAnalysis({ borehole }: { borehole: BoreholeRecord }) {
   const rows = borehole.spt.filter(r=>r.testType==='SPT').map(record=>({record,derived:deriveSptValues(borehole,record)}))
-  return <div className="engineering-grid-wrap"><div className="grid-toolbar"><b>SPT HESAP İZİ</b><span>N30 · N60 · σv · σ′v · (N1)60</span></div><table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>N60</th><th>σv</th><th>σ′v</th><th>CN</th><th>(N1)60</th><th>Dilatasyon</th></tr></thead><tbody>{rows.map(({record,derived})=><tr key={record.id}><td>{fmt(record.depth)}</td><td>{fmt(derived.nField,0)}</td><td>{fmt(derived.n60)}</td><td>{fmt(derived.verticalStress)}</td><td>{fmt(derived.effectiveStress)}</td><td>{fmt(derived.overburdenCorrection)}</td><td>{fmt(derived.n1_60)}</td><td>{derived.dilatancyApplied?`Uygulandı → ${fmt(derived.n60DilatancyCorrected)}`:'—'}</td></tr>)}</tbody></table></div>
+  return <div className="engineering-grid-wrap"><div className="grid-toolbar"><b>SPT HESAP İZİ</b><span>N30 · N60 · σv · σ′v · (N1)60</span></div><table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>N60</th><th>σv</th><th>σ′v</th><th>CN</th><th>(N1)60</th><th>Dilatasyon</th></tr></thead><tbody>{rows.map(({record,derived})=><tr key={record.id}><td>{fmt(record.depth)}–{fmt(experimentDepthTo(record))}</td><td>{fmt(derived.nField,0)}</td><td>{fmt(derived.n60)}</td><td>{fmt(derived.verticalStress)}</td><td>{fmt(derived.effectiveStress)}</td><td>{fmt(derived.overburdenCorrection)}</td><td>{fmt(derived.n1_60)}</td><td>{derived.dilatancyApplied?`Uygulandı → ${fmt(derived.n60DilatancyCorrected)}`:'—'}</td></tr>)}</tbody></table></div>
 }
 
 function LaboratoryGrid({ borehole, labs, onChange }: { borehole: BoreholeRecord; labs: LaboratoryRecord[]; onChange: (rows: LaboratoryRecord[]) => void }) {
@@ -186,7 +220,7 @@ export default function FieldInvestigation({ boreholes, labs, onBoreholesChange,
   const [tab,setTab]=useState<'spt'|'lab'|'log'>('spt')
   const active=useMemo(()=>boreholes.find(b=>b.id===selectedId)??boreholes[0], [boreholes,selectedId])
   useEffect(()=>{if(!selectedId&&boreholes[0])setSelectedId(boreholes[0].id)},[boreholes,selectedId])
-  useEffect(()=>{if(active){const synced=syncLabs(labs,active);if(JSON.stringify(synced)!==JSON.stringify(labs))onLabsChange(synced)}},[active?.id,active?.spt.length,active?.spt.map(r=>`${r.id}:${r.depth}:${r.testType}:${r.soilCode}`).join('|')])
+  useEffect(()=>{if(active){const synced=syncLabs(labs,active);if(JSON.stringify(synced)!==JSON.stringify(labs))onLabsChange(synced)}},[active?.id,active?.spt.length,active?.spt.map(r=>`${r.id}:${r.depth}:${r.depthTo}:${r.testType}:${r.soilCode}`).join('|')])
   if(!active) return <div className="field-empty"><b>Sondaj verisi yok.</b><button onClick={()=>{const b=blankBorehole(boreholes.length+1);onBoreholesChange([b]);setSelectedId(b.id)}}>+ İlk Sondajı Oluştur</button></div>
   const changeBorehole=(next:BoreholeRecord)=>onBoreholesChange(boreholes.map(b=>b.id===next.id?next:b))
   const addBorehole=()=>{const b=blankBorehole(boreholes.length+1);onBoreholesChange([...boreholes,b]);setSelectedId(b.id)}
