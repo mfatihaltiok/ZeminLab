@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import './assets/main.css'
 import { WorkspaceShell, type ScreenId } from './workspace/WorkspaceShell'
-import { Dashboard, FieldScreen, Foundation, JetGrout, Liquefaction, ProjectInfo, Report, Settlement, useDemoFieldData } from './screens/EngineeringScreens'
+import { Dashboard, FieldScreen, Foundation, JetGrout, Liquefaction, Report, Settlement, useDemoFieldData } from './screens/EngineeringScreens'
+import { ProjectInfoScreen } from './screens/ProjectInfoScreen'
 import { EarthquakeScreen } from './screens/EarthquakeScreen'
 import { SoilProfileScreen } from './screens/SoilProfileScreen'
 import { BearingCapacityScreen } from './screens/BearingCapacityScreen'
@@ -61,7 +62,7 @@ export default function App() {
 
   const content: Record<ScreenId, ReactNode> = {
     dashboard: <Dashboard onNavigate={setScreen} />,
-    'project-info': <ProjectInfo />,
+    'project-info': <ProjectInfoScreen />,
     field: <FieldScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />,
     profile: <SoilProfileScreen boreholes={boreholes} labs={labs} />,
     earthquake: <EarthquakeScreen />,
