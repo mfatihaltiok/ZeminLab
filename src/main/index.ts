@@ -4,7 +4,9 @@ import { promises as fs } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
-const projectFilter = [{ name: 'ZeminLab Projesi', extensions: ['zlab'] }]
+const projectSaveFilter = [{ name: 'ZeminLab Projesi', extensions: ['zlproj'] }]
+const projectOpenFilter = [{ name: 'ZeminLab Projesi', extensions: ['zlproj', 'zlab'] }]
+const pdfFilter = [{ name: 'PDF Belgesi', extensions: ['pdf'] }]
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -48,11 +50,11 @@ app.whenReady().then(() => {
     if (!filePath) {
       const result = await dialog.showSaveDialog({
         title: 'ZeminLab Projesini Kaydet',
-        defaultPath: 'Yeni Proje.zlab',
-        filters: projectFilter
+        defaultPath: 'Yeni Proje.zlproj',
+        filters: projectSaveFilter
       })
       if (result.canceled || !result.filePath) return null
-      filePath = result.filePath.endsWith('.zlab') ? result.filePath : `${result.filePath}.zlab`
+      filePath = result.filePath.endsWith('.zlproj') ? result.filePath : `${result.filePath}.zlproj`
     }
 
     const envelope = {
@@ -69,7 +71,7 @@ app.whenReady().then(() => {
     const result = await dialog.showOpenDialog({
       title: 'ZeminLab Projesini Aç',
       properties: ['openFile'],
-      filters: projectFilter
+      filters: projectOpenFilter
     })
     if (result.canceled || !result.filePaths[0]) return null
 
@@ -80,6 +82,35 @@ app.whenReady().then(() => {
       throw new Error('Geçersiz veya desteklenmeyen ZeminLab proje dosyası.')
     }
     return { filePath, data: envelope.data }
+  })
+
+  ipcMain.handle('report:print', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window) return false
+    return await new Promise<boolean>((resolve) => {
+      window.webContents.print({ printBackground: true, silent: false }, (success) => resolve(success))
+    })
+  })
+
+  ipcMain.handle('report:export-pdf', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window) return null
+    const result = await dialog.showSaveDialog(window, {
+      title: 'Mühendislik Raporunu PDF Olarak Kaydet',
+      defaultPath: 'ZeminLab-Muhendislik-Raporu.pdf',
+      filters: pdfFilter
+    })
+    if (result.canceled || !result.filePath) return null
+
+    const pdf = await window.webContents.printToPDF({
+      landscape: true,
+      pageSize: 'A4',
+      printBackground: true,
+      displayHeaderFooter: false,
+      margins: { top: 0, bottom: 0, left: 0, right: 0 }
+    })
+    await fs.writeFile(result.filePath.endsWith('.pdf') ? result.filePath : `${result.filePath}.pdf`, pdf)
+    return result.filePath.endsWith('.pdf') ? result.filePath : `${result.filePath}.pdf`
   })
 
   ipcMain.handle('window:minimize', (event) => {
