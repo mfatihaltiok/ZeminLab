@@ -9,6 +9,8 @@
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
+    "strictNullChecks": false,
+    "noUnusedLocals": false,
     "baseUrl": ".",
     "paths": {
       "@renderer/*": [
