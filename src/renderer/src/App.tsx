@@ -37,38 +37,38 @@ function isProjectDocument(value: unknown): value is ProjectDocument {
 function FieldCommandBar({
   boreholes,
   labs,
+  selectedBoreholeId,
+  onSelectedBoreholeChange,
   onBoreholesChange,
   onLabsChange,
 }: {
   boreholes: BoreholeRecord[]
   labs: LaboratoryRecord[]
+  selectedBoreholeId: string
+  onSelectedBoreholeChange: (id: string) => void
   onBoreholesChange: (r: BoreholeRecord[]) => void
   onLabsChange: (r: LaboratoryRecord[]) => void
 }) {
-  const [selectedId, setSelectedId] = useState(boreholes[0]?.id ?? '')
   const create = () => {
     const b = createEmptyBorehole(boreholes.length + 1)
     onBoreholesChange([...boreholes, b])
-    setSelectedId(b.id)
+    onSelectedBoreholeChange(b.id)
   }
   const remove = () => {
-    const t = boreholes.find(b => b.id === selectedId)
+    const t = boreholes.find(b => b.id === selectedBoreholeId)
     if (!t) return
     if (!window.confirm(`${t.name} sondajını ve bu sondaja bağlı laboratuvar kayıtlarını silmek istiyor musunuz?`)) return
-    onBoreholesChange(boreholes.filter(b => b.id !== t.id))
+    const nextBoreholes = boreholes.filter(b => b.id !== t.id)
+    onBoreholesChange(nextBoreholes)
     onLabsChange(labs.filter(l => l.boreholeId !== t.id))
-    setSelectedId(boreholes.find(b => b.id !== t.id)?.id ?? '')
+    onSelectedBoreholeChange(nextBoreholes[0]?.id ?? '')
   }
   return (
     <div className="field-command-bar">
       <div className="command-group">
         <span className="command-caption">SONDAJ YÖNETİMİ</span>
         <button className="command-button primary" onClick={create}>＋ Yeni Sondaj</button>
-        <select value={selectedId} onChange={e => setSelectedId(e.target.value)} disabled={!boreholes.length}>
-          <option value="">Sondaj seç</option>
-          {boreholes.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        <button className="command-button danger" onClick={remove} disabled={!selectedId}>Sil</button>
+        <button className="command-button danger" onClick={remove} disabled={!selectedBoreholeId}>Sil</button>
       </div>
     </div>
   )
@@ -79,6 +79,7 @@ export default function App() {
   const project = useProjectInfo()
   const [boreholes, setBoreholes] = useState<BoreholeRecord[]>([])
   const [labs, setLabs] = useState<LaboratoryRecord[]>([])
+  const [selectedBoreholeId, setSelectedBoreholeId] = useState('')
   const [idealizedSoilProfile, setIdealizedSoilProfile] = useState<IdealizedSoilProfile>()
   const [projectPath, setProjectPath] = useState<string>()
 
@@ -98,6 +99,7 @@ export default function App() {
       updateProjectInfo(normalizeProjectInfo(r.data.projectInfo))
       setBoreholes(r.data.boreholes)
       setLabs(r.data.labs)
+      setSelectedBoreholeId(r.data.boreholes[0]?.id ?? '')
       setIdealizedSoilProfile(r.data.idealizedSoilProfile)
       setProjectPath(r.filePath)
       setScreen('dashboard')
@@ -111,14 +113,29 @@ export default function App() {
     setProjectPath(undefined)
     setBoreholes([])
     setLabs([])
+    setSelectedBoreholeId('')
     setIdealizedSoilProfile(undefined)
     setScreen('dashboard')
   }
 
   const field = (
     <>
-      <FieldCommandBar boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />
-      <FieldInvestigation boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} onLabsChange={setLabs} />
+      <FieldCommandBar
+        boreholes={boreholes}
+        labs={labs}
+        selectedBoreholeId={selectedBoreholeId}
+        onSelectedBoreholeChange={setSelectedBoreholeId}
+        onBoreholesChange={setBoreholes}
+        onLabsChange={setLabs}
+      />
+      <FieldInvestigation
+        boreholes={boreholes}
+        labs={labs}
+        selectedBoreholeId={selectedBoreholeId}
+        onSelectedBoreholeChange={setSelectedBoreholeId}
+        onBoreholesChange={setBoreholes}
+        onLabsChange={setLabs}
+      />
     </>
   )
 
