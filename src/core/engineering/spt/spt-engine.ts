@@ -37,13 +37,14 @@ function energyRatio(input: SptEngineInput) {
   return 60
 }
 function boreholeFactor(diameter?: number) { if (!finitePositive(diameter) || diameter! <= 120) return 1; if (diameter! <= 150) return 1.05; return 1.15 }
-function samplerFactor(type?: SptSamplerType) { return type === 'without-liner' ? 1.0 : type === 'liner' ? 0.8 : 1.0 }
+function samplerFactor(type?: SptSamplerType) { return type === 'without-liner' ? 1.2 : 1.0 }
 function rodFactor(length?: number) { if (!finitePositive(length)) return 1; if (length! < 4) return 0.75; if (length! < 6) return 0.85; if (length! < 10) return 0.95; return 1 }
 
 /**
  * Single SPT correction path used by field tables, liquefaction and correlations.
- * The engine keeps raw field N separate from corrected values and returns a calculation trace.
- * References used for the correction structure: FHWA NHI-10-016 and FHWA NHI-11-032; project-specific TBDY checks remain separate.
+ * TBDY 2018 Ek 16B.2 uses CN = 9.78 / sqrt(sigma'v0), capped at 1.70.
+ * The sampler factor uses 1.20 as the selectable project default for the
+ * TBDY 1.10–1.30 range when an unlined sampler is selected.
  */
 export function calculateSpt(input: SptEngineInput): SptEngineResult {
   if (!Number.isFinite(input.nField) || input.nField < 0) throw new Error('SPT N değeri geçerli olmalıdır.')
@@ -51,7 +52,7 @@ export function calculateSpt(input: SptEngineInput): SptEngineResult {
   const n60 = input.nField * ce * cb * cs * cr
   const sigma = input.effectiveStress
   const applyOverburden = input.applyOverburden ?? true
-  const cn = applyOverburden && finitePositive(sigma) ? Math.min(1.7, Math.sqrt(100 / sigma!)) : 1
+  const cn = applyOverburden && finitePositive(sigma) ? Math.min(1.7, 9.78 / Math.sqrt(sigma!)) : 1
   const n1_60 = n60 * cn
   const fines = input.fineContent ?? 0
   const dilatancyApplied = Boolean(input.applyDilatancy && fines < 35 && finitePositive(sigma) && n1_60 > 15)
@@ -63,7 +64,7 @@ export function calculateSpt(input: SptEngineInput): SptEngineResult {
     { symbol: 'Cₛ', title: 'Numune alıcı düzeltmesi', formula: 'Cₛ = f(sampler)', value: cs, note: `Numune alıcı = ${input.sampler ?? 'standard'}` },
     { symbol: 'Cᵣ', title: 'Rod boyu düzeltmesi', formula: 'Cᵣ = f(L)', value: cr, note: input.rodLengthM ? `Rod boyu = ${input.rodLengthM} m` : 'Rod boyu girilmemiş; 1.00 kullanıldı.' },
     { symbol: 'N₆₀', title: 'Standartlaştırılmış SPT', formula: 'N₆₀ = N · Cₑ · Cᵦ · Cₛ · Cᵣ', value: n60 },
-    { symbol: 'Cᴺ', title: 'Örtü basıncı düzeltmesi', formula: 'Cᴺ = min(1.70, √(100 / σ′ᵥ₀))', value: cn, unit: '—', note: finitePositive(sigma) ? `σ′ᵥ₀ = ${sigma!.toFixed(3)}` : 'Etkin düşey gerilme verilmediği için uygulanmadı.' },
+    { symbol: 'Cᴺ', title: 'Örtü basıncı düzeltmesi', formula: 'Cᴺ = min(1.70, 9.78 / √σ′ᵥ₀)', value: cn, unit: '—', note: finitePositive(sigma) ? `σ′ᵥ₀ = ${sigma!.toFixed(3)} kPa` : 'Etkin düşey gerilme verilmediği için uygulanmadı.' },
     { symbol: '(N₁)₆₀', title: 'Normalize SPT', formula: '(N₁)₆₀ = Cᴺ · N₆₀', value: n1_60 }
   ]
   if (dilatancyApplied) trace.push({ symbol: '(N₁)₆₀,d', title: 'Dilatansi düzeltmesi', formula: '15 + 0.5[(N₁)₆₀ − 15]', value: n1_60_dilatancy, note: 'Yalnızca seçilmiş düzeltme koşullarında uygulanır.' })
