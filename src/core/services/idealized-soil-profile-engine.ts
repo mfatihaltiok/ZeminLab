@@ -1,9 +1,5 @@
 import type { BoreholeRecord, LaboratoryRecord, LithologyLayer, SptRecord } from '../models/field-data'
-import type {
-  IdealizedParameterSource,
-  IdealizedSoilLayer,
-  IdealizedSoilProfile,
-} from '../models/idealized-soil-profile'
+import type { IdealizedParameterSource, IdealizedSoilLayer, IdealizedSoilProfile } from '../models/idealized-soil-profile'
 
 export interface IdealizedProfileInput {
   boreholes: BoreholeRecord[]
@@ -35,18 +31,10 @@ function intervalLithology(boreholes: BoreholeRecord[], top: number, bottom: num
 }
 
 function intervalSpt(boreholes: BoreholeRecord[], top: number, bottom: number): Array<SptRecord & { boreholeId: string }> {
-  return boreholes.flatMap(b =>
-    b.spt
-      .filter(x => x.depth >= top && x.depth < bottom)
-      .map(x => ({ ...x, boreholeId: b.id })),
-  )
+  return boreholes.flatMap(b => b.spt.filter(x => x.depth >= top && x.depth < bottom).map(x => ({ ...x, boreholeId: b.id })))
 }
 
-function buildSources(
-  lithology: LithologyLayer[],
-  spt: Array<SptRecord & { boreholeId: string }>,
-  labs: LaboratoryRecord[],
-): Record<string, IdealizedParameterSource> {
+function buildSources(lithology: LithologyLayer[], spt: Array<SptRecord & { boreholeId: string }>, labs: LaboratoryRecord[]): Record<string, IdealizedParameterSource> {
   const sources: Record<string, IdealizedParameterSource> = {}
   if (lithology.some(x => x.unitWeight != null)) sources.gamma = { type: 'LİTOLOJİ' }
   if (lithology.some(x => x.saturatedUnitWeight != null)) sources.gammaSat = { type: 'LİTOLOJİ' }
@@ -60,10 +48,12 @@ function buildSources(
   if (labs.some(x => x.phi != null || x.directShearPhi != null || x.uuPhi != null)) sources.frictionAngle = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.consolidationCc != null)) sources.compressionIndexCc = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.consolidationCs != null)) sources.recompressionIndexCr = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
+  if (labs.some(x => x.voidRatio != null)) sources.initialVoidRatio = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.elasticModulus != null)) {
     sources.oedometricModulus = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
     sources.constrainedModulus = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   }
+  if (labs.some(x => x.poissonRatio != null)) sources.poissonRatio = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (spt.length) sources.representativeSptN = { type: 'SPT_KORELASYONU', boreholeIds: spt.map(x => x.boreholeId), note: 'SPT sayımı saha kaydından alınır; otomatik olarak dayanım veya sıkışabilirlik parametresine dönüştürülmez.' }
   return sources
 }
@@ -74,24 +64,14 @@ function collectCandidateCuts(boreholes: BoreholeRecord[], laboratories: Laborat
     if (x.from > 0 && x.from < maxDepth) points.push({ depth: x.from, kind: 'lithology' })
     if (x.to > 0 && x.to < maxDepth) points.push({ depth: x.to, kind: 'lithology' })
   }))
-  boreholes.forEach(b => b.spt.forEach(x => {
-    if (x.depth > 0 && x.depth < maxDepth) points.push({ depth: x.depth, kind: 'spt' })
-  }))
-  laboratories.forEach(x => {
-    if (x.depth > 0 && x.depth < maxDepth) points.push({ depth: x.depth, kind: 'lab' })
-  })
+  boreholes.forEach(b => b.spt.forEach(x => { if (x.depth > 0 && x.depth < maxDepth) points.push({ depth: x.depth, kind: 'spt' }) }))
+  laboratories.forEach(x => { if (x.depth > 0 && x.depth < maxDepth) points.push({ depth: x.depth, kind: 'lab' }) })
   const grouped = new Map<number, DepthPoint[]>()
-  points.forEach(p => {
-    const key = Math.round(p.depth * 100) / 100
-    grouped.set(key, [...(grouped.get(key) ?? []), p])
-  })
-  return [...grouped.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .sort((a, b) => {
-      const priority = (x: DepthPoint[]) => Math.max(...x.map(p => p.kind === 'lithology' ? 3 : p.kind === 'lab' ? 2 : 1))
-      return priority(b[1]) - priority(a[1])
-    })
-    .map(([depth]) => depth)
+  points.forEach(p => { const key = Math.round(p.depth * 100) / 100; grouped.set(key, [...(grouped.get(key) ?? []), p]) })
+  return [...grouped.entries()].sort((a, b) => a[0] - b[0]).sort((a, b) => {
+    const priority = (x: DepthPoint[]) => Math.max(...x.map(p => p.kind === 'lithology' ? 3 : p.kind === 'lab' ? 2 : 1))
+    return priority(b[1]) - priority(a[1])
+  }).map(([depth]) => depth)
 }
 
 function chooseCuts(candidates: number[], maxDepth: number, target: number): number[] {
@@ -99,7 +79,6 @@ function chooseCuts(candidates: number[], maxDepth: number, target: number): num
   const usable = [...new Set(candidates.filter(x => x > 0 && x < maxDepth))].sort((a, b) => a - b)
   if (!usable.length) return Array.from({ length: target + 1 }, (_, i) => Math.round((maxDepth * i / target) * 100) / 100)
   if (usable.length <= target - 1) return [0, ...usable, maxDepth]
-
   const selected = new Set<number>()
   const spacing = maxDepth / target
   for (let i = 1; i < target; i += 1) {
@@ -110,13 +89,7 @@ function chooseCuts(candidates: number[], maxDepth: number, target: number): num
   return [0, ...selected].sort((a, b) => a - b).concat(maxDepth).filter((x, i, arr) => i === 0 || x !== arr[i - 1])
 }
 
-function makeLayer(
-  boreholes: BoreholeRecord[],
-  laboratories: LaboratoryRecord[],
-  top: number,
-  bottom: number,
-  order: number,
-): IdealizedSoilLayer {
+function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[], top: number, bottom: number, order: number): IdealizedSoilLayer {
   const lithology = intervalLithology(boreholes, top, bottom)
   const spt = intervalSpt(boreholes, top, bottom)
   const labs = laboratories.filter(x => x.depth >= top && x.depth < bottom)
@@ -134,32 +107,19 @@ function makeLayer(
   if (gamma != null && sources.gamma?.type === 'LİTOLOJİ' && labs.some(x => x.unitWeight != null)) sources.gamma = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
 
   return {
-    id: crypto.randomUUID(),
-    order,
-    topDepth: top,
-    bottomDepth: bottom,
-    soilName: mode(descriptions) ?? 'Tanımlanmamış zemin',
-    soilCode: mode(codes) ?? '',
+    id: crypto.randomUUID(), order, topDepth: top, bottomDepth: bottom,
+    soilName: mode(descriptions) ?? 'Tanımlanmamış zemin', soilCode: mode(codes) ?? '',
     boreholeIds: [...new Set([...lithology.flatMap(() => boreholes.filter(b => b.lithology.some(x => overlap(x.from, x.to, top, bottom))).map(b => b.id)), ...spt.map(x => x.boreholeId), ...labs.map(x => x.boreholeId)])],
-    sptRecordIds: spt.map(x => x.id),
-    laboratoryRecordIds: labs.map(x => x.id),
-    representativeSptN: median(nValues),
-    gamma,
-    gammaSat,
-    waterContent: labMedian(labs.map(x => x.waterContent)),
-    liquidLimit: labMedian(labs.map(x => x.liquidLimit)),
-    plasticLimit: labMedian(labs.map(x => x.plasticLimit)),
-    plasticityIndex: labMedian(labs.map(x => x.plasticityIndex)),
+    sptRecordIds: spt.map(x => x.id), laboratoryRecordIds: labs.map(x => x.id),
+    representativeSptN: median(nValues), gamma, gammaSat,
+    waterContent: labMedian(labs.map(x => x.waterContent)), liquidLimit: labMedian(labs.map(x => x.liquidLimit)),
+    plasticLimit: labMedian(labs.map(x => x.plasticLimit)), plasticityIndex: labMedian(labs.map(x => x.plasticityIndex)),
     finesContent: labMedian(labs.map(x => x.finesContent ?? x.sieve200Passing)),
-    cohesion: cLab ?? firstDefined(lithology.map(x => x.cohesion)),
-    frictionAngle: phiLab ?? firstDefined(lithology.map(x => x.frictionAngle)),
-    compressionIndexCc: labMedian(labs.map(x => x.consolidationCc)),
-    recompressionIndexCr: labMedian(labs.map(x => x.consolidationCs)),
-    constrainedModulus: labMedian(labs.map(x => x.elasticModulus)),
-    oedometricModulus: labMedian(labs.map(x => x.elasticModulus)),
-    poissonRatio: labMedian(labs.map(x => x.poissonRatio)),
-    parameterSources: sources,
-    userOverride: false,
+    cohesion: cLab ?? firstDefined(lithology.map(x => x.cohesion)), frictionAngle: phiLab ?? firstDefined(lithology.map(x => x.frictionAngle)),
+    compressionIndexCc: labMedian(labs.map(x => x.consolidationCc)), recompressionIndexCr: labMedian(labs.map(x => x.consolidationCs)),
+    initialVoidRatio: labMedian(labs.map(x => x.voidRatio)),
+    constrainedModulus: labMedian(labs.map(x => x.elasticModulus)), oedometricModulus: labMedian(labs.map(x => x.elasticModulus)),
+    poissonRatio: labMedian(labs.map(x => x.poissonRatio)), parameterSources: sources, userOverride: false,
   }
 }
 
@@ -170,17 +130,11 @@ export function generateIdealizedSoilProfile(input: IdealizedProfileInput): Idea
   const candidates = collectCandidateCuts(boreholes, laboratories, maxDepth)
   const cuts = chooseCuts(candidates, maxDepth, targetLayerCount)
   const layers = cuts.slice(0, -1).map((top, i) => makeLayer(boreholes, laboratories, top, cuts[i + 1], i + 1))
-
   return {
-    id: previous?.id ?? crypto.randomUUID(),
-    version: previous?.version ?? 1,
-    status: 'TASLAK',
-    targetLayerCount,
-    generatedAt: new Date().toISOString(),
-    sourceBoreholeIds: [...new Set(boreholes.map(x => x.id))],
-    sourceLaboratoryIds: [...new Set(laboratories.map(x => x.id))],
-    layers,
-    methodology: 'TBDY 2018 ve yürürlükteki Türk mevzuatı esas alınır. Otomatik katmanlama; litoloji sınırları, SPT derinlikleri ve laboratuvar numune derinliklerini aday sınırlar olarak kullanır. Hedef katman sayısına indirgeme gerektiğinde derinlik boyunca temsil edici sınırlar seçilir. SPT, dayanım veya sıkışabilirlik parametrelerine otomatik korelasyonla dönüştürülmez. Nihai mühendislik kararı kullanıcıya aittir.',
+    id: previous?.id ?? crypto.randomUUID(), version: previous?.version ?? 1, status: 'TASLAK', targetLayerCount,
+    generatedAt: new Date().toISOString(), sourceBoreholeIds: [...new Set(boreholes.map(x => x.id))],
+    sourceLaboratoryIds: [...new Set(laboratories.map(x => x.id))], layers,
+    methodology: 'TBDY 2018 ve yürürlükteki Türk mevzuatı esas alınır. Otomatik katmanlama; litoloji sınırları, SPT derinlikleri ve laboratuvar numune derinliklerini aday sınırlar olarak kullanır. SPT, dayanım veya sıkışabilirlik parametrelerine otomatik korelasyonla dönüştürülmez. Nihai mühendislik kararı kullanıcıya aittir.',
     notes: 'Otomatik profil bir mühendislik taslağıdır. Kullanıcı sınırları ve parametreleri değiştirdiğinde ilgili katman userOverride olarak işaretlenir.',
   }
 }
