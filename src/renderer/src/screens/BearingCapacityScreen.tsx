@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { bearingCapacity, tbdyBearingCapacity, SOURCE_NOTES, type BearingMethod } from '../../../core/calculations/engineering'
+import { tbdyBearingCapacity, SOURCE_NOTES, type BearingMethod } from '../../../core/calculations/engineering'
+import { bearingCapacity as bearingCapacityEngine } from '../../../core/engineering/calculation-engine'
 import { useProjectInfo } from '../../../core/state/project-store'
 import { forceFromBase, forceToBase, momentToBase, stressFromBase, stressToBase, unitWeightFromBase, unitWeightToBase, PROJECT_UNIT_LABELS } from '../../../core/units/project-units'
 import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
@@ -8,19 +9,15 @@ import { CalculationTrace } from '../components/CalculationTrace'
 export function BearingCapacityScreen() {
   const p=useProjectInfo(); const soil=p.soilParameters; const f=p.foundationParameters
   const [method, setMethod] = useState<BearingMethod>('Terzaghi')
-  const generic = useMemo(() => bearingCapacity({
+  const FS = f.safetyFactor > 0 ? f.safetyFactor : 3
+  const generic = useMemo(() => bearingCapacityEngine({
     B:f.footingWidth,L:f.footingLength,Df:f.footingDepth,gamma:unitWeightToBase(soil.unitWeight,p.unitSystem),
-    c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,FS:f.factorOfSafety||3,method
-  }), [p.unitSystem,soil,f,method])
+    c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,FS,method
+  }), [p.unitSystem,soil,f,method,FS])
   const result=useMemo(()=>tbdyBearingCapacity({B:f.footingWidth,L:f.footingLength,Df:f.footingDepth,gamma1:unitWeightToBase(soil.unitWeight,p.unitSystem),gamma2:Math.max(unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem)-9.80665,0),c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,verticalLoad:forceToBase(f.verticalLoad,p.unitSystem),horizontalLoad:forceToBase(f.horizontalLoad,p.unitSystem),momentX:momentToBase(f.momentX,p.unitSystem),momentY:momentToBase(f.momentY,p.unitSystem),groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:f.resistanceFactorRv||1}),[p.unitSystem,soil,f])
   const stress=(v:number)=>stressFromBase(v,p.unitSystem); const force=(v:number)=>forceFromBase(v,p.unitSystem); const gamma=(v:number)=>unitWeightFromBase(v,p.unitSystem)
   const trace=[{symbol:'eₓ / eᵧ',title:'Yük eksantriklikleri',formula:'eₓ = Mᵧ / N  ·  eᵧ = Mₓ / N',value:`${result.ex.toFixed(4)} / ${result.ey.toFixed(4)} m`,note:'Moment ve düşey yükten elde edilir.'},{symbol:'B′ / L′',title:'Etkin temel boyutları',formula:'B′ = B − 2|eₓ|  ·  L′ = L − 2|eᵧ|',value:`${result.Be.toFixed(3)} / ${result.Le.toFixed(3)} m`},{symbol:'N꜀ / Nq / Nᵧ',title:'Taşıma gücü katsayıları',formula:'φ′ bağıntılarından N꜀, Nq, Nᵧ',value:`${result.Nc.toFixed(3)} / ${result.Nq.toFixed(3)} / ${result.Ngamma.toFixed(3)}`},{symbol:'s',title:'Şekil katsayıları',formula:'s꜀, sq, sᵧ',value:`${result.sc.toFixed(3)} / ${result.sq.toFixed(3)} / ${result.sg.toFixed(3)}`},{symbol:'d',title:'Derinlik katsayıları',formula:'d꜀, dq, dᵧ',value:`${result.dc.toFixed(3)} / ${result.dq.toFixed(3)} / ${result.dg.toFixed(3)}`},{symbol:'i',title:'Yük eğikliği katsayıları',formula:'i꜀, iq, iᵧ',value:`${result.ic.toFixed(3)} / ${result.iq.toFixed(3)} / ${result.ig.toFixed(3)}`},{symbol:'g',title:'Zemin eğimi katsayıları',formula:'g꜀, gq, gᵧ',value:`${result.gc.toFixed(3)} / ${result.gq.toFixed(3)} / ${result.gg.toFixed(3)}`},{symbol:'b',title:'Temel tabanı eğimi katsayıları',formula:'b꜀, bq, bᵧ',value:`${result.bc.toFixed(3)} / ${result.bq.toFixed(3)} / ${result.bg.toFixed(3)}`},{symbol:'q',title:'Sürşarj',formula:'q = Df · γ₁',value:stress(result.surcharge),unit:PROJECT_UNIT_LABELS.stress},{symbol:'qₖ',title:'Karakteristik taşıma gücü',formula:'Denklem 16.8 katsayılarıyla',value:stress(result.qk),unit:PROJECT_UNIT_LABELS.stress},{symbol:'qₜ',title:'Tasarım taşıma gücü',formula:'qₜ = qₖ / γRv',value:stress(result.qt),unit:PROJECT_UNIT_LABELS.stress},{symbol:'q₀',title:'Temel taban basıncı',formula:'q₀ = N / (B′ · L′)',value:stress(result.qo),unit:PROJECT_UNIT_LABELS.stress}]
-  const genericRows: (string|number)[][] = [
-    ['Terzaghi', bearingCapacity({B:f.footingWidth,L:f.footingLength,Df:f.footingDepth,gamma:unitWeightToBase(soil.unitWeight,p.unitSystem),c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,FS:f.factorOfSafety||3,method:'Terzaghi'}).allowableGross],
-    ['Meyerhof', bearingCapacity({B:f.footingWidth,L:f.footingLength,Df:f.footingDepth,gamma:unitWeightToBase(soil.unitWeight,p.unitSystem),c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,FS:f.factorOfSafety||3,method:'Meyerhof'}).allowableGross],
-    ['Hansen', bearingCapacity({B:f.footingWidth,L:f.footingLength,Df:f.footingDepth,gamma:unitWeightToBase(soil.unitWeight,p.unitSystem),c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,FS:f.factorOfSafety||3,method:'Hansen'}).allowableGross],
-    ['Vesic', bearingCapacity({B:f.footingWidth,L:f.footingLength,Df:f.footingDepth,gamma:unitWeightToBase(soil.unitWeight,p.unitSystem),c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,FS:f.factorOfSafety||3,method:'Vesic'}).allowableGross]
-  ]
+  const genericRows: (string|number)[][] = (['Terzaghi','Meyerhof','Hansen','Vesic'] as BearingMethod[]).map(m=>[m,bearingCapacityEngine({B:f.footingWidth,L:f.footingLength,Df:f.footingDepth,gamma:unitWeightToBase(soil.unitWeight,p.unitSystem),c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,FS,method:m}).value.allowableGross])
   return <Frame screen="bearing-capacity">
     <Source>{SOURCE_NOTES.bearing} Literatür yöntemleri ile TBDY 2018 kontrolü ayrı gösterilir; yöntemler birbirinin yerine sessizce kullanılmaz.</Source>
     <Card title="LİTERATÜR YÖNTEMİ">
@@ -28,7 +25,7 @@ export function BearingCapacityScreen() {
         <label>Hesap yöntemi<select value={method} onChange={e=>setMethod(e.target.value as BearingMethod)}>{(['Terzaghi','Meyerhof','Hansen','Vesic'] as BearingMethod[]).map(x=><option key={x}>{x}</option>)}</select></label>
         <Metric label="Aktif qallow,gross" value={stress(generic.value.allowableGross).toFixed(2)} unit={PROJECT_UNIT_LABELS.stress} tone="primary" />
         <Metric label="Aktif qult" value={stress(generic.value.ultimate).toFixed(2)} unit={PROJECT_UNIT_LABELS.stress} />
-        <Metric label="FS" value={(f.factorOfSafety||3).toFixed(2)} />
+        <Metric label="FS" value={FS.toFixed(2)} />
       </div>
     </Card>
     <Card title="YÖNTEMLERİN YAN YANA HESAPLANMASI">
@@ -37,6 +34,6 @@ export function BearingCapacityScreen() {
     </Card>
     <div className="metric-strip"><Metric label="TBDY qk" value={stress(result.qk).toFixed(2)} unit={PROJECT_UNIT_LABELS.stress} tone="primary"/><Metric label="TBDY qt" value={stress(result.qt).toFixed(2)} unit={PROJECT_UNIT_LABELS.stress} tone="primary"/><Metric label="TBDY q0" value={stress(result.qo).toFixed(2)} unit={PROJECT_UNIT_LABELS.stress}/><Metric label="Kullanım oranı" value={(result.utilization*100).toFixed(1)} unit="%"/><Metric label="TBDY kontrolü" value={result.adequate?'UYGUN':'YETERSİZ'} tone={result.adequate?'primary':undefined}/></div>
     <div className="dashboard-grid"><div><Card title="PROJE VERİSİ · OKUMA"><Table headers={['Girdi','Değer','Birim']} rows={[[ 'B',f.footingWidth.toFixed(3),'m'],['L',f.footingLength.toFixed(3),'m'],['Df',f.footingDepth.toFixed(3),'m'],['γ doğal',gamma(unitWeightToBase(soil.unitWeight,p.unitSystem)).toFixed(3),PROJECT_UNIT_LABELS.unitWeight],['γsat',gamma(unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem)).toFixed(3),PROJECT_UNIT_LABELS.unitWeight],['c / cu',stress(stressToBase(soil.cohesion,p.unitSystem)).toFixed(3),PROJECT_UNIT_LABELS.stress],['φ′',soil.frictionAngle.toFixed(3),'°'],['Fz',force(forceToBase(f.verticalLoad,p.unitSystem)).toFixed(3),PROJECT_UNIT_LABELS.force],['V',force(forceToBase(f.horizontalLoad,p.unitSystem)).toFixed(3),PROJECT_UNIT_LABELS.force],['Mx / My',`${force(momentToBase(f.momentX,p.unitSystem)).toFixed(3)} / ${force(momentToBase(f.momentY,p.unitSystem)).toFixed(3)}`,PROJECT_UNIT_LABELS.moment]]}/></Card></div><div><Card title="TBDY KATSAYI KONTROLLERİ"><Table headers={['Kontrol','Değer','Durum']} rows={[[`q₀ ≤ qₜ`,`${stress(result.qo).toFixed(2)} ≤ ${stress(result.qt).toFixed(2)} ${PROJECT_UNIT_LABELS.stress}`,result.adequate?'UYGUN':'YETERSİZ'],['γRv',f.resistanceFactorRv.toFixed(3),'Proje verisi'],['B′·L′',`${(result.Be*result.Le).toFixed(2)} m²`,'Hesaplandı']]}/></Card></div></div>
-    <CalculationTrace title="TBDY 16.8 hesap zinciri" rows={trace} source={SOURCE_NOTES.bearing}/>
+    <CalculationTrace title="TBDY 16.8 hesap zinciri" source={SOURCE_NOTES.bearing} rows={trace}/>
   </Frame>
 }
