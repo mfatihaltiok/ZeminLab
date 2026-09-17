@@ -16,7 +16,7 @@ export function OcrSettingsScreen() {
     <div className="project-info-layout">
       <Card title="İNTERNET BAĞLANTISI">
         <div className="metric-strip"><div className="metric"><span>Durum</span><strong>{online === undefined ? 'Kontrol ediliyor…' : online ? 'BAĞLI' : 'ÇEVRİMDIŞI'}</strong></div><div className="metric"><span>Yerel OCR</span><strong>HAZIR</strong></div><div className="metric"><span>Uzaktan OCR</span><strong>{config.hasApiKey ? 'AYARLI' : 'ANAHTAR YOK'}</strong></div></div>
-        <div className="classification-note">ZeminLab, internet yokken yerel OCR ve yerel hesap motorlarıyla çalışmaya devam eder. Electron'un ağ durum kontrolü bağlantının varlığını gösterir, tek başına uzak sunucunun erişilebilir olduğunu garanti etmez. citeturn0search0</div>
+        <div className="classification-note">ZeminLab, internet yokken yerel OCR ve yerel hesap motorlarıyla çalışmaya devam eder. Electron ağ durumu kontrolü bağlantının varlığını gösterir, tek başına uzak sunucunun erişilebilir olduğunu garanti etmez.</div>
         <button className="primary-button" onClick={() => void test()} disabled={busy}>Bağlantıyı test et</button>
       </Card>
       <Card title="PADDLEOCR / OCR SAĞLAYICISI">
@@ -25,7 +25,7 @@ export function OcrSettingsScreen() {
           <Field label="OCR API adresi" type="url" value={config.endpoint} onChange={(v) => setConfig({ ...config, endpoint: v })} />
           <label><span>API anahtarı</span><input type="password" value={apiKey} placeholder={config.hasApiKey ? 'Kayıtlı anahtarı değiştirmek için girin' : 'API anahtarını girin'} onChange={(e) => setApiKey(e.target.value)} /></label>
         </div>
-        <div className="classification-note">Önemli ayrım: PaddleOCR açık kaynaklı yerel bir OCR motorudur ve yerel kullanım için API anahtarı gerektirmez. API anahtarı alanı yalnızca uzak bir OCR servis sağlayıcısı kullanıldığında devreye girer. Model dosyaları kurulum paketine alınabilir ve çevrimdışı çalıştırılabilir. citeturn0search9</div>
+        <div className="classification-note">Önemli ayrım: PaddleOCR açık kaynaklı yerel bir OCR motorudur ve yerel kullanım için API anahtarı gerektirmez. API anahtarı alanı yalnızca uzak bir OCR servis sağlayıcısı kullanıldığında devreye girer. Model dosyaları kurulum paketine alınabilir ve çevrimdışı çalıştırılabilir.</div>
         <button className="primary-button" onClick={() => void save()} disabled={busy}>Ayarları kaydet</button>
       </Card>
       {message && <div className="engineering-note"><b>Durum:</b> {message}</div>}
