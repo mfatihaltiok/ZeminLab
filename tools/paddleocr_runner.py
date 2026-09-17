@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -22,6 +24,27 @@ def result_to_dict(result):
     return {}
 
 
+def load_paddleocr():
+    try:
+        from paddleocr import PaddleOCR
+        return PaddleOCR
+    except ModuleNotFoundError as error:
+        if error.name != 'paddleocr':
+            raise
+        # Development fallback: if the bundled runtime has not been prepared yet,
+        # install the CPU runtime automatically into the Python interpreter that
+        # launched this runner. The Windows installer will ship the prepared
+        # runtime and models, so normal end-user execution remains offline.
+        subprocess.check_call([
+            sys.executable, '-m', 'pip', 'install',
+            'paddlepaddle==3.2.0',
+            'paddleocr',
+            '-i', 'https://www.paddlepaddle.org.cn/packages/stable/cpu/',
+        ])
+        from paddleocr import PaddleOCR
+        return PaddleOCR
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', required=True)
@@ -33,7 +56,7 @@ def main() -> int:
     if not image_path.is_file():
         raise FileNotFoundError(f'Görsel bulunamadı: {image_path}')
 
-    from paddleocr import PaddleOCR
+    PaddleOCR = load_paddleocr()
 
     device = os.environ.get('ZEMINLAB_OCR_DEVICE', 'cpu')
     ocr = PaddleOCR(
@@ -59,7 +82,10 @@ def main() -> int:
             lines.append({'text': text, 'score': score, 'box': box})
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps({'ok': True, 'provider': 'paddleocr-local', 'lines': lines}, ensure_ascii=False, indent=2), encoding='utf-8')
+    output_path.write_text(
+        json.dumps({'ok': True, 'provider': 'paddleocr-local', 'lines': lines}, ensure_ascii=False, indent=2),
+        encoding='utf-8',
+    )
 
 
 if __name__ == '__main__':
