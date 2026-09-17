@@ -65,7 +65,7 @@ export function liquefactionProfile(i:LiquefactionProfileInput):LiquefactionProf
   else if(isSandySoil&&fines>35&&n1_60>20)explanation=`İnce dane > 35% ve (N1)60 > 20.`
   else explanation=`Rτ/τdeprem = ${fsL.toFixed(3)} ≥ 1.10.`
   let isLiquefiable:LiquefactionProfileRow['isLiquefiable']='SIVILAŞMA YOK';if(conclusion==='SIVILAŞMA VAR')isLiquefiable='YÜKSEK';else if(fsL<1.3)isLiquefiable='ORTA'
-  return{id:record.id,depth:record.depth,soilType,nField:record.nField,sigmaV:st.sigmaV,sigmaVPrime:st.sigmaVPrime,u:st.u,ce:f.ce,cb:f.cb,cs:f.cs,cr:f.cr,cn,n60,n1_60,n1_60_dilatancy,fines,alpha:fine.alpha,beta:fine.beta,n1_60f:fine.n1_60f,rd:rr,csr,crr,msf:CM,gsL:fsL,fsL,tauResistance,tauEarthquake,sds:i.Sds,isCohesive:cohesive,claySofteningRisk,clayLL:ll,clayW:w,clayExplanation,conclusion,isLiquefiable,explanation}
+  return{id:record.id,depth:record.depth,soilType,nField:record.nField,sigmaV:st.sigmaV,sigmaVPrime:st.sigmaVPrime,u:st.u,ce:spt.ce,cb:spt.cb,cs:spt.cs,cr:spt.cr,cn,n60,n1_60,n1_60_dilatancy,fines,alpha:fine.alpha,beta:fine.beta,n1_60f:fine.n1_60f,rd:rr,csr,crr,msf:CM,gsL:fsL,fsL,tauResistance,tauEarthquake,sds:i.Sds,isCohesive:cohesive,claySofteningRisk,clayLL:ll,clayW:w,clayExplanation,conclusion,isLiquefiable,explanation}
  })
  return{rows,method:'TBDY 2018 Ek 16B · SPT düzeltmeleri → N1,60 → IDI düzeltmesi → CRR_M7.5 → CM → Rτ → τdeprem → Rτ/τdeprem',source:'TBDY 2018 Bölüm 16.6 ve Ek 16B.2-Ek 16B.4; resmi AFAD yönetmelik metni.'}
 }
