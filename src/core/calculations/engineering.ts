@@ -1,8 +1,9 @@
 import { calculateSpt } from '../engineering/spt/spt-engine'
 import { bearingCapacity as bearingEngine, foundationChecks as foundationEngine, jetGrout as jetGroutEngine, liquefaction as liquefactionEngine, settlement as settlementEngine, stressAtDepth as stressEngine, tbdyBearingCapacity as tbdyBearingEngine, type BearingMethod } from '../engineering/calculation-engine'
+import { liquefactionProfile as liquefactionProfileEngine, type LiquefactionProfileInput, type LiquefactionProfileResult } from '../engineering/liquefaction-profile'
 import { layerSettlement as layerSettlementEngine, schmertmannSettlement, stressSpread21, subgradeReaction as subgradeReactionEngine, jetGroutAdvanced as jetGroutAdvancedEngine, type LayerSettlementInput, type SchmertmannLayer } from '../engineering/advanced-geotech'
 
-export type { BearingMethod, LayerSettlementInput, SchmertmannLayer }
+export type { BearingMethod, LayerSettlementInput, SchmertmannLayer, LiquefactionProfileInput, LiquefactionProfileResult }
 export type SoilLayerInput = { top: number; bottom: number; soil?: string; gamma: number; gammaSat: number; cohesion?: number; phi?: number; fines?: number; cu?: number; PI?: number }
 export type SptInput = { depth: number; nField: number; energyRatio?: number; boreholeDiameter?: number; sampler?: 'standard' | 'without-liner'; fines?: number }
 
@@ -27,6 +28,7 @@ export type TbdyBearingInput = { B: number; L: number; Df: number; gamma1: numbe
 export function tbdyBearingCapacity(i: TbdyBearingInput) { return tbdyBearingEngine(i).value }
 export function settlement(i: { B: number; q: number; Es: number; nu: number; layers?: { thickness: number; Cc?: number; e0?: number; sigma0?: number; dSigma?: number }[] }) { return settlementEngine(i).value }
 export function liquefaction(i: { Mw: number; Sds: number; depth: number; N160f: number; sigmaV: number; sigmaVPrime: number }) { return liquefactionEngine(i) }
+export function liquefactionProfile(i: LiquefactionProfileInput) { return liquefactionProfileEngine(i) }
 export function foundationChecks(i: { B: number; L: number; N: number; V: number; Mx: number; My: number; delta?: number; cu?: number; area?: number }) { return foundationEngine(i).value }
 export function jetGrout(i: { columnDiameter: number; spacing: number; qultSoil: number; qultColumn: number; improvementFactor: number; FS: number; columnStrength: number }) { return jetGroutEngine(i).value }
 
@@ -38,7 +40,7 @@ export function jetGroutAdvanced(i: Parameters<typeof jetGroutAdvancedEngine>[0]
 
 export const SOURCE_NOTES = {
   investigation: 'TBDY 2018 Bölüm 16 ve Ek 16A: zemin araştırmaları, SPT/laboratuvar verileri ve raporlama.',
-  liquefaction: 'TBDY 2018 Ek 16B: SPT düzeltmeleri, CRR ve deprem kayma gerilmesi. Güvenlik koşulları ayrıca raporlanmalıdır.',
+  liquefaction: 'TBDY 2018 Bölüm 16.6 ve Ek 16B: SPT düzeltmeleri, CRR ve deprem kayma gerilmesi. Güvenlik koşulları hesap izinde gösterilir.',
   bearing: 'TBDY 2018 16.8.3.2 ve Denklem 16.8: yüzeysel temel taşıma gücü.',
   settlement: 'TBDY 2018 Bölüm 16: taşıma gücü ve yerdeğiştirme koşulları birlikte değerlendirilir.',
   stressSpread: '2:1 gerilme yayılımı; katmanlı oturma hesabında Δσ hesabı için kullanılır.',
