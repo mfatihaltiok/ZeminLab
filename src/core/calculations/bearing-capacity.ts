@@ -59,7 +59,7 @@ export function calculateBearingCapacity(
 
     Nc = (Nq - 1) / Math.tan(phi)
 
-    Ngamma = 2 * (Nq + 1) * Math.tan(phi)
+    Ngamma = 2 * (Nq - 1) * Math.tan(phi)
   }
 
   const surcharge = gamma * Df
