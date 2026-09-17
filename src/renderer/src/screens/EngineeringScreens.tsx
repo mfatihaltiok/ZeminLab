@@ -4,6 +4,7 @@ import { settlement as settlementEngine, type CalculationStep } from '../../core
 import { defaultElasticModulusMethod, estimateElasticModulus } from '../../core/engineering/correlation-registry'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
 import { deriveSptValues } from '../../core/engineering/field-calculations'
+import { liquefactionProfile, type LiquefactionSptRecord } from '../../core/engineering/liquefaction-profile'
 import { forceToBase, stressToBase, stressFromBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
 import { useProjectInfo } from '../../core/state/project-store'
 import { Card, Field, Frame, Metric, Source, type ScreenId } from '../workspace/WorkspaceShell'
@@ -91,19 +92,42 @@ export function Liquefaction({ boreholes = [], labs = [] }: { boreholes?: Boreho
   const p = useProjectInfo()
   const [selected, setSelected] = useState(boreholes[0]?.id ?? '')
   const b = boreholes.find(x => x.id === selected) ?? boreholes[0]
-  const spt = b?.spt.find(x => x.testType === 'SPT' && Number.isFinite(x.n2) && Number.isFinite(x.n3))
-  const depth = spt?.depth ?? 0
-  const layer = b?.lithology.find(l => depth >= l.from && depth <= l.to)
-  const stress = useMemo(() => b ? stressAtDepth(depth, b.lithology.map(l => ({ top: l.from, bottom: l.to, gamma: l.unitWeight ?? 0, gammaSat: l.saturatedUnitWeight ?? l.unitWeight ?? 0 })), b.groundwaterDepth ?? -1) : undefined, [b, depth])
-  const derived = b && spt ? deriveSptValues(b, spt) : undefined
   const sds = p.seismic.ss != null && p.seismic.fs != null ? p.seismic.ss * p.seismic.fs : undefined
-  const result = derived && stress && sds && p.seismic.magnitude
-    ? liquefaction({ Mw: p.seismic.magnitude, Sds: sds, depth, N160f: derived.n1_60_dilatancy ?? derived.n1_60, sigmaV: stress.sigmaV, sigmaVPrime: stress.sigmaVPrime })
-    : undefined
+  const validSpt = useMemo(() => (b?.spt ?? [])
+    .filter(x => x.testType === 'SPT' && Number.isFinite(x.n2) && Number.isFinite(x.n3))
+    .sort((a, c) => a.depth - c.depth), [b])
+  const profileInput = useMemo(() => {
+    if (!b || !p.seismic.magnitude || sds == null || validSpt.length === 0) return undefined
+    const rows: LiquefactionSptRecord[] = validSpt.map(record => {
+      const lab = labs
+        .filter(x => x.boreholeId === b.id)
+        .filter(x => record.depth >= x.depth && record.depth <= (x.depthTo ?? x.depth + 0.5))
+        .sort((x, y) => Math.abs(x.depth - record.depth) - Math.abs(y.depth - record.depth))[0]
+      const layer = b.lithology.find(x => record.depth >= x.from && record.depth <= x.to)
+      const cfg = record.correction ?? {}
+      return {
+        depth: record.depth,
+        nField: record.n2! + record.n3!,
+        fineContent: cfg.fineContent ?? lab?.finesContent ?? layer?.finesContent,
+        energyRatio: cfg.energyRatio,
+        boreholeDiameterMm: b.drillingDiameter,
+        sampler: cfg.samplerCorrection === 1.2 ? 'without-liner' : 'standard',
+        rodLengthM: undefined
+      }
+    })
+    return liquefactionProfile({
+      Mw: p.seismic.magnitude,
+      Sds: sds,
+      gwt: b.groundwaterDepth ?? Number.POSITIVE_INFINITY,
+      layers: b.lithology.map(l => ({ top: l.from, bottom: l.to, gamma: l.unitWeight ?? 0, gammaSat: l.saturatedUnitWeight ?? l.unitWeight ?? 0, soil: l.code })),
+      spt: rows,
+      applyDilatancy: false
+    })
+  }, [b, labs, p.seismic.magnitude, sds, validSpt])
 
   return (
     <Frame screen="liquefaction">
-      <Source>{SOURCE_NOTES.liquefaction} Nihai yöntem doğrulaması tamamlanmadan sonuç “ön değerlendirme” olarak işaretlenir.</Source>
+      <Source>{SOURCE_NOTES.liquefaction} Hesap artık seçilen sondajdaki tüm geçerli SPT seviyelerini birlikte değerlendirir. Sonuçlar proje verisi ve TBDY 2018 Ek 16B hesap zinciri üzerinden raporlanır.</Source>
       {!b ? (
         <Card title="SONDAJ VERİSİ BEKLENİYOR"><div className="inline-empty">Sıvılaşma hesabı için en az bir sondaj ve hesaplanabilir SPT kaydı gerekir.</div></Card>
       ) : (
@@ -111,24 +135,38 @@ export function Liquefaction({ boreholes = [], labs = [] }: { boreholes?: Boreho
           <Card title="HESAP KATMANI">
             <div className="form-grid">
               <label>Sondaj<select value={b.id} onChange={e => setSelected(e.target.value)}>{boreholes.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-              <Metric label="SPT" value={spt ? `${spt.depth.toFixed(2)} m` : '—'} />
+              <Metric label="SPT noktası" value={validSpt.length} />
               <Metric label="Laboratuvar" value={labs.filter(x => x.boreholeId === b.id).length} />
-              <Metric label="Zemin" value={layer?.code || '—'} />
+              <Metric label="Yeraltı suyu" value={Number.isFinite(b.groundwaterDepth) ? `${b.groundwaterDepth!.toFixed(2)} m` : '—'} />
               <Metric label="Mw" value={p.seismic.magnitude ?? '—'} />
+              <Metric label="SDS" value={sds != null ? sds.toFixed(3) : '—'} />
             </div>
           </Card>
-          {!result ? (
-            <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">SPT düzeltmesi, etkin gerilme, Ss/Fs ve sıvılaşma için proje deprem büyüklüğü birlikte sağlanmalıdır.</div></Card>
+          {!profileInput ? (
+            <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">Sondaj, SPT, deprem büyüklüğü ve SDS birlikte sağlanmalıdır. Geçerli SPT noktası bulunamadıysa önce saha verisi tamamlanmalıdır.</div></Card>
           ) : (
             <>
-              <div className="metric-strip">
-                <Metric label="N60" value={derived!.n60.toFixed(2)} />
-                <Metric label="(N1)60" value={derived!.n1_60.toFixed(2)} />
-                <Metric label="CRR" value={result.value.CRRM75.toFixed(3)} />
-                <Metric label="Talep" value={result.value.tau.toFixed(3)} />
-                <Metric label="FS" value={result.value.ratio.toFixed(3)} tone={result.value.safe ? 'primary' : ''} />
-              </div>
-              <CalculationTrace title="Sıvılaşma hesap zinciri" source={result.source} rows={result.steps} />
+              {profileInput.warnings.length > 0 && <Card title="VERİ UYARILARI"><div className="inline-empty">{profileInput.warnings.join(' ')}</div></Card>}
+              <Card title="DERİNLİK PROFİLİ">
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>z (m)</th><th>Zemin</th><th>IDI %</th><th>σv (kPa)</th><th>σ′v (kPa)</th><th>N60</th><th>(N1)60</th><th>(N1)60f</th><th>CRR7.5</th><th>τdeprem</th><th>FS</th></tr></thead>
+                    <tbody>{profileInput.rows.map((row, i) => <tr key={`${row.depth}-${i}`}>
+                      <td>{row.depth.toFixed(2)}</td><td>{row.soil ?? '—'}</td><td>{row.fineContent != null ? row.fineContent.toFixed(1) : '—'}</td>
+                      <td>{row.sigmaV.toFixed(2)}</td><td>{row.sigmaVPrime.toFixed(2)}</td><td>{row.n60.toFixed(2)}</td><td>{row.n1_60.toFixed(2)}</td><td>{row.n1_60f.toFixed(2)}</td>
+                      <td>{row.crrM75 != null ? row.crrM75.toFixed(4) : '—'}</td><td>{row.tauEarthquake != null ? row.tauEarthquake.toFixed(2) : '—'}</td>
+                      <td>{row.FS != null ? row.FS.toFixed(3) : '—'}</td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>
+              </Card>
+              {profileInput.rows.length > 0 && (
+                <CalculationTrace
+                  title="Seçili ilk SPT için ayrıntılı hesap zinciri"
+                  source={profileInput.source}
+                  rows={profileInput.rows[0].trace}
+                />
+              )}
             </>
           )}
         </>
