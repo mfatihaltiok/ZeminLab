@@ -5,6 +5,7 @@ import './assets/field-workspace.css'
 import './assets/idealized-profile.css'
 import { WorkspaceShell, type ScreenId } from './workspace/WorkspaceShell'
 import { Dashboard, Foundation, JetGrout, Liquefaction } from './screens/EngineeringScreens'
+import { JetGroutEngineeringScreen } from './screens/JetGroutEngineeringScreen'
 import { IdealizedSettlementScreen } from './screens/IdealizedSettlementScreen'
 import FieldInvestigation from './screens/FieldInvestigation'
 import BoreholeLogScreen from './screens/BoreholeLogScreen'
@@ -21,149 +22,20 @@ import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-d
 import type { IdealizedSoilProfile } from '../../core/models/idealized-soil-profile'
 import { createEmptyBorehole } from '../../core/models/field-data-factory'
 
-type ProjectDocument = {
-  projectInfo: ProjectInfoModel
-  boreholes: BoreholeRecord[]
-  labs: LaboratoryRecord[]
-  idealizedSoilProfile?: IdealizedSoilProfile
+type ProjectDocument = { projectInfo: ProjectInfoModel; boreholes: BoreholeRecord[]; labs: LaboratoryRecord[]; idealizedSoilProfile?: IdealizedSoilProfile }
+function isProjectDocument(value: unknown): value is ProjectDocument { if (!value || typeof value !== 'object') return false; const d = value as Partial<ProjectDocument>; return !!d.projectInfo && Array.isArray(d.boreholes) && Array.isArray(d.labs) }
+function FieldCommandBar({ boreholes,labs,selectedBoreholeId,onSelectedBoreholeChange,onBoreholesChange,onLabsChange }:{boreholes:BoreholeRecord[];labs:LaboratoryRecord[];selectedBoreholeId:string;onSelectedBoreholeChange:(id:string)=>void;onBoreholesChange:(r:BoreholeRecord[])=>void;onLabsChange:(r:LaboratoryRecord[])=>void}) {
+  const create=()=>{const b=createEmptyBorehole(boreholes.length+1);onBoreholesChange([...boreholes,b]);onSelectedBoreholeChange(b.id)}
+  const remove=()=>{const t=boreholes.find(b=>b.id===selectedBoreholeId);if(!t)return;if(!window.confirm(`${t.name} sondajını ve bu sondaja bağlı laboratuvar kayıtlarını silmek istiyor musunuz?`))return;const next=boreholes.filter(b=>b.id!==t.id);onBoreholesChange(next);onLabsChange(labs.filter(l=>l.boreholeId!==t.id));onSelectedBoreholeChange(next[0]?.id??'')}
+  return <div className="field-command-bar"><div className="command-group"><span className="command-caption">SONDAJ YÖNETİMİ</span><button className="command-button primary" onClick={create}>＋ Yeni Sondaj</button><button className="command-button danger" onClick={remove} disabled={!selectedBoreholeId}>Sil</button></div></div>
 }
-
-function isProjectDocument(value: unknown): value is ProjectDocument {
-  if (!value || typeof value !== 'object') return false
-  const d = value as Partial<ProjectDocument>
-  return !!d.projectInfo && Array.isArray(d.boreholes) && Array.isArray(d.labs)
-}
-
-function FieldCommandBar({
-  boreholes,
-  labs,
-  selectedBoreholeId,
-  onSelectedBoreholeChange,
-  onBoreholesChange,
-  onLabsChange,
-}: {
-  boreholes: BoreholeRecord[]
-  labs: LaboratoryRecord[]
-  selectedBoreholeId: string
-  onSelectedBoreholeChange: (id: string) => void
-  onBoreholesChange: (r: BoreholeRecord[]) => void
-  onLabsChange: (r: LaboratoryRecord[]) => void
-}) {
-  const create = () => {
-    const b = createEmptyBorehole(boreholes.length + 1)
-    onBoreholesChange([...boreholes, b])
-    onSelectedBoreholeChange(b.id)
-  }
-  const remove = () => {
-    const t = boreholes.find(b => b.id === selectedBoreholeId)
-    if (!t) return
-    if (!window.confirm(`${t.name} sondajını ve bu sondaja bağlı laboratuvar kayıtlarını silmek istiyor musunuz?`)) return
-    const nextBoreholes = boreholes.filter(b => b.id !== t.id)
-    onBoreholesChange(nextBoreholes)
-    onLabsChange(labs.filter(l => l.boreholeId !== t.id))
-    onSelectedBoreholeChange(nextBoreholes[0]?.id ?? '')
-  }
-  return (
-    <div className="field-command-bar">
-      <div className="command-group">
-        <span className="command-caption">SONDAJ YÖNETİMİ</span>
-        <button className="command-button primary" onClick={create}>＋ Yeni Sondaj</button>
-        <button className="command-button danger" onClick={remove} disabled={!selectedBoreholeId}>Sil</button>
-      </div>
-    </div>
-  )
-}
-
-export default function App() {
-  const [screen, setScreen] = useState<ScreenId>('dashboard')
-  const project = useProjectInfo()
-  const [boreholes, setBoreholes] = useState<BoreholeRecord[]>([])
-  const [labs, setLabs] = useState<LaboratoryRecord[]>([])
-  const [selectedBoreholeId, setSelectedBoreholeId] = useState('')
-  const [idealizedSoilProfile, setIdealizedSoilProfile] = useState<IdealizedSoilProfile>()
-  const [projectPath, setProjectPath] = useState<string>()
-
-  const saveProject = async () => {
-    try {
-      const path = await window.api.project.save({ projectInfo: project, boreholes, labs, idealizedSoilProfile }, projectPath)
-      if (path) setProjectPath(path)
-    } catch (e) {
-      console.error('ZeminLab proje kaydı başarısız:', e)
-    }
-  }
-
-  const openProject = async () => {
-    try {
-      const r = await window.api.project.open()
-      if (!r || !isProjectDocument(r.data)) return
-      updateProjectInfo(normalizeProjectInfo(r.data.projectInfo))
-      setBoreholes(r.data.boreholes)
-      setLabs(r.data.labs)
-      setSelectedBoreholeId(r.data.boreholes[0]?.id ?? '')
-      setIdealizedSoilProfile(r.data.idealizedSoilProfile)
-      setProjectPath(r.filePath)
-      setScreen('dashboard')
-    } catch (e) {
-      console.error('ZeminLab proje açma başarısız:', e)
-    }
-  }
-
-  const newProject = () => {
-    updateProjectInfo({ ...defaultProjectInfo, id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10) })
-    setProjectPath(undefined)
-    setBoreholes([])
-    setLabs([])
-    setSelectedBoreholeId('')
-    setIdealizedSoilProfile(undefined)
-    setScreen('dashboard')
-  }
-
-  const field = (
-    <>
-      <FieldCommandBar
-        boreholes={boreholes}
-        labs={labs}
-        selectedBoreholeId={selectedBoreholeId}
-        onSelectedBoreholeChange={setSelectedBoreholeId}
-        onBoreholesChange={setBoreholes}
-        onLabsChange={setLabs}
-      />
-      <FieldInvestigation
-        boreholes={boreholes}
-        labs={labs}
-        selectedBoreholeId={selectedBoreholeId}
-        onSelectedBoreholeChange={setSelectedBoreholeId}
-        onBoreholesChange={setBoreholes}
-        onLabsChange={setLabs}
-      />
-    </>
-  )
-
-  const foundation = (
-    <>
-      <Foundation />
-      <Foundation3DView boreholes={boreholes} />
-    </>
-  )
-
-  const content: Record<ScreenId, ReactNode> = {
-    dashboard: <Dashboard onNavigate={setScreen} />,
-    'project-info': <ProjectInfoScreenV2 />,
-    field,
-    'borehole-log': <BoreholeLogScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes} />,
-    profile: <IdealizedSoilProfileScreen boreholes={boreholes} labs={labs} profile={idealizedSoilProfile} onChange={setIdealizedSoilProfile} />,
-    'bearing-capacity': <BearingCapacityScreen />,
-    settlement: <IdealizedSettlementScreen profile={idealizedSoilProfile} boreholes={boreholes} />,
-    liquefaction: <Liquefaction boreholes={boreholes} labs={labs} />,
-    foundation,
-    'jet-grout': <JetGrout />,
-    report: <EngineeringReportScreen boreholes={boreholes} labs={labs} />,
-    'unit-converter': <UnitConverterScreen />,
-  }
-
-  return (
-    <WorkspaceShell screen={screen} onScreenChange={setScreen} onNewProject={newProject} onOpenProject={openProject} onSaveProject={saveProject}>
-      {content[screen]}
-    </WorkspaceShell>
-  )
+export default function App(){
+ const [screen,setScreen]=useState<ScreenId>('dashboard'); const project=useProjectInfo(); const [boreholes,setBoreholes]=useState<BoreholeRecord[]>([]); const [labs,setLabs]=useState<LaboratoryRecord[]>([]); const [selectedBoreholeId,setSelectedBoreholeId]=useState(''); const [idealizedSoilProfile,setIdealizedSoilProfile]=useState<IdealizedSoilProfile>(); const [projectPath,setProjectPath]=useState<string>()
+ const saveProject=async()=>{try{const path=await window.api.project.save({projectInfo:project,boreholes,labs,idealizedSoilProfile},projectPath);if(path)setProjectPath(path)}catch(e){console.error('ZeminLab proje kaydı başarısız:',e)}}
+ const openProject=async()=>{try{const r=await window.api.project.open();if(!r||!isProjectDocument(r.data))return;updateProjectInfo(normalizeProjectInfo(r.data.projectInfo));setBoreholes(r.data.boreholes);setLabs(r.data.labs);setSelectedBoreholeId(r.data.boreholes[0]?.id??'');setIdealizedSoilProfile(r.data.idealizedSoilProfile);setProjectPath(r.filePath);setScreen('dashboard')}catch(e){console.error('ZeminLab proje açma başarısız:',e)}}
+ const newProject=()=>{updateProjectInfo({...defaultProjectInfo,id:crypto.randomUUID(),date:new Date().toISOString().slice(0,10)});setProjectPath(undefined);setBoreholes([]);setLabs([]);setSelectedBoreholeId('');setIdealizedSoilProfile(undefined);setScreen('dashboard')}
+ const field=<><FieldCommandBar boreholes={boreholes} labs={labs} selectedBoreholeId={selectedBoreholeId} onSelectedBoreholeChange={setSelectedBoreholeId} onBoreholesChange={setBoreholes} onLabsChange={setLabs}/><FieldInvestigation boreholes={boreholes} labs={labs} selectedBoreholeId={selectedBoreholeId} onSelectedBoreholeChange={setSelectedBoreholeId} onBoreholesChange={setBoreholes} onLabsChange={setLabs}/></>
+ const foundation=<><Foundation/><Foundation3DView boreholes={boreholes}/></>
+ const content:Record<ScreenId,ReactNode>={dashboard:<Dashboard onNavigate={setScreen}/>, 'project-info':<ProjectInfoScreenV2/>,field,'borehole-log':<BoreholeLogScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes}/>,profile:<IdealizedSoilProfileScreen boreholes={boreholes} labs={labs} profile={idealizedSoilProfile} onChange={setIdealizedSoilProfile}/>,'bearing-capacity':<BearingCapacityScreen/>,settlement:<IdealizedSettlementScreen profile={idealizedSoilProfile} boreholes={boreholes}/>,liquefaction:<Liquefaction boreholes={boreholes} labs={labs}/>,foundation,'jet-grout':<JetGroutEngineeringScreen/>,report:<EngineeringReportScreen boreholes={boreholes} labs={labs}/>, 'unit-converter':<UnitConverterScreen/>}
+ return <WorkspaceShell screen={screen} onScreenChange={setScreen} onNewProject={newProject} onOpenProject={openProject} onSaveProject={saveProject}>{content[screen]}</WorkspaceShell>
 }
