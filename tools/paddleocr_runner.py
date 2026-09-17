@@ -31,18 +31,39 @@ def load_paddleocr():
     except ModuleNotFoundError as error:
         if error.name != 'paddleocr':
             raise
-        # Development fallback: if the bundled runtime has not been prepared yet,
-        # install the CPU runtime automatically into the Python interpreter that
-        # launched this runner. The Windows installer will ship the prepared
-        # runtime and models, so normal end-user execution remains offline.
-        subprocess.check_call([
+
+    # Development bootstrap only. The previous implementation used the
+    # Paddle CPU index exclusively. On some Windows/Python 3.12 environments
+    # that index can return "No matching distribution", even though the same
+    # Windows cp312 wheel is published on PyPI. Try the official index first,
+    # then PyPI as a fallback.
+    commands = [
+        [
             sys.executable, '-m', 'pip', 'install',
             'paddlepaddle==3.2.0',
             'paddleocr',
             '-i', 'https://www.paddlepaddle.org.cn/packages/stable/cpu/',
-        ])
-        from paddleocr import PaddleOCR
-        return PaddleOCR
+        ],
+        [
+            sys.executable, '-m', 'pip', 'install',
+            'paddlepaddle==3.2.0',
+            'paddleocr',
+            '--index-url', 'https://pypi.org/simple',
+        ],
+    ]
+
+    last_error = None
+    for command in commands:
+        try:
+            subprocess.check_call(command)
+            from paddleocr import PaddleOCR
+            return PaddleOCR
+        except subprocess.CalledProcessError as error:
+            last_error = error
+
+    raise RuntimeError(
+        'PaddleOCR kurulamadı. Önce resmi Paddle CPU deposu, ardından PyPI denendi.'
+    ) from last_error
 
 
 def main() -> int:
