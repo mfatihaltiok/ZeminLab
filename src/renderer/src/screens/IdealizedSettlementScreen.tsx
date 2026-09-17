@@ -3,7 +3,7 @@ import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '..
 import { subgradeReaction } from '../../core/calculations/engineering'
 import type { IdealizedSoilProfile } from '../../core/models/idealized-soil-profile'
 import type { BoreholeRecord } from '../../core/models/field-data'
-import { forceToBase, forceFromBase, stressToBase, stressFromBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
+import { forceToBase, forceFromBase, stressToBase, stressFromBase } from '../../core/units/project-units'
 import type { SubgradeReactionMethod, SubgradeSoilType } from '../../core/engineering/subgrade-reaction'
 import { useProjectInfo } from '../../core/state/project-store'
 import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
@@ -175,7 +175,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
               </label>
               {ksMethod === 'erol-plate' && <>
                 <label>Kv1 · 30×30 cm plaka deneyi
-                  <input type="number" min="0" step="any" value={kv1Input} onChange={e => setKv1Input(e.target.value)} placeholder={PROJECT_UNIT_LABELS.unitWeight} />
+                  <input type="number" min="0" step="any" value={kv1Input} onChange={e => setKv1Input(e.target.value)} placeholder={p.unitSystem === 'kN-m' ? 'kN/m³' : 'tonf/m³'} />
                 </label>
                 <label>Zemin tipi
                   <select value={ksSoilType} onChange={e => setKsSoilType(e.target.value as SubgradeSoilType)}>
@@ -184,7 +184,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
                   </select>
                 </label>
               </>}
-              <Metric label="Sonuç" value={ks ? ks.ks.toFixed(3) : '—'} unit={p.unitSystem === 'kN-m' ? 'kN/m³' : 'tonf/m³'} />
+              <Metric label="Sonuç" value={ks ? forceFromBase(ks.ks, p.unitSystem).toFixed(3) : '—'} unit={p.unitSystem === 'kN-m' ? 'kN/m³' : 'tonf/m³'} />
             </div>
             <div className="inline-empty">
               {ksMethod === 'erol-plate'
@@ -219,7 +219,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
                   ['Yöntem', ks.method, ''],
                   ['B', f.footingWidth.toFixed(3), 'm'],
                   ['L', f.footingLength.toFixed(3), 'm'],
-                  ['ks', ks.ks.toFixed(3), 'kN/m³'],
+                  ['ks', forceFromBase(ks.ks, p.unitSystem).toFixed(3), p.unitSystem === 'kN-m' ? 'kN/m³' : 'tonf/m³'],
                   ['Proje birimi', p.unitSystem === 'kN-m' ? 'kN/m³' : 'tonf/m³', '']
                 ]} />
               ) : <div className="inline-empty">Seçilen yatak katsayısı yöntemi için gerekli veriler girilmelidir.</div>}
