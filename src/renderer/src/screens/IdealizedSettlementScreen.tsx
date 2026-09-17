@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '../../core/engineering/idealized-settlement-engine'
+import { subgradeReaction } from '../../core/calculations/engineering'
 import type { IdealizedSoilProfile } from '../../core/models/idealized-soil-profile'
 import type { BoreholeRecord } from '../../core/models/field-data'
 import { forceToBase, stressToBase, stressFromBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
 import { useProjectInfo } from '../../core/state/project-store'
-import { Card, Frame, Metric, Source } from '../workspace/WorkspaceShell'
+import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
 
 const finite = (v: number) => Number.isFinite(v) && v !== 0
@@ -74,9 +75,24 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
     })
   }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth])
 
+  const surfaceLayer = profile?.layers.find(x => x.bottomDepth > f.footingDepth)
+  const ks = useMemo(() => {
+    const Es = surfaceLayer?.constrainedModulus ?? surfaceLayer?.oedometricModulus
+    if (!Es || Es <= 0 || f.footingWidth <= 0) return undefined
+    return subgradeReaction({ B: f.footingWidth, Es, nu: surfaceLayer?.poissonRatio ?? 0.30, method: 'elastic' })
+  }, [surfaceLayer, f.footingWidth])
+
+  const methodLabel: Record<IdealizedSettlementMethod, string> = {
+    'burland-burbidge': 'Burland & Burbidge',
+    elasticity: 'Elastisite teorisi',
+    '2to1-layer': '2:1 + tabaka',
+    janbu: 'Janbu M-integrasyonu',
+    schmertmann: 'Schmertmann'
+  }
+
   return (
     <Frame screen="settlement">
-      <Source>Oturma hesabı yalnızca SABİTLENDİ durumundaki İdealize Zemin Profili üzerinden yürütülür. Eski Zemin Etüdü/Jet Grout yazılımındaki Burland &amp; Burbidge ve tabaka bazlı gerilme yaklaşımı yeni motora taşınmıştır.</Source>
+      <Source>Oturma hesabı SABİTLENDİ durumundaki İdealize Zemin Profili üzerinden yürütülür. Yöntem seçimi, gerilme yayılımı ve katman sonuçları hesap zincirinde açıkça gösterilir. Eksik parametreler sessizce varsayılmaz.</Source>
 
       <Card title="OTURMA YÖNTEMİ">
         <div className="form-grid">
@@ -84,6 +100,9 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
             <select value={method} onChange={e => setMethod(e.target.value as IdealizedSettlementMethod)}>
               <option value="burland-burbidge">Yöntem 1 · Burland &amp; Burbidge + kilde konsolidasyon</option>
               <option value="elasticity">Yöntem 2 · Elastisite teorisi + kilde konsolidasyon</option>
+              <option value="2to1-layer">Yöntem 3 · 2:1 gerilme yayılımı + tabaka</option>
+              <option value="janbu">Yöntem 4 · Janbu M-integrasyonu</option>
+              <option value="schmertmann">Yöntem 5 · Schmertmann gerinim integrasyonu</option>
             </select>
           </label>
           <label>Sondaj / YASS
@@ -117,13 +136,14 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
             <Metric label="σ′v0 @ Df" value={result.foundationEffectiveStress.toFixed(2)} unit="kPa" />
             <Metric label="qnet" value={result.netFoundationPressure.toFixed(2)} unit="kPa" />
             <Metric label="zI" value={result.influenceDepth.toFixed(2)} unit="m" />
+            {ks && <Metric label="ks" value={ks.ks.toFixed(2)} unit="kN/m³" />}
           </div>
 
           <Card title="TABAKA ORTA NOKTALARI · EFEKTİF GERİLMELER">
             <ProfileDiagram result={result} />
           </Card>
 
-          <Card title="TABAKA BAZINDA OTURMA HESABI">
+          <Card title={`TABAKA BAZINDA OTURMA · ${methodLabel[method]}`}>
             <div className="table-wrap">
               <table>
                 <thead><tr><th>#</th><th>Zemin</th><th>Üst</th><th>Alt</th><th>zorta</th><th>σ′v0</th><th>Δσ′</th><th>σ′vf</th><th>Ani</th><th>Kons.</th><th>Durum</th></tr></thead>
@@ -136,13 +156,31 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
             </div>
           </Card>
 
+          <div className="dashboard-grid">
+            <Card title="ZEMİN YATAK KATSAYISI · ks">
+              {ks ? (
+                <Table headers={['Parametre','Değer','Birim']} rows={[
+                  ['Yöntem', ks.method, ''],
+                  ['Es', (surfaceLayer?.constrainedModulus ?? surfaceLayer?.oedometricModulus)!.toFixed(1), 'kPa'],
+                  ['ν', (surfaceLayer?.poissonRatio ?? 0.30).toFixed(3), ''],
+                  ['B', f.footingWidth.toFixed(3), 'm'],
+                  ['ks', ks.ks.toFixed(3), 'kPa/m ≈ kN/m³']
+                ]} />
+              ) : <div className="inline-empty">ks için temel genişliği ve profilin temel altındaki ilk tabakasında Eoed/E gereklidir.</div>}
+            </Card>
+            <Card title="HESAP YÖNTEMİ / KAYNAK">
+              <div className="inline-empty">Aktif yöntem: <b>{methodLabel[method]}</b>. Katman gerilmeleri orta nokta yaklaşımıyla raporlanır. 2:1, Janbu ve Schmertmann sonuçları proje parametreleriyle doğrulanmalıdır.</div>
+            </Card>
+          </div>
+
           <CalculationTrace title="Oturma hesap zinciri" source={result.source} rows={[
             { symbol: 'σ′v0', title: 'Temel tabanındaki efektif gerilme', formula: 'ΣγH − u', value: result.foundationEffectiveStress, unit: 'kPa' },
             { symbol: 'qnet', title: 'Net temel gerilmesi', formula: 'max(0.1q, q − σ′v0)', value: result.netFoundationPressure, unit: 'kPa' },
-            { symbol: 'zI', title: 'Burland etki derinliği', formula: 'zI = B^0.76 (B ≤ 30 m)', value: result.influenceDepth, unit: 'm' },
-            { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: method === 'burland-burbidge' ? 'Σ[fS·fL·Ic·qnet·B^0.7]' : 'Σ[(Δσ′/E)·H·(1−ν²)]', value: result.totalImmediate, unit: 'mm' },
+            { symbol: 'zI', title: 'Etki derinliği', formula: method === 'burland-burbidge' ? 'B^0.76 (B ≤ 30 m)' : 'Profil/gerilme yayılımı sınırı', value: result.influenceDepth, unit: 'm' },
+            { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: method === 'burland-burbidge' ? 'Σ[fS·fL·Ic·qnet·B^0.7]' : method === 'elasticity' ? 'Σ[(Δσ′/E)·H·(1−ν²)]' : method === '2to1-layer' ? 'Σ[Δσ₂:₁·H/E]' : method === 'janbu' ? 'Σ[Δσ′·H/M]' : 'Σ[C1·C2·q·Iz/Es·Δz]', value: result.totalImmediate, unit: 'mm' },
             { symbol: 's꜀', title: 'Toplam konsolidasyon', formula: 'Σ[Cc/(1+e₀)·H·log10(σ′vf/σ′v0)]', value: result.totalConsolidation, unit: 'mm' },
             { symbol: 'sₜ', title: 'Toplam oturma', formula: 'sₜ = sᵢ + s꜀', value: result.totalSettlement, unit: 'mm' },
+            ...(ks ? [{ symbol: 'ks', title: 'Winkler yatak katsayısı', formula: 'ks ≈ Es/[B(1−ν²)]', value: ks.ks, unit: 'kN/m³' }] : [])
           ]} />
         </>
       )}
