@@ -53,8 +53,8 @@ export function Settlement({ boreholes = [] }: { boreholes?: BoreholeRecord[] })
   const soilType = b && s.finesContent >= 15 ? 'sand-with-fines' : 'sand'
   const correlationId = defaultElasticModulusMethod(soilType)
   const correlation = derived ? estimateElasticModulus(correlationId, derived.n60) : undefined
-  const q = finite(f.verticalLoad) && finite(f.footingWidth)
-    ? stressToBase(forceToBase(f.verticalLoad, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9), p.unitSystem)
+  const q = finite(f.verticalLoad) && finite(f.footingWidth) && finite(f.footingLength)
+    ? forceToBase(f.verticalLoad, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
     : 0
   const Es = correlation ? correlation.value * 98.0665 : 0
   const ready = !!correlation && q > 0 && f.footingWidth > 0

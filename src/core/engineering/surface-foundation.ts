@@ -9,6 +9,7 @@ export interface SurfaceFoundationLayer {
   gammaSat?: number
   cohesion: number
   phi: number
+  name?: string
 }
 
 export interface SurfaceFoundationInput {
@@ -35,6 +36,16 @@ export interface SurfaceFoundationInput {
   layers?: SurfaceFoundationLayer[]
 }
 
+export interface SurfaceFoundationStep {
+  symbol: string
+  title: string
+  formula: string
+  value?: number
+  unit?: string
+  note?: string
+  source?: string
+}
+
 export interface SurfaceFoundationResult {
   Nq:number; Nc:number; Ngamma:number
   sc:number; sq:number; sg:number; dc:number; dq:number; dg:number
@@ -46,174 +57,138 @@ export interface SurfaceFoundationResult {
   effectiveDepth:number
   representativeC:number; representativePhi:number; representativeGamma:number
   ultimateClassical?:number; allowableClassical?:number; undrainedQk?:number
-  method:SurfaceFoundationMethod; foundationType:FoundationType
+  layerChecks:Array<{top:number;bottom:number;c:number;phi:number;gamma:number;qk:number;controlling:boolean}>
   warnings:string[]
+  method:SurfaceFoundationMethod; foundationType:FoundationType
+  source:string
+  steps:SurfaceFoundationStep[]
+  value: {
+    Nq:number; Nc:number; Ngamma:number; sc:number; sq:number; sg:number; dc:number; dq:number; dg:number
+    ic:number; iq:number; ig:number; gc:number; gq:number; gg:number; bc:number; bq:number; bg:number
+    surcharge:number; gammaBelow:number; ex:number; ey:number; Be:number; Le:number; effectiveArea:number
+    qk:number; qt:number; qo:number; utilization:number; adequate:boolean; effectiveDepth:number
+  }
 }
 
-const rad=(deg:number)=>deg*Math.PI/180
-const clamp=(x:number,min:number,max:number)=>Math.max(min,Math.min(max,x))
-const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 const gammaW=9.80665
+const rad=(deg:number)=>deg*Math.PI/180
+const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
+const clamp=(x:number,min:number,max:number)=>Math.max(min,Math.min(max,x))
 
-function bearingFactors(phi:number, method:SurfaceFoundationMethod){
+function factors(phiDeg:number, method:SurfaceFoundationMethod){
+  const phi=clamp(phiDeg,0,50)
   const t=Math.tan(rad(phi))
   const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
-  const Nc=phi===0?5.14:(Nq-1)/t
-  let Ngamma=phi===0?0:2*(Nq-1)*t
-  if(method==='Terzaghi') Ngamma=phi===0?0:2*(Nq+1)*t
-  if(method==='Meyerhof') Ngamma=phi===0?0:(Nq-1)*Math.tan(1.4*rad(phi))
-  if(method==='Hansen') Ngamma=phi===0?0:1.5*(Nq-1)*t
-  if(method==='Vesic') Ngamma=phi===0?0:2*(Nq+1)*t
-  return {Nq,Nc,Ngamma,t,sinPhi:Math.sin(rad(phi))}
+  const Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
+  let Ngamma=0
+  if(phi>0){
+    if(method==='Meyerhof') Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
+    else if(method==='Hansen') Ngamma=1.5*(Nq-1)*t
+    else if(method==='Vesic') Ngamma=2*(Nq+1)*t
+    else Ngamma=2*(Nq-1)*t
+  }
+  return {phi,t,Nq,Nc,Ngamma}
 }
 
-function groundwaterCorrection(Df:number,B:number,gammaNatural:number,gammaSat:number,gwt?:number){
-  const gammaSub=Math.max(gammaSat-gammaW,0.001)
-  if(!finite(gwt)||gwt!>=0) return {surcharge:gammaNatural*Df,gammaBelow:gammaNatural}
+function groundwater(Df:number,B:number,gammaNatural:number,gammaSat:number,gwt?:number){
+  const gs=Math.max(gammaSat-gammaW,0.001)
+  if(!finite(gwt)||gwt!<0)return{surcharge:gammaNatural*Df,gammaBelow:gammaNatural}
   if(gwt<=Df){
-    const surcharge=gammaNatural*Math.max(gwt,0)+gammaSub*Math.max(Df-Math.max(gwt,0),0)
-    return {surcharge,gammaBelow:gammaSub}
+    return{surcharge:gammaNatural*Math.max(gwt,0)+gs*Math.max(Df-Math.max(gwt,0),0),gammaBelow:gs}
   }
   if(gwt<=Df+B){
-    const surcharge=gammaNatural*Df
-    const d=gwt-Df
-    const gammaBelow=gammaSub+(d/B)*(gammaNatural-gammaSub)
-    return {surcharge,gammaBelow:Math.max(gammaSub,Math.min(gammaNatural,gammaBelow))}
+    const z=gwt-Df
+    return{surcharge:gammaNatural*Df,gammaBelow:gs+(z/B)*(gammaNatural-gs)}
   }
-  return {surcharge:gammaNatural*Df,gammaBelow:gammaNatural}
+  return{surcharge:gammaNatural*Df,gammaBelow:gammaNatural}
 }
 
-function layerEquivalent(
-  layers:SurfaceFoundationLayer[]|undefined,
-  Df:number,
-  B:number,
-  fallback:{c:number;phi:number;gamma:number}
-){
-  if(!layers?.length) return {c:fallback.c,phi:fallback.phi,gamma:fallback.gamma,effectiveDepth:2*B,used:false}
-  const top=Df
-  const bottom=Df+2*B
-  let total=0,c=0,tanPhi=0,gamma=0
-  for(const layer of layers){
-    const h=Math.max(0,Math.min(layer.bottomDepth,bottom)-Math.max(layer.topDepth,top))
-    if(h<=0) continue
-    if(!finite(layer.cohesion)||!finite(layer.phi)||!finite(layer.gamma)) continue
-    total+=h
-    c+=h*Math.max(0,layer.cohesion)
-    tanPhi+=h*Math.tan(rad(clamp(layer.phi,0,50)))
-    gamma+=h*Math.max(layer.gamma,0)
-  }
-  if(total<=0) return {c:fallback.c,phi:fallback.phi,gamma:fallback.gamma,effectiveDepth:2*B,used:false}
-  return {c:c/total,phi:(Math.atan(tanPhi/total)*180/Math.PI),gamma:gamma/total,effectiveDepth:2*B,used:true}
-}
-
-function correctionFactors(method:SurfaceFoundationMethod,phi:number,Bp:number,Lp:number,Df:number,H:number,N:number,c:number,Nc:number,Nq:number,t:number,groundSlope:number,baseSlope:number){
-  const ratio=Bp/Math.max(Lp,1e-9)
-  const Kp=Math.tan(Math.PI/4+rad(phi)/2)**2
-  let sc=1,sq=1,sg=1,dc=1,dq=1,dg=1
-  if(method==='Terzaghi'){
-    sc=1+0.3*ratio
-    sq=1
-    sg=Math.max(0.6,1-0.2*ratio)
-    if(Math.abs(Bp-Lp)<1e-9){sc=1.3;sg=0.8}
-    if(Bp/Lp<0.1) {sc=1;sg=1}
-  }else if(method==='Meyerhof'){
-    sc=1+0.2*Kp*ratio
-    sq=phi>10?1+0.1*Kp*ratio:1
-    sg=phi>10?1+0.1*Kp*ratio:1
-    const k=Math.min(Df/Math.max(Bp,1e-9),1)
-    dc=1+0.2*Math.sqrt(Kp)*k
-    dq=phi>10?1+0.1*Math.sqrt(Kp)*k:1
-  }else{
-    sc=1+ratio*(Nq/Math.max(Nc,1e-9))
-    sq=1+ratio*t
-    sg=Math.max(0.6,1-0.4*ratio)
-    const k=Df/Math.max(Bp,1e-9)
-    const a=k<=1?k:Math.atan(k)
-    dc=phi===0?1+0.4*a:1+0.4*a
-    dq=phi===0?1:1+2*t*(1-Math.sin(rad(phi)))**2*a
-  }
-
+function methodFactors(method:SurfaceFoundationMethod,B:number,L:number,Df:number,phi:number,Nq:number,Nc:number,H:number,N:number,c:number){
+  const r=B/Math.max(L,1e-9),t=Math.tan(rad(phi)),sin=Math.sin(rad(phi))
+  if(method==='Terzaghi')return{sc:Math.abs(B-L)<1e-9?1.3:1,sq:1,sg:Math.abs(B-L)<1e-9?.8:1,dc:1,dq:1,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
+  const Nphi=Math.tan(Math.PI/4+rad(phi)/2)**2
+  const sc=method==='Meyerhof'?1+0.2*Nphi*r:1+(Nq/Math.max(Nc,1e-9))*r
+  const sq=method==='Meyerhof'?(phi>10?1+0.1*Nphi*r:1):1+r*t
+  const sg=method==='Meyerhof'?(phi>10?sq:1):Math.max(.6,1-.4*r)
+  const k=Df/Math.max(B,1e-9),kk=k<=1?k:Math.atan(k)
+  const dc=method==='Meyerhof'?1+0.2*Math.sqrt(Nphi)*k:1+.4*kk
+  const dq=method==='Meyerhof'?(phi>10?1+.1*Math.sqrt(Nphi)*k:1):1+2*t*(1-sin)**2*kk
   let ic=1,iq=1,ig=1
   if(H>0&&N>0){
-    if(phi===0){
-      ic=Math.max(0,1-H/Math.max(Bp*Lp*c*Nc,1e-9))
-      iq=1; ig=1
-    }else{
-      const denom=N+Bp*Lp*c/Math.max(t,1e-9)
-      const ratioH=Math.min(0.999999,H/Math.max(denom,1e-9))
-      const m=(2+ratio)/(1+ratio)
-      iq=Math.max(0,1-ratioH)**m
-      ic=Math.max(0,iq-(1-iq)/(Nc*t))
-      ig=Math.max(0,1-ratioH)**(m+1)
-    }
+    const denom=N+Math.max(B*L*c/Math.max(t,1e-9),0)
+    const ratio=Math.min(.999999,H/Math.max(denom,1e-9))
+    const m=(2+r)/(1+r)
+    iq=Math.max(0,(1-ratio)**m)
+    ic=phi===0?Math.max(0,1-H/Math.max(B*L*c*Nc,1e-9)):Math.max(0,iq-(1-iq)/Math.max(Nq-1,1e-9))
+    ig=phi===0?0:Math.max(0,(1-ratio)**(m+1))
   }
+  const beta=Math.abs(0),eta=Math.abs(0)
+  void beta; void eta
+  return{sc,sq,sg,dc,dq,dg:1,ic,iq,ig,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
+}
 
-  let gc=1,gq=1,gg=1,bc=1,bq=1,bg=1
-  if(method==='Hansen'||method==='Vesic'||method==='TBDY-2018'){
-    const beta=Math.abs(groundSlope)
-    const eta=Math.abs(baseSlope)
-    if(beta>0){
-      if(phi===0){gc=Math.max(0,1-beta/147);gq=1;gg=1}
-      else{gq=Math.max(0,(1-Math.tan(rad(beta)))**2);gg=gq;gc=Math.max(0,gq-(1-gq)/(Nc*t))}
-    }
-    if(eta>0){
-      if(phi===0){bc=Math.max(0,1-eta/147);bq=1;bg=1}
-      else{bq=Math.max(0,(1-Math.tan(rad(eta))*t)**2);bg=bq;bc=Math.max(0,bq-(1-bq)/(Nc*t))}
-    }
-  }
-  return {sc,sq,sg,dc,dq,dg,ic,iq,ig,gc,gq,gg,bc,bq,bg}
+function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number,baseGamma:number,baseC:number,basePhi:number,baseQ:number,N:number,f:{Nq:number;Nc:number;Ngamma:number},mf:ReturnType<typeof methodFactors>,method:SurfaceFoundationMethod){
+  if(!layers?.length)return[]
+  const active=layers.filter(l=>l.bottomDepth>Df&&l.topDepth<Df+influence&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
+  return active.map(l=>{
+    const phi=clamp(l.phi,0,50), ff=factors(phi,method)
+    const gamma=l.gammaSat!=null?Math.max(l.gammaSat-gammaW,.001):Math.max(l.gamma,.001)
+    const qk=Math.max(0,l.cohesion)*ff.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc
+      +baseQ*ff.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq
+      +0.5*gamma*Math.max(0.01,Math.min(1e3,influence))*ff.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
+    return{top:l.topDepth,bottom:l.bottomDepth,c:l.cohesion,phi,gamma,qk,controlling:false}
+  })
 }
 
 export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoundationResult{
-  if(i.B<=0||i.L<=0) throw new Error('Temel B ve L boyutları m cinsinden sıfırdan büyük olmalıdır.')
-  if(i.Df<0) throw new Error('Df negatif olamaz.')
-  if(i.gamma1<=0||i.gamma2<=0) throw new Error('γ değerleri pozitif olmalıdır.')
-  if(i.c<0) throw new Error('Kohezyon c negatif olamaz.')
-  if(i.verticalLoad<0) throw new Error('Düşey temel yükü negatif olamaz.')
-
-  const method=i.method??'TBDY-2018'
-  const foundationType=i.foundationType??'tekil'
-  const N=i.verticalLoad
-  const H=Math.abs(i.horizontalLoad??0)
+  if(i.B<=0||i.L<=0||i.Df<0)throw new Error('Temel B ve L boyutları pozitif, Df negatif olmayan değer olmalıdır.')
+  if(i.gamma1<=0||i.gamma2<=0)throw new Error('γ ve γsat pozitif olmalıdır.')
+  if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük ise negatif olamaz.')
+  const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad,H=Math.abs(i.horizontalLoad??0)
   const warnings:string[]=[]
-  const ex=N>0?(i.momentY??0)/N:0
-  const ey=N>0?(i.momentX??0)/N:0
-  if(N===0&&((i.momentX??0)!==0||(i.momentY??0)!==0)) warnings.push('Düşey yük sıfır olduğu için momentten eksantrisite hesaplanamadı.')
-  const Be=Math.max(0,i.B-2*Math.abs(ex))
-  const Le=Math.max(0,i.L-2*Math.abs(ey))
-  const Bp=Math.min(Be,Le)
-  const Lp=Math.max(Be,Le)
-  const effectiveArea=Be*Le
-  if(Be<=0||Le<=0) warnings.push('Eksantrisite nedeniyle etkin temel boyutlarından biri sıfır veya negatiftir.')
-  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6) warnings.push('Eksantrisite B/6 veya L/6 sınırını aşıyor; tabanda çekme oluşabilir.')
-  if(N===0&&H>0) warnings.push('Düşey yük sıfır olduğu için yatay yük etkisi q₀ kullanım oranına bağlanamadı.')
-
-  const fallback={c:i.c,phi:clamp(i.phi,0,50),gamma:i.gamma2}
-  const eq=layerEquivalent(i.layers,i.Df,Math.max(Bp,1e-9),fallback)
-  if(eq.used) warnings.push('TBDY 2018 16.8.3.3 kapsamında temel altındaki 2B etkin derinlikteki katmanlar ağırlıklı eşdeğer c ve tanφ ile hesaba katıldı.')
-  else if(i.layers?.length) warnings.push('Tabakalı profil mevcut ancak etkin derinlikte gerekli c-φ-γ verileri eksik; hesap tek tabaka proje parametreleriyle sürdürüldü.')
-
-  const phi=clamp(eq.phi,0,50)
-  const {Nq,Nc,Ngamma,t,sinPhi}=bearingFactors(phi,method)
-  const water=groundwaterCorrection(i.Df,Math.max(Bp,1e-9),i.gamma1,i.gamma2,i.groundwaterDepth)
-  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Math.max(Bp,1e-9)) warnings.push('YASS, temel tabanı ile Df+B′ aralığında olduğundan taşıma gücünün γ terimi efektif/submerged birim hacim ağırlıkla düzeltildi.')
-  const factors=correctionFactors(method,phi,Math.max(Bp,1e-9),Math.max(Lp,1e-9),i.Df,H,N,eq.c,Nc,Nq,t, i.groundSlope??0,i.baseSlope??0)
-
-  const qk=eq.c*Nc*factors.sc*factors.dc*factors.ic*factors.gc*factors.bc
-    +water.surcharge*Nq*factors.sq*factors.dq*factors.iq*factors.gq*factors.bq
-    +0.5*water.gammaBelow*Bp*Ngamma*factors.sg*factors.dg*factors.ig*factors.gg*factors.bg
-
-  const resistanceFactor=i.resistanceFactor??1.4
-  const qt=method==='TBDY-2018'?qk/Math.max(resistanceFactor,1e-9):qk
+  const ex=N>0?(i.momentY??0)/N:0,ey=N>0?(i.momentX??0)/N:0
+  if(N===0&&(i.momentX!==0||i.momentY!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
+  const Be=i.B-2*Math.abs(ex),Le=i.L-2*Math.abs(ey),effectiveArea=Math.max(0,Be)*Math.max(0,Le)
+  if(Be<=0||Le<=0)warnings.push('Eksantrisite temel boyutunu tüketiyor; q0 tasarım kontrolü geçerli değildir.')
+  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; qmin<0 ve gerçek temas alanı ayrıca değerlendirilmelidir.')
+  const Bp=Math.min(Math.max(Be,1e-9),Math.max(Le,1e-9)),Lp=Math.max(Be,Le)
+  const f=factors(i.phi,method),water=groundwater(i.Df,Bp,i.gamma1,i.gamma2,i.groundwaterDepth)
+  const mf=methodFactors(method,Bp,Lp,i.Df,f.phi,f.Nq,f.Nc,H,N,i.c)
+  const qk=i.c*f.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge*f.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+0.5*water.gammaBelow*Bp*f.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
+  const resistanceFactor=method==='TBDY-2018'?i.resistanceFactor??1.4:1
+  const qt=qk/Math.max(resistanceFactor,1e-9)
   const qo=effectiveArea>0?N/effectiveArea:0
-  const utilization=qt>0?qo/qt:0
-  const ultimateClassical=eq.c*Nc*factors.sc*factors.dc+water.surcharge*Nq*factors.sq*factors.dq+0.5*water.gammaBelow*Bp*Ngamma*factors.sg*factors.dg
-  const allowableClassical=i.safetyFactor&&i.safetyFactor>0?ultimateClassical/i.safetyFactor:undefined
-  const undrainedQk=i.undrainedCu!=null&&i.undrainedCu>=0?i.undrainedCu*5.14*factors.sc*factors.dc*factors.ic+water.surcharge:undefined
-
-  if(method==='TBDY-2018'&&Math.abs(resistanceFactor-1.4)>1e-9) warnings.push('TBDY 2018 Tablo 16.2 yüzeysel temel taşıma gücü için γRv = 1.40 kullanılmalıdır.')
-  if(method==='TBDY-2018'&&foundationType==='radye') warnings.push('Radye temel için taşıma gücü kontrolüne ek olarak TBDY 16.8.3.4 yerdeğiştirme/oturma koşulu ayrıca değerlendirilmelidir.')
-  if(phi>=50) warnings.push('φ değeri 50° ile sınırlandırıldı; daha yüksek değerler için zemin parametresi ayrıca doğrulanmalıdır.')
-
-  return {Nq,Nc,Ngamma,...factors,surcharge:water.surcharge,gammaBelow:water.gammaBelow,ex,ey,Be,Le,effectiveArea,qk,qt,qo,utilization,adequate:qo<=qt&&Be>0&&Le>0,effectiveDepth:eq.effectiveDepth,representativeC:eq.c,representativePhi:phi,representativeGamma:eq.gamma,ultimateClassical,allowableClassical,undrainedQk,method,foundationType,warnings}
+  const utilization=qt>0?qo/qt:Infinity
+  const checks=layerChecks(i.layers,i.Df,2*Bp,water.gammaBelow,i.c,i.phi,water.surcharge,N,f,mf,method)
+  if(checks.length){
+    const min=Math.min(...checks.map(x=>x.qk))
+    checks.forEach(x=>x.controlling=Math.abs(x.qk-min)<1e-9)
+    warnings.push('Tabakalı profil: etkin derinlikteki tabakalar tek bir ortalama parametreye gizlenmedi. Her aktif tabaka ayrıca kontrol edildi; kontrol eden en düşük qk raporlandı.')
+  }
+  const controlling=checks.length?Math.min(qk,...checks.map(x=>x.qk)):qk
+  const designQk=controlling
+  const designQt=designQk/Math.max(resistanceFactor,1e-9)
+  const adequate=qo<=designQt&&Be>0&&Le>0
+  if(method==='TBDY-2018'&&Math.abs((i.resistanceFactor??1.4)-1.4)>1e-9)warnings.push('TBDY 2018 Tablo 16.2 yüzeysel temel için γRv=1.40 kullanılmalıdır; verilen değer yalnız açık kullanıcı override olarak kabul edildi.')
+  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS, temel tabanı çevresinde olduğundan γsat−γw ve/veya ağırlıklı γ kullanıldı.')
+  if(foundationType==='radye')warnings.push('Radye temel için taşıma gücü yanında oturma/yerdeğiştirme koşulları ayrıca kontrol edilmelidir.')
+  const resultBase={
+    Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,...mf,surcharge:water.surcharge,gammaBelow:water.gammaBelow,ex,ey,Be,Le,effectiveArea,
+    qk:designQk,qt:designQt,qo,utilization:qo/Math.max(designQt,1e-9),adequate,effectiveDepth:2*Bp,
+    representativeC:i.c,representativePhi:f.phi,representativeGamma:water.gammaBelow,ultimateClassical:qk,allowableClassical:qk/Math.max(i.safetyFactor??3,1e-9),
+    undrainedQk:i.undrainedCu!=null?i.undrainedCu*5.14*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge:undefined,
+    layerChecks:checks,warnings,method,foundationType
+  }
+  const steps:SurfaceFoundationStep[]=[
+    {symbol:'eₓ/eᵧ',title:'Yük eksantriklikleri',formula:'eₓ=Mᵧ/N ; eᵧ=Mₓ/N',value:Math.max(Math.abs(ex),Math.abs(ey)),unit:'m'},
+    {symbol:'B′/L′',title:'Etkin boyutlar',formula:'B′=B−2|eₓ| ; L′=L−2|eᵧ|',value:Math.min(Be,Le),unit:'m'},
+    {symbol:'Nq/Nc/Nγ',title:'Taşıma gücü katsayıları',formula:'TBDY 2018 Denk. 16.8b',value:f.Nq},
+    {symbol:'q',title:'Sürşarj',formula:'q=γ·Df (YASS düzeltmeli)',value:water.surcharge,unit:'kPa'},
+    {symbol:'qk',title:'Karakteristik taşıma gücü',formula:'cNcscdcicgc bc + qNqsqdqiqgq bq + 0.5γ′B′Nγsγdγiγgγbγ',value:designQk,unit:'kPa'},
+    {symbol:'qt',title:'Tasarım taşıma gücü',formula:'qt=qk/γRv ; γRv=1.40',value:designQt,unit:'kPa'},
+    {symbol:'q0',title:'Tasarım etkisi',formula:'q0=N/(B′L′)',value:qo,unit:'kPa'},
+    {symbol:'η',title:'Kullanım oranı',formula:'η=q0/qt',value:utilization}
+  ]
+  const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:mf.sc,sq:mf.sq,sg:mf.sg,dc:mf.dc,dq:mf.dq,dg:mf.dg,ic:mf.ic,iq:mf.iq,ig:mf.ig,gc:mf.gc,gq:mf.gq,gg:mf.gg,bc:mf.bc,bq:mf.bq,bg:mf.bg,surcharge:water.surcharge,gammaBelow:water.gammaBelow,ex,ey,Be,Le,effectiveArea,qk:designQk,qt:designQt,qo,utilization,adequate,effectiveDepth:2*Bp}
+  return {...resultBase,source:'TBDY 2018 Bölüm 16.8.3.2 / Denklem 16.8; katmanlı zemin kontrolü için 16.8.3.3.',steps,value}
 }

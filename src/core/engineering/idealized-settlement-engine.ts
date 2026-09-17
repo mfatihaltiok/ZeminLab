@@ -161,6 +161,7 @@ export function calculateIdealizedSettlement(input: IdealizedSettlementInput): I
   }
 
   if (results.some(x => x.status === 'VERİ EKSİK')) warnings.push('Bir veya daha fazla tabakada gerekli oturma parametresi eksik. Eksik değerler varsayılmadı.')
+  if (method === 'janbu') warnings.push('Janbu seçimi mevcut veri modelinde M modülü ile tabaka integrasyonu olarak uygulanır; tam Janbu parametre seti verilmeden ek varsayım yapılmaz.')
   const methodSource = method === '2to1-layer' ? '2:1 gerilme yayılımı + tabaka bazlı elastik gerinim' : method === 'janbu' ? 'Janbu gerilme-gerinim yaklaşımı, M modülü üzerinden tabaka integrasyonu' : method === 'schmertmann' ? 'Schmertmann gerinim integrasyonu çerçevesi' : method === 'burland-burbidge' ? 'Burland & Burbidge (1985)' : 'Elastisite teorisi'
   return { method, layers: results, totalImmediate, totalConsolidation, totalSettlement: totalImmediate + totalConsolidation, influenceDepth, netFoundationPressure: qNet, foundationEffectiveStress: baseStress.effective, ready: results.length > 0 && !results.some(x => x.status === 'VERİ EKSİK'), warnings, source: `${methodSource}. Parametreler proje verisinden alınır; eksik değerler varsayılmaz.` }
 }

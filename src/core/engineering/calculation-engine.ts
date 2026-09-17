@@ -1,3 +1,4 @@
+import { calculateSurfaceFoundation } from './surface-foundation'
 export type BearingMethod = 'Terzaghi' | 'Meyerhof' | 'Hansen' | 'Vesic'
 
 export interface CalculationStep {
@@ -132,6 +133,140 @@ export function tbdyBearingCapacity(i: TbdyBearingInput): CalculationResult<{
       { symbol: 'η', title: 'Kullanım oranı', formula: 'η = q₀ / qₜ', value: utilization }
     ]
   }
+}
+
+export interface SettlementInput {
+  B: number; q: number; Es: number; nu: number
+  layers?: { thickness: number; Cc?: number; e0?: number; sigma0?: number; dSigma?: number }[]
+}
+
+export function settlement(i: SettlementInput): CalculationResult<{ immediate: number; consolidation: number; total: number }> {
+  const immediate = i.q * i.B * (1 - i.nu * i.nu) / Math.max(i.Es, 1)
+  const consolidation = (i.layers ?? []).reduce((sum, layer) => {
+    if (layer.Cc == null || layer.e0 == null || layer.sigma0 == null || layer.dSigma == null || layer.sigma0 <= 0) return sum
+    return sum + layer.thickness * layer.Cc / (1 + layer.e0) * Math.log10((layer.sigma0 + layer.dSigma) / layer.sigma0)
+  }, 0)
+  const value = { immediate, consolidation, total: immediate + consolidation }
+  return {
+    value,
+    method: 'Elastik + konsolidasyon',
+    source: 'Eksik konsolidasyon parametreleri mevcut değilse yalnızca hesaplanabilir elastik bileşen gösterilir.',
+    steps: [
+      { symbol: 'sᵢ', title: 'Elastik oturma', formula: 'sᵢ = q·B·(1−ν²) / Eₛ', value: immediate, unit: 'm' },
+      { symbol: 's꜀', title: 'Konsolidasyon oturması', formula: 'Σ H·Cc/(1+e₀)·log₁₀[(σ′₀+Δσ′)/σ′₀]', value: consolidation, unit: 'm' },
+      { symbol: 'sₜ', title: 'Toplam oturma', formula: 'sₜ = sᵢ + s꜀', value: value.total, unit: 'm' }
+    ]
+  }
+}
+
+export interface LiquefactionInput {
+  Mw: number; Sds: number; depth: number; N160f: number; sigmaV: number; sigmaVPrime: number
+}
+
+export function liquefaction(i: LiquefactionInput): CalculationResult<{
+  rd: number; CRRM75: number; CM: number; Rtau: number; tau: number; ratio: number; safe: boolean
+}> {
+  const z = Math.max(i.depth, 0.01)
+  const rd = Math.exp(-1.012 - 0.01126 * z + 0.5133 / z)
+  const N = clamp(i.N160f, 0.1, 33.9)
+  const CRRM75 = 1 / (34 - N) + N / 135 + 50 / (10 * N + 45) ** 2 - 1 / 200
+  const CM = 10 ** (2.24 / Math.max(i.Mw, 4) ** 2.56)
+  const Rtau = CRRM75 * CM * Math.max(i.sigmaVPrime, 0)
+  const tau = 0.65 * (0.4 * i.Sds) * i.sigmaV * rd
+  const ratio = Rtau / Math.max(tau, 1e-9)
+  const value = { rd, CRRM75, CM, Rtau, tau, ratio, safe: ratio >= 1.1 }
+  return {
+    value,
+    method: 'TBDY 2018 Ek 16B SPT tabanlı sıvılaşma ön değerlendirmesi',
+    source: 'TBDY 2018 Ek 16B.3–16B.5: N1,60f, CRRM7.5, CM ve deprem kayma gerilmesi bağıntıları. İnce dane düzeltmesi ve SPT düzeltmeleri merkezi SPT motorundan gelmelidir.',
+    steps: [
+      { symbol: 'rᵈ', title: 'Gerilme azaltma katsayısı', formula: 'rᵈ = exp(−1.012 − 0.01126z + 0.5133/z)', value: rd },
+      { symbol: 'CRR₇.₅', title: 'Çevrimsel dayanım oranı', formula: 'Denklem 16B.4b', value: CRRM75 },
+      { symbol: 'Cᴹ', title: 'Deprem büyüklüğü düzeltmesi', formula: 'Cᴹ = 10^(2.24/Mw^2.56)', value: CM },
+      { symbol: 'τᴿ', title: 'Sıvılaşma direnci', formula: 'τᴿ = CRR₇.₅·Cᴹ·σ′ᵥ₀', value: Rtau },
+      { symbol: 'τdeprem', title: 'Deprem kayma gerilmesi', formula: 'τdeprem = 0.65·(0.4SDS)·σᵥ₀·rᵈ', value: tau },
+      { symbol: 'FS', title: 'Sıvılaşma güvenlik oranı', formula: 'FS = τᴿ / τdeprem ≥ 1.1', value: ratio }
+    ]
+  }
+}
+
+export interface FoundationInput {
+  B: number; L: number; N: number; V: number; Mx: number; My: number
+  delta?: number; cu?: number; area?: number
+}
+
+export function foundationChecks(i: FoundationInput) {
+  const N = Math.max(Math.abs(i.N), 1e-9)
+  const ex = i.My / N
+  const ey = i.Mx / N
+  const qAvg = i.N / Math.max(i.B * i.L, 1e-9)
+  const qMax = qAvg * (1 + 6 * Math.abs(ex) / Math.max(i.L, 1e-9) + 6 * Math.abs(ey) / Math.max(i.B, 1e-9))
+  const qMin = qAvg * (1 - 6 * Math.abs(ex) / Math.max(i.L, 1e-9) - 6 * Math.abs(ey) / Math.max(i.B, 1e-9))
+  const delta = i.delta ?? 0
+  const resistance = Math.max(0, i.N) * Math.tan(delta) + (i.cu ?? 0) * (i.area ?? i.B * i.L)
+  const contactRatio = qMin >= 0 ? 1 : Math.max(0, 1 - 6 * Math.abs(ex) / Math.max(i.L, 1e-9)) * Math.max(0, 1 - 6 * Math.abs(ey) / Math.max(i.B, 1e-9))
+  return {
+    value: { ex, ey, qAvg, qMax, qMin, contactRatio, slidingFS: Math.abs(i.V) > 0 ? resistance / Math.abs(i.V) : Infinity },
+    steps: [
+      { symbol: 'eₓ', title: 'Eksantriklik', formula: 'eₓ = Mᵧ / N', value: ex, unit: 'm' },
+      { symbol: 'eᵧ', title: 'Eksantriklik', formula: 'eᵧ = Mₓ / N', value: ey, unit: 'm' },
+      { symbol: 'q̄', title: 'Ortalama taban gerilmesi', formula: 'q̄ = N/(B·L)', value: qAvg },
+      { symbol: 'qmax', title: 'Maksimum taban gerilmesi', formula: 'qmax = q̄(1+6eₓ/L+6eᵧ/B)', value: qMax },
+      { symbol: 'qmin', title: 'Minimum taban gerilmesi', formula: 'qmin = q̄(1−6eₓ/L−6eᵧ/B)', value: qMin }
+    ],
+    method: 'Temel gerilme / eksantriklik kontrolü',
+    source: 'TBDY 2018 Bölüm 16.7–16.8 temel tasarım kontrolleri.'
+  }
+}
+
+export function jetGrout(i: {
+  columnDiameter: number; spacing: number; qultSoil: number; qultColumn: number
+  improvementFactor: number; FS: number; columnStrength: number
+}) {
+  const Ac = Math.PI * i.columnDiameter ** 2 / 4
+  const ratio = Math.min(1, Ac / Math.max(i.spacing ** 2, 1e-9))
+  const composite = (1 - ratio) * i.qultSoil + ratio * i.qultColumn * i.improvementFactor
+  return {
+    value: { Ac, ratio, composite, allowable: composite / Math.max(i.FS, 1e-9), columnLoad: Ac * i.columnStrength / Math.max(i.FS, 1e-9) },
+    steps: [
+      { symbol: 'A꜀', title: 'Kolon alanı', formula: 'A꜀ = πd²/4', value: Ac, unit: 'm²' },
+      { symbol: 'ρ', title: 'İyileştirme oranı', formula: 'ρ = A꜀/s²', value: ratio },
+      { symbol: 'qcomp', title: 'Kompozit model', formula: '(1−ρ)qsoil + ρ·qcolumn·η', value: composite },
+      { symbol: 'qallow', title: 'İzin verilen değer', formula: 'qallow = qcomp/FS', value: composite / Math.max(i.FS, 1e-9) }
+    ],
+    method: 'Jet Grout kompozit ön model',
+    source: 'TBDY 2018 Bölüm 16 / Ek 16D; proje deneyleri ile doğrulama gerekir.'
+  }
+}
+
+export function stressAtDepth(depth: number, layers: { top: number; bottom: number; gamma: number; gammaSat: number }[], gwt: number) {
+  let sigmaV = 0
+  for (const layer of [...layers].sort((a, b) => a.top - b.top)) {
+    const z0 = Math.max(layer.top, 0)
+    const z1 = Math.min(layer.bottom, depth)
+    if (z1 <= z0) continue
+    const dryThickness = Math.max(0, Math.min(z1, gwt) - z0)
+    const saturatedThickness = Math.max(0, z1 - z0 - dryThickness)
+    sigmaV += dryThickness * layer.gamma + saturatedThickness * layer.gammaSat
+  }
+  const porePressure = Math.max(0, depth - gwt) * 9.80665
+  return { sigmaV, sigmaVPrime: Math.max(0.01, sigmaV - porePressure), u: porePressure }
+}
+
+export const SOURCE_NOTES = {
+  investigation: 'TBDY 2018 Bölüm 16 ve Ek 16A: zemin araştırmaları, SPT/laboratuvar verileri ve raporlama.',
+  liquefaction: 'TBDY 2018 Bölüm 16.6 ve Ek 16B: sıvılaşma değerlendirmesi. Yöntem ve varsayımlar hesap izinde ayrıca gösterilir.',
+  bearing: 'TBDY 2018 Bölüm 16.8.3.2 ve Denklem 16.8: yüzeysel temel taşıma gücü.',
+  settlement: 'TBDY 2018 Bölüm 16: taşıma gücü ve yerdeğiştirme koşulları birlikte değerlendirilir.',
+  foundation: 'TBDY 2018 Bölüm 16.7–16.8: temel tasarımı ve taban gerilmesi kontrolleri.',
+  jetGrout: 'TBDY 2018 Bölüm 16 / Ek 16D: zemin iyileştirmesi; proje deneyleri ile doğrulama gerekir.'
+}export function tbdyBearingCapacity(i: TbdyBearingInput): CalculationResult<any> {
+  const result=calculateSurfaceFoundation({
+    B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma1,gamma2:i.gamma2,c:i.c,phi:i.phi,
+    verticalLoad:i.verticalLoad,horizontalLoad:i.horizontalLoad,momentX:i.momentX,momentY:i.momentY,
+    groundSlope:i.groundSlope,baseSlope:i.baseSlope,resistanceFactor:i.resistanceFactor,method:'TBDY-2018'
+  })
+  return {value:result,steps:result.steps,method:result.method,source:result.source,warnings:result.warnings}
 }
 
 export interface SettlementInput {

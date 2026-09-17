@@ -1,6 +1,8 @@
 import { app, shell, BrowserWindow, dialog, ipcMain, net, safeStorage } from 'electron'
 import { join } from 'path'
-import { promises as fs } from 'fs'
+import { promises as fs, existsSync } from 'fs'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
@@ -8,10 +10,11 @@ const projectSaveFilter=[{name:'ZeminLab Projesi',extensions:['zlproj']}]
 const projectOpenFilter=[{name:'ZeminLab Projesi',extensions:['zlproj','zlab']}]
 const pdfFilter=[{name:'PDF Belgesi',extensions:['pdf']}]
 const PROJECT_SCHEMA_VERSION=2
+const execFileAsync=promisify(execFile)
 const GOOGLE_VISION_ENDPOINT='https://vision.googleapis.com/v1/images:annotate'
 const ocrSettingsPath=()=>join(app.getPath('userData'),'ocr-settings.json')
 
-type StoredOcrSettings={provider:'google';endpoint:string;apiKey?:string}
+type StoredOcrSettings={provider:'local'|'google'|'remote';endpoint:string;apiKey?:string}
 type GoogleVertex={x?:number;y?:number}
 type GoogleAnnotation={description?:string;boundingPoly?:{vertices?:GoogleVertex[]}}
 type GoogleOcrResponse={error?:{message?:string;status?:string};textAnnotations?:GoogleAnnotation[];fullTextAnnotation?:{text?:string}}
@@ -26,7 +29,7 @@ async function readOcrSettings():Promise<StoredOcrSettings>{
     if(encrypted){
       apiKey=safeStorage.isEncryptionAvailable()?safeStorage.decryptString(Buffer.from(encrypted,'base64')):encrypted
     }
-    return{provider:'google',endpoint:value.endpoint||GOOGLE_VISION_ENDPOINT,apiKey}
+    return{provider:value.provider==='google'||value.provider==='remote'?'google':'local',endpoint:value.endpoint||GOOGLE_VISION_ENDPOINT,apiKey}
   }catch{
     return{provider:'google',endpoint:GOOGLE_VISION_ENDPOINT}
   }
@@ -35,7 +38,7 @@ async function readOcrSettings():Promise<StoredOcrSettings>{
 async function writeOcrSettings(input:{endpoint?:string;apiKey?:string}):Promise<void>{
   const apiKey=input.apiKey?.trim()
   const stored:StoredOcrSettings={
-    provider:'google',
+    provider:'local',
     endpoint:input.endpoint?.trim()||GOOGLE_VISION_ENDPOINT,
     apiKey:apiKey?(safeStorage.isEncryptionAvailable()?safeStorage.encryptString(apiKey).toString('base64'):apiKey):undefined
   }
@@ -113,6 +116,39 @@ async function runGoogleVisionOcr(dataUrl:string){
 
   return{ok:true,provider:'google-cloud-vision',lines}
 }
+async function runLocalPaddleOcr(dataUrl:string){
+  const match=/^data:image\/(png|jpeg|jpg);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl)
+  if(!match)throw new Error('OCR için yalnızca PNG veya JPG görseli kabul edilir.')
+  const root=app.isPackaged?process.resourcesPath:app.getAppPath()
+  const pythonCandidates=[process.env.ZEMINLAB_PYTHON,join(root,'python-runtime','Scripts','python.exe'),join(root,'python-runtime','bin','python'),'python'].filter((x):x is string=>Boolean(x))
+  const runnerCandidates=[join(root,'tools','paddleocr_runner.py'),join(process.resourcesPath,'tools','paddleocr_runner.py')]
+  const runner=runnerCandidates.find(x=>existsSync(x))
+  if(!runner)throw new Error('Yerel PaddleOCR çalıştırıcısı bulunamadı: tools/paddleocr_runner.py')
+  const python=pythonCandidates.find(x=>x==='python'||existsSync(x))
+  if(!python)throw new Error('Yerel Python runtime bulunamadı. Kurulum paketinin python-runtime klasörünü kontrol edin.')
+  const tempRoot=join(app.getPath('temp'),'zeminlab-ocr')
+  await fs.mkdir(tempRoot,{recursive:true})
+  const token=Date.now().toString(36)+Math.random().toString(36).slice(2,8)
+  const inputPath=join(tempRoot,token+'.png'),outputPath=join(tempRoot,token+'.json')
+  try{
+    await fs.writeFile(inputPath,Buffer.from(match[2],'base64'))
+    await execFileAsync(python,[runner,'--input',inputPath,'--output',outputPath],{windowsHide:true,maxBuffer:20*1024*1024})
+    const result=JSON.parse(await fs.readFile(outputPath,'utf8')) as {ok?:boolean;provider?:string;lines?:Array<{text:string;score?:number|null;box?:unknown}>;error?:string}
+    if(!result.ok)throw new Error(result.error||'PaddleOCR başarısız oldu.')
+    return result
+  }catch(error){
+    throw new Error(`Yerel PaddleOCR çalıştırılamadı: ${error instanceof Error?error.message:String(error)}`)
+  }finally{
+    await fs.rm(inputPath,{force:true}).catch(()=>undefined)
+    await fs.rm(outputPath,{force:true}).catch(()=>undefined)
+  }
+}
+
+async function runConfiguredOcr(dataUrl:string){
+  const settings=await readOcrSettings()
+  if(settings.provider==='google')return runGoogleVisionOcr(dataUrl)
+  return runLocalPaddleOcr(dataUrl)
+}
 
 function createWindow():void{
   const mainWindow=new BrowserWindow({
@@ -155,19 +191,20 @@ app.whenReady().then(()=>{
 
   ipcMain.handle('ocr:status',async()=>{
     const settings=await readOcrSettings()
-    return{online:net.isOnline(),config:{provider:'google' as const,endpoint:settings.endpoint,hasApiKey:Boolean(settings.apiKey)}}
+    return{online:net.isOnline(),config:{provider:settings.provider==='google'?'remote':'local' as const,endpoint:settings.endpoint,hasApiKey:Boolean(settings.apiKey)}}
   })
 
   ipcMain.handle('ocr:save-config',async(_event,input:{provider?:'google'|'remote'|'local';endpoint?:string;apiKey?:string})=>{
     const current=await readOcrSettings()
     await writeOcrSettings({endpoint:input?.endpoint||current.endpoint,apiKey:input?.apiKey?.trim()||current.apiKey})
+    if(input?.provider==='remote'||input?.provider==='google'){const raw=await fs.readFile(ocrSettingsPath(),'utf8');const stored=JSON.parse(raw) as StoredOcrSettings;stored.provider='google';await fs.writeFile(ocrSettingsPath(),JSON.stringify(stored,null,2),'utf8')}
     return true
   })
 
   ipcMain.handle('ocr:test',async(_event,endpoint?:string)=>testEndpoint(endpoint))
   ipcMain.handle('ocr:analyze-image',async(_event,input:{dataUrl:string})=>{
     if(typeof input?.dataUrl!=='string')throw new Error('OCR görseli verilmedi.')
-    return await runGoogleVisionOcr(input.dataUrl)
+    return await runConfiguredOcr(input.dataUrl)
   })
 
   ipcMain.handle('report:print',async event=>{

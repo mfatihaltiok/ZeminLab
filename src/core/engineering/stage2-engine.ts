@@ -1,4 +1,6 @@
 import { EROL_SOURCE_KEYS } from '../provenance/erol-sources'
+import { bearingCapacity as authoritativeBearing } from './calculation-engine'
+import { calculateSurfaceFoundation } from './surface-foundation'
 
 export type Stage2BearingMethod = 'Terzaghi' | 'Meyerhof' | 'Hansen' | 'Vesic'
 export type Stage2BearingDesign = 'classical-allowable' | 'tbdy-2018'
@@ -80,61 +82,27 @@ function methodFactors(method: Stage2BearingMethod, B: number, L: number, phi: n
 }
 
 export function stage2BearingCapacity(i: Stage2BearingInput): Stage2Result<any> {
-  const B = Math.max(i.B, 0.01), L = Math.max(i.L, B), Df = Math.max(i.Df, 0)
-  const c = Math.max(i.c, 0), phi = factors(i.phi), V = Math.max(Math.abs(i.loadV ?? 0), 1e-9)
-  const ex = (i.momentY ?? 0) / V, ey = (i.momentX ?? 0) / V
-  const Be = Math.max(B - 2 * Math.abs(ex), B * 0.01), Le = Math.max(L - 2 * Math.abs(ey), L * 0.01)
-  const effectiveB = Math.min(Be, Le), effectiveL = Math.max(Be, Le)
-  const mf = methodFactors(i.method, effectiveB, effectiveL, phi.phi, Df)
-  const wg = waterTableGamma(i, effectiveB)
-  const q = i.surcharge != null ? Math.max(0, i.surcharge) : wg.gamma * Df
-  const Ngamma = i.method === 'Meyerhof' ? phi.NgammaM : phi.NgammaV
-  const H = Math.abs(i.loadH ?? 0)
-  const loadRatio = clamp(H / V, 0, 0.999999)
-  const m = (2 + effectiveB / effectiveL) / (1 + effectiveB / effectiveL)
-  const ic = Math.pow(1 - loadRatio, m)
-  const iq = Math.pow(1 - loadRatio, m)
-  const igamma = Math.pow(1 - loadRatio, m + 1)
-  const slopeC = clamp(Math.abs(i.soilSlope ?? 0), 0, 45)
-  const slopeQ = Math.pow(Math.max(0, 1 - Math.tan(rad(slopeC)) / Math.max(Math.tan(rad(45 + phi.phi / 2)), 1e-9)), 2)
-  const slopeGamma = slopeQ
-  const baseSlope = clamp(Math.abs(i.baseSlope ?? 0), 0, 45)
-  const bq = Math.max(0, 1 - Math.tan(rad(baseSlope)) * phi.t)
-  const bgamma = bq
-  const bc = bq
-  const characteristic = c * phi.Nc * mf.sc * mf.dc * ic * bc
-    + q * phi.Nq * mf.sq * mf.dq * iq * slopeQ
-    + 0.5 * wg.gamma * effectiveB * Ngamma * mf.sgamma * mf.dgamma * igamma * slopeGamma * bgamma
-  const resistanceFactor = i.design === 'tbdy-2018' ? 1.4 : undefined
-  const designResistance = resistanceFactor ? characteristic / resistanceFactor : undefined
-  const FS = Math.max(i.FS ?? 3, 0.1)
-  const allowable = characteristic / FS
-  const qApplied = V / Math.max(Be * Le, 1e-9) + 6 * Math.abs(i.momentX ?? 0) / Math.max(Be * Le * Le, 1e-9) + 6 * Math.abs(i.momentY ?? 0) / Math.max(Le * Be * Be, 1e-9)
-  const warnings: string[] = []
-  if (Math.abs(ex) > B / 6 || Math.abs(ey) > L / 6) warnings.push('Eksantriklik çekirdek dışına taşıyor; etkin alan yöntemiyle birlikte temas basıncı ayrıca kontrol edilmelidir.')
-  if (i.design === 'tbdy-2018') warnings.push('TBDY yolu izin verilen gerilme yöntemi değildir: 16.8.2 gereği Rγ=1.4 ile karakteristik taşıma gücünden tasarım dayanımı üretilir.')
-  if (i.layers?.length) warnings.push('Tabakalı zemin tanımlandı. 16.8.3.3 için etkili derinlik içindeki tabakalar ayrı katman hesabına dönüştürülmelidir; tek eşdeğer parametre sonucu nihai tasarım yerine geçmez.')
+  const V = i.loadV ?? 0
+  const H = i.loadH ?? 0
+  if (i.design === 'tbdy-2018') {
+    const r = calculateSurfaceFoundation({
+      B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma,gamma2:i.gamma,c:i.c,phi:i.phi,
+      verticalLoad:Math.max(0,V),horizontalLoad:H,momentX:i.momentX??0,momentY:i.momentY??0,
+      groundSlope:i.soilSlope??0,baseSlope:i.baseSlope??0,resistanceFactor:1.4,
+      method:'TBDY-2018',groundwaterDepth:i.waterTableDepth,
+      layers:i.layers?.map((x,idx)=>({topDepth:i.Df+(idx===0?0:i.layers!.slice(0,idx).reduce((a,y)=>a+y.thickness,0)),bottomDepth:i.Df+i.layers!.slice(0,idx+1).reduce((a,y)=>a+y.thickness,0),gamma:x.gamma,cohesion:x.c,phi:x.phi}))
+    })
+    return {
+      value:{Nq:r.Nq,Nc:r.Nc,Ngamma:r.Ngamma,sc:r.sc,sq:r.sq,sgamma:r.sg,dc:r.dc,dq:r.dq,dgamma:r.dg,ic:r.ic,iq:r.iq,igamma:r.ig,characteristic:r.qk,designResistance:r.qt,allowableGross:r.qk/Math.max(i.FS??3,1e-9),qApplied:r.qo,BEffective:r.Be,LEffective:r.Le,ex:r.ex,ey:r.ey,qSurcharge:r.surcharge,resistanceFactor:1.4},
+      method:'TBDY 2018',source:r.source,warnings:r.warnings,steps:r.steps
+    }
+  }
+  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,c:i.c,phi:i.phi,FS:Math.max(i.FS??3,0.1),method:i.method})
+  const warnings:string[]=[]
+  if(Math.abs(i.momentX??0)>0||Math.abs(i.momentY??0)>0)warnings.push('Klasik sonuç merkezi düşey yük varsayımıyla hesaplanır; momentli temas kontrolü için temel kontrol motoru kullanılmalıdır.')
   return {
-    value: {
-      Nq: phi.Nq, Nc: phi.Nc, Ngamma, sc: mf.sc, sq: mf.sq, sgamma: mf.sgamma,
-      dc: mf.dc, dq: mf.dq, dgamma: mf.dgamma, ic, iq, igamma,
-      characteristic, designResistance, allowableGross: allowable, qApplied,
-      BEffective: Be, LEffective: Le, ex, ey, qSurcharge: q, resistanceFactor
-    },
-    method: i.design === 'tbdy-2018' ? `${i.method} / TBDY 2018` : i.method,
-    source: i.design === 'tbdy-2018'
-      ? 'TBDY 2018 Bölüm 16, Denk.(16.4)-(16.8), Tablo 16.2; klasik katsayı bağıntıları literatürden. Erol & Çekinmez (2014) saha deneyi korelasyonları gerektiğinde ikincil kaynak olarak kullanılmalıdır.'
-      : `${mf.source}; Erol & Çekinmez (2014) saha deneyleri ve parametre seçimi için ikincil kaynak.`,
-    warnings,
-    steps: [
-      { symbol: 'Nq', title: 'Taşıma gücü katsayısı', formula: 'Nq = exp(π tanφ′) · tan²(45°+φ′/2)', value: phi.Nq, source: 'TBDY 2018 16.8.3.2 / Denk.(16.8b)' },
-      { symbol: 'Nc', title: 'Kohezyon katsayısı', formula: 'Nc = (Nq−1)cotφ′', value: phi.Nc, source: 'TBDY 2018 16.8.3.2 / Denk.(16.8b)' },
-      { symbol: 'Nγ', title: 'Birim hacim ağırlığı katsayısı', formula: i.method === 'Meyerhof' ? 'Meyerhof Nγ bağıntısı' : 'Seçilen yöntemin Nγ bağıntısı', value: Ngamma, source: mf.source },
-      { symbol: 'e', title: 'Eksantriklikler', formula: 'ex=M_y/V, ey=M_x/V', value: Math.max(Math.abs(ex), Math.abs(ey)), unit: 'm' },
-      { symbol: 'B′,L′', title: 'Etkin boyutlar', formula: 'B′=B−2|ex|, L′=L−2|ey|', value: Math.min(Be, Le), unit: 'm' },
-      { symbol: 'qk', title: 'Karakteristik taşıma gücü', formula: 'cNcscdcic + qNqsqdqiq + 0.5γ′B′Nγsγdγiγ', value: characteristic, unit: 'kPa', source: 'TBDY 2018 16.8.3.2 / Denk.(16.8a)' },
-      ...(resistanceFactor ? [{ symbol: 'qt', title: 'TBDY tasarım taşıma gücü', formula: 'qt = qk / Rγ, Rγ=1.4', value: designResistance, unit: 'kPa', source: 'TBDY 2018 16.7.4, 16.8.2, Denk.(16.7)' }] : [{ symbol: 'qallow', title: 'İzin verilen brüt taşıma gücü', formula: 'qallow=qk/FS', value: allowable, unit: 'kPa', note: 'Klasik allowable-stress değerlendirmesi; TBDY tasarım yolu değildir.' }])
-    ]
+    value:{Nq:r.value.Nq,Nc:r.value.Nc,Ngamma:r.value.Ngamma,sc:r.value.sc,sq:r.value.sq,sgamma:r.value.sg,dc:r.value.dc,dq:r.value.dq,dgamma:r.value.dg,ic:1,iq:1,igamma:1,characteristic:r.value.ultimate,designResistance:undefined,allowableGross:r.value.allowableGross,qApplied:Math.max(0,V)/(Math.max(i.B*i.L,1e-9)),BEffective:i.B,LEffective:i.L,ex:0,ey:0,qSurcharge:i.gamma*i.Df,resistanceFactor:undefined},
+    method:i.method,source:r.source,warnings,steps:r.steps
   }
 }
 

@@ -1,4 +1,4 @@
-import type { SptEngineInput } from '../spt/spt-engine'
+import { calculateSpt, fineContentCorrection, type SptEngineInput } from '../spt/spt-engine'
 
 export interface SoilLayerStressInput { top:number; bottom:number; gamma:number; gammaSat:number; finesContent?:number; plasticityIndex?:number; liquidLimit?:number; waterContent?:number }
 export interface LiquefactionSptRecord extends SptEngineInput { depth:number; fines?:number; fineContent?:number; id?:string; soilType?:string; plasticityIndex?:number; liquidLimit?:number; waterContent?:number; unitWeightTPerM3?:number; testType?:'SPT'|'UD' }
@@ -37,8 +37,7 @@ function stress(depth:number,record:LiquefactionSptRecord,layers:SoilLayerStress
   const s=effectiveStressAtDepth(depth,layers,gwt)
   return{...s,gammaK:depth>0?s.sigmaV/depth:17}
 }
-function correctionFactors(record:LiquefactionSptRecord){const er=Number.isFinite(record.energyRatio)&&record.energyRatio!>0?record.energyRatio!:60;const ce=er/60;const d=record.boreholeDiameterMm;const cb=d!=null?(d<=115?1:d<=150?1.05:1.15):1;const cs=record.sampler==='without-liner'?1.1:1;const cr=record.rodLengthM!=null&&record.rodLengthM>0?(record.rodLengthM<4?.75:record.rodLengthM<6?.85:record.rodLengthM<10?.95:1):(record.depth<4?.75:record.depth<6?.85:record.depth<10?.95:1);return{ce,cb,cs,cr}}
-function fineCorrection(n1_60:number,fines=0){const fc=Math.max(0,fines);if(fc<=5)return{alpha:0,beta:1,n1_60f:n1_60};if(fc<35){const alpha=Math.exp(1.76-190/Math.pow(fc,2));const beta=.99+Math.pow(fc,1.5)/1000;return{alpha,beta,n1_60f:alpha+beta*n1_60}}return{alpha:5,beta:1.2,n1_60f:5+1.2*n1_60}}
+
 function rd(depth:number){if(depth<=9.15)return 1-.00765*depth;if(depth<=23)return 1.174-.0267*depth;if(depth<=30)return .744-.008*depth;return .5}
 function crrM75(n1_60f:number){if(n1_60f>=29.9)return 2;const n=Math.max(0,n1_60f);return Math.max(.01,1/(34-n)+n/135+50/Math.pow(10*n+45,2)-1/200)}
 function cM(Mw:number){return Math.pow(10,2.24)/Math.pow(Math.max(Mw,1e-9),2.56)}
@@ -48,13 +47,12 @@ export function liquefactionProfile(i:LiquefactionProfileInput):LiquefactionProf
  if(!Number.isFinite(i.Sds)||i.Sds<0)throw new Error('SDS geçerli olmalıdır.')
  const CM=cM(i.Mw), layers=sortedLayers(i.layers)
  const rows=[...i.spt].filter(x=>x.testType!=='UD'&&Number.isFinite(x.depth)&&x.depth>0&&Number.isFinite(x.nField)&&x.nField>=0).sort((a,b)=>a.depth-b.depth).map(record=>{
-  const layer=layerAt(record.depth,layers),soilType=record.soilType||'',cohesive=isCohesiveSoil(soilType),st=stress(record.depth,record,layers,i.groundwaterDepth),f=correctionFactors(record)
+  const layer=layerAt(record.depth,layers),soilType=record.soilType||'',cohesive=isCohesiveSoil(soilType),st=stress(record.depth,record,layers,i.groundwaterDepth)
   const belowGwt=i.groundwaterDepth>=0&&record.depth>=i.groundwaterDepth
-  const cn=cohesive?1:Math.min(1.70,Math.sqrt(100/Math.max(1,st.sigmaVPrime)))
-  const n60=record.nField*f.ce*f.cb*f.cs*f.cr,n1_60=n60*cn
-  // TBDY Annex 16B result is based on corrected (N1)60; no extra legacy dilatancy reduction is silently imposed.
+  const spt=calculateSpt({...record, effectiveStress:st.sigmaVPrime, fineContent:record.fines??record.fineContent??layer?.finesContent, applyOverburden:!cohesive, applyDilatancy:false})
+  const cn=spt.cn, n60=spt.n60, n1_60=spt.n1_60
   const n1_60_dilatancy=n1_60
-  const fines=record.fines??record.fineContent??layer?.finesContent??0,fine=fineCorrection(n1_60_dilatancy,fines),rr=rd(record.depth)
+  const fines=record.fines??record.fineContent??layer?.finesContent??0,fine=fineContentCorrection(fines),rr=rd(record.depth)
   const csr=.65*(.4*i.Sds)*(st.sigmaV/Math.max(.1,st.sigmaVPrime))*rr,crr=crrM75(fine.n1_60f)
   const tauEarthquake=.65*(.4*i.Sds)*st.sigmaV*rr,tauResistance=crr*CM*st.sigmaVPrime,fsL=tauEarthquake>0?tauResistance/tauEarthquake:9.9
   let claySofteningRisk:LiquefactionProfileRow['claySofteningRisk']='VERİ YOK',clayExplanation='';const w=record.waterContent??layer?.waterContent,ll=record.liquidLimit??layer?.liquidLimit
