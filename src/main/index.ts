@@ -102,15 +102,18 @@ app.whenReady().then(() => {
     })
     if (result.canceled || !result.filePath) return null
 
+    // Orientation and page size are controlled by the report's named @page rules.
+    // Keeping landscape=false avoids forcing every report page to landscape.
     const pdf = await window.webContents.printToPDF({
-      landscape: true,
+      landscape: false,
       pageSize: 'A4',
       printBackground: true,
       displayHeaderFooter: false,
       margins: { top: 0, bottom: 0, left: 0, right: 0 }
     })
-    await fs.writeFile(result.filePath.endsWith('.pdf') ? result.filePath : `${result.filePath}.pdf`, pdf)
-    return result.filePath.endsWith('.pdf') ? result.filePath : `${result.filePath}.pdf`
+    const filePath = result.filePath.endsWith('.pdf') ? result.filePath : `${result.filePath}.pdf`
+    await fs.writeFile(filePath, pdf)
+    return filePath
   })
 
   ipcMain.handle('window:minimize', (event) => {
