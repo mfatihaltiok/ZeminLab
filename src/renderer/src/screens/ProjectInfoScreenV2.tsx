@@ -24,7 +24,7 @@ export function ProjectInfoScreenV2() {
           <Field label="Ada" type="text" value={p.ada} onChange={(v) => set('ada', v)} />
           <Field label="Parsel" type="text" value={p.parsel} onChange={(v) => set('parsel', v)} />
           <Field label="Yapı Türü" type="text" value={p.buildingType} onChange={(v) => set('buildingType', v)} />
-          <Field label="İmar Durumu" type="text" value={p.address} onChange={(v) => set('address', v)} />
+          <Field label="İmar Durumu" type="text" value={p.zoningStatus} onChange={(v) => set('zoningStatus', v)} />
           <Field label="Kat Sayısı" type="number" value={p.normalFloorCount || ''} onChange={(v) => set('normalFloorCount', n(v))} />
           <Field label="Bodrum Sayısı" type="number" value={p.basementCount || ''} onChange={(v) => set('basementCount', n(v))} />
         </div>
