@@ -1,8 +1,8 @@
 /**
  * Advanced geotechnical calculation services migrated from the legacy ZeminLab engine.
  *
- * These functions are calculation engines. Method, assumptions and source are
- * returned so the UI/report can expose the engineering basis.
+ * Jet Grout composite calculations use the published Erol & Çekinmez Bayram
+ * (2018) reference as the project calculation basis where applicable.
  */
 
 export type StressSpreadMethod = '2:1'
@@ -44,7 +44,6 @@ export interface SubgradeReactionResult {
   formula: string
 }
 
-/** Winkler modulus from direct q/s or an elastic half-space approximation. */
 export function subgradeReaction(i: SubgradeReactionInput): SubgradeReactionResult {
   const B = Math.max(i.B, 1e-9)
   if (i.method === 'q/s' && i.q != null && i.settlement != null && i.settlement > 0) {
@@ -78,27 +77,19 @@ export interface LayerSettlementResult {
   layers: Array<{ settlement: number; type: 'elastic' | 'oedometer' }>
 }
 
-/**
- * Layer-by-layer settlement. Uses mv where supplied, otherwise an
- * oedometer Cc/e0 formulation with optional preconsolidation stress, otherwise
- * elastic Es. This keeps the calculation deterministic and auditable.
- */
 export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlementResult {
   let immediate = 0
   let consolidation = 0
   const details: LayerSettlementResult['layers'] = []
-
   for (const l of layers) {
     const H = Math.max(0, l.thickness)
     const ds = Math.max(0, l.deltaSigma)
     let s = 0
     let type: 'elastic' | 'oedometer' = 'elastic'
-
     if (H <= 0 || ds <= 0) {
       details.push({ settlement: 0, type })
       continue
     }
-
     if (l.mv != null && l.mv >= 0) {
       s = H * l.mv * ds
       consolidation += s
@@ -129,17 +120,11 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
 }
 
 export interface SchmertmannLayer { thickness: number; Es: number; Iz: number }
-
-/** Schmertmann-style strain integration: s = C1 C2 q Σ(Iz/Es)Δz. */
 export function schmertmannSettlement(q: number, layers: SchmertmannLayer[], C1 = 1, C2 = 1) {
   const settlement = Math.max(0, C1) * Math.max(0, C2) * Math.max(0, q) * layers.reduce((sum, l) => {
     return sum + Math.max(0, l.Iz) * Math.max(0, l.thickness) / Math.max(l.Es, 1e-9)
   }, 0)
-  return {
-    settlement,
-    formula: 's = C1·C2·q·Σ(Iz/Es)Δz',
-    method: 'Schmertmann strain-integration framework'
-  }
+  return { settlement, formula: 's = C1·C2·q·Σ(Iz/Es)Δz', method: 'Schmertmann strain-integration framework' }
 }
 
 export type JetGroutLayout = 'square' | 'triangular'
@@ -150,18 +135,22 @@ export interface JetGroutAdvancedInput {
   layout?: JetGroutLayout
   qSoil: number
   qColumn: number
+  cSoil?: number
+  cColumn?: number
   EsSoil?: number
   EsColumn?: number
   load?: number
   foundationArea?: number
   FS?: number
 }
+
 export interface JetGroutAdvancedResult {
   areaColumn: number
   cellArea: number
   areaReplacementRatio: number
   compositeCapacity: number
   compositeModulus?: number
+  compositeCohesion?: number
   columnLoadShare: number
   soilLoadShare: number
   untreatedCapacity: number
@@ -170,15 +159,15 @@ export interface JetGroutAdvancedResult {
   settlementReductionFactor?: number
   treatedSettlementFactor?: number
   layout: JetGroutLayout
+  source: string
+  sourceNote: string
 }
 
 /**
- * Unit-cell composite model for jet-grout columns.
- *
- * The square/triangular unit-cell geometry is explicit. No Priebe factor is
- * silently applied here: Priebe's original framework is associated with
- * granular column/vibro-replacement systems and must not be presented as a
- * TBDY jet-grout coefficient without a project-specific validated adaptation.
+ * Erol & Çekinmez Bayram (2018) composite-material approach:
+ * soil and jet-grout column properties are combined using the replacement
+ * area ratio. This is intentionally kept separate from Priebe, which is not
+ * silently applied to Jet Grout.
  */
 export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResult {
   const d = Math.max(i.columnDiameter, 1e-9)
@@ -192,6 +181,9 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
   const compositeCapacity = ar * qColumn + (1 - ar) * qSoil
   const compositeModulus = i.EsSoil != null && i.EsColumn != null && i.EsSoil > 0 && i.EsColumn > 0
     ? ar * i.EsColumn + (1 - ar) * i.EsSoil
+    : undefined
+  const compositeCohesion = i.cSoil != null && i.cColumn != null
+    ? ar * i.cColumn + (1 - ar) * i.cSoil
     : undefined
   const n = i.EsSoil != null && i.EsColumn != null && i.EsSoil > 0 && i.EsColumn > 0
     ? Math.max(1, i.EsColumn / i.EsSoil)
@@ -209,6 +201,7 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
     areaReplacementRatio: ar,
     compositeCapacity,
     compositeModulus,
+    compositeCohesion,
     columnLoadShare,
     soilLoadShare,
     untreatedCapacity: qSoil,
@@ -216,6 +209,8 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
     capacityFS,
     settlementReductionFactor: n,
     treatedSettlementFactor,
-    layout
+    layout,
+    source: 'Erol & Çekinmez Bayram (2018), Jet Enjeksiyon Yöntemi, Yüksel Proje, Ankara',
+    sourceNote: 'Kompozit parametreler alan oranı üzerinden değerlendirilir. Kolon kapasitesi ve nihai tasarım, imalat doğrulaması/zemin tabakası bazlı kontroller ile ayrıca ele alınmalıdır.'
   }
 }
