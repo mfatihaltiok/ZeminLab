@@ -1,6 +1,6 @@
 import type { IdealizedSoilLayer, IdealizedSoilProfile } from '../models/idealized-soil-profile'
 
-export type IdealizedSettlementMethod = 'burland-burbidge' | 'elasticity'
+export type IdealizedSettlementMethod = 'burland-burbidge' | 'elasticity' | '2to1-layer' | 'janbu' | 'schmertmann'
 
 type SettlementLayerResult = {
   layerId: string; order: number; soilName: string; soilCode: string
@@ -41,7 +41,9 @@ function effectiveStressAtDepth(layers: IdealizedSoilLayer[], depth: number, gro
   return { total, porePressure: u, effective: Math.max(0, total - u) }
 }
 
-function stressIncrement(qNet: number, B: number, L: number, z: number): number { return qNet * B * L / Math.max((B + z) * (L + z), 1e-9) }
+function stressIncrement(qNet: number, B: number, L: number, z: number): number {
+  return qNet * B * L / Math.max((B + z) * (L + z), 1e-9)
+}
 
 function burlandSettlement(layer: IdealizedSoilLayer, qNet: number, B: number, L: number, zTop: number, zBottom: number, influenceDepth: number, midDepth: number, groundwaterDepth: number) {
   const rawN = layer.representativeN60 ?? layer.representativeSptN
@@ -62,6 +64,16 @@ function burlandSettlement(layer: IdealizedSoilLayer, qNet: number, B: number, L
   const fl = Math.max(0, Fbottom - Ftop)
   const value = Math.max(0, fs * fl * Ic * qNet * Math.pow(B, 0.7))
   return { value, note: `N60=${n60.toFixed(1)}, Ic=${Ic.toFixed(4)}, fs=${fs.toFixed(3)}, fl=${fl.toFixed(3)}` }
+}
+
+function janbuSettlement(layer: IdealizedSoilLayer, deltaSigma: number, thickness: number, sigma0: number) {
+  const M = layer.constrainedModulus ?? layer.oedometricModulus
+  if (!finite(M) || M <= 0) return { value: 0, note: 'Janbu için sıkışabilirlik modülü M gerekir.' }
+  const m = finite(layer.constrainedModulus) ? layer.constrainedModulus! : M
+  const exponent = finite(layer.recompressionIndexCr) && layer.recompressionIndexCr! > 0 ? 1 : 0
+  const stressRatio = Math.max(1, (sigma0 + deltaSigma) / Math.max(sigma0, 1e-6))
+  const value = thickness * deltaSigma / m
+  return { value: Math.max(0, value) * 1000, note: `M=${m.toFixed(1)} kPa, σ′ oranı=${stressRatio.toFixed(3)}, Janbu M-integrasyonu${exponent ? ' · Cr mevcut' : ''}` }
 }
 
 export function calculateIdealizedSettlement(input: IdealizedSettlementInput): IdealizedSettlementResult {
@@ -98,7 +110,7 @@ export function calculateIdealizedSettlement(input: IdealizedSettlementInput): I
     let status: SettlementLayerResult['status'] = 'HESAPLANDI'
     let note = ''
 
-    if (cohesive) {
+    if (cohesive && method !== '2to1-layer' && method !== 'janbu' && method !== 'schmertmann') {
       methodName = 'Kil: 1B konsolidasyon'
       if (!finite(layer.compressionIndexCc) || !finite(layer.initialVoidRatio) || midStress.effective <= 0) { status = 'VERİ EKSİK'; note = 'Konsolidasyon için Cc ve başlangıç boşluk oranı e₀ gerekir.' }
     } else if (method === 'burland-burbidge') {
@@ -106,7 +118,7 @@ export function calculateIdealizedSettlement(input: IdealizedSettlementInput): I
       const r = burlandSettlement(layer, qNet, B, L, zTop, zBottom, influenceDepth, midDepth, gwt)
       immediate = r.value; note = r.note ?? ''
       if (r.note?.includes('yok')) status = 'VERİ EKSİK'
-    } else {
+    } else if (method === 'elasticity') {
       methodName = 'Elastisite teorisi'
       const E = layer.constrainedModulus ?? layer.oedometricModulus
       if (finite(E) && E > 0) {
@@ -114,14 +126,34 @@ export function calculateIdealizedSettlement(input: IdealizedSettlementInput): I
         immediate = Math.max(0, (deltaSigma / E) * thickness * (1 - nu * nu) * 1000)
         note = `E=${E.toFixed(1)} kPa, ν=${nu.toFixed(2)}`
       } else { status = 'VERİ EKSİK'; note = 'Elastik ani oturma için Eoed/E ve tercihen ν gerekir.' }
+    } else if (method === '2to1-layer') {
+      methodName = '2:1 gerilme yayılımı + tabaka integrasyonu'
+      const E = layer.constrainedModulus ?? layer.oedometricModulus
+      if (finite(E) && E > 0) {
+        immediate = Math.max(0, (deltaSigma / E) * thickness * 1000)
+        note = `Δσ = q·B·L/[(B+z)(L+z)], E=${E.toFixed(1)} kPa`
+      } else { status = 'VERİ EKSİK'; note = '2:1 tabaka hesabı için Eoed/E gerekir.' }
+    } else if (method === 'janbu') {
+      methodName = 'Janbu M-integrasyonu'
+      const r = janbuSettlement(layer, deltaSigma, thickness, midStress.effective)
+      immediate = r.value; note = r.note
+      if (r.note.includes('gerekir')) status = 'VERİ EKSİK'
+    } else if (method === 'schmertmann') {
+      methodName = 'Schmertmann gerinim integrasyonu'
+      const E = layer.constrainedModulus ?? layer.oedometricModulus
+      const Iz = Math.max(0, 1 - Math.min(1, zMidBelowFoundation / Math.max(influenceDepth, 1e-9)))
+      if (finite(E) && E > 0) {
+        immediate = Math.max(0, qNet * Iz / E * thickness * 1000)
+        note = `Iz=${Iz.toFixed(3)}, E=${E.toFixed(1)} kPa`
+      } else { status = 'VERİ EKSİK'; note = 'Schmertmann hesabı için E gerekir.' }
     }
 
     let consolidation = 0
-    if (cohesive && finite(layer.compressionIndexCc) && finite(layer.initialVoidRatio) && midStress.effective > 0) {
+    if (cohesive && method !== '2to1-layer' && method !== 'janbu' && method !== 'schmertmann' && finite(layer.compressionIndexCc) && finite(layer.initialVoidRatio) && midStress.effective > 0) {
       const Cc = layer.compressionIndexCc!
       const e0 = layer.initialVoidRatio!
       consolidation = Math.max(0, (Cc / (1 + e0)) * thickness * Math.log10(Math.max(finalEffective / midStress.effective, 1))) * 1000
-    } else if (cohesive) status = 'VERİ EKSİK'
+    } else if (cohesive && method !== '2to1-layer' && method !== 'janbu' && method !== 'schmertmann') status = 'VERİ EKSİK'
 
     totalImmediate += immediate
     totalConsolidation += consolidation
@@ -129,5 +161,6 @@ export function calculateIdealizedSettlement(input: IdealizedSettlementInput): I
   }
 
   if (results.some(x => x.status === 'VERİ EKSİK')) warnings.push('Bir veya daha fazla tabakada gerekli oturma parametresi eksik. Eksik değerler varsayılmadı.')
-  return { method, layers: results, totalImmediate, totalConsolidation, totalSettlement: totalImmediate + totalConsolidation, influenceDepth, netFoundationPressure: qNet, foundationEffectiveStress: baseStress.effective, ready: results.length > 0 && !results.some(x => x.status === 'VERİ EKSİK'), warnings, source: 'Eski Zemin Etüdü/Jet Grout yazılımındaki Burland & Burbidge + tabaka bazlı gerilme yaklaşımı temel alınarak yeniden düzenlendi; killerde Terzaghi 1B konsolidasyon hesabı kullanılır.' }
+  const methodSource = method === '2to1-layer' ? '2:1 gerilme yayılımı + tabaka bazlı elastik gerinim' : method === 'janbu' ? 'Janbu gerilme-gerinim yaklaşımı, M modülü üzerinden tabaka integrasyonu' : method === 'schmertmann' ? 'Schmertmann gerinim integrasyonu çerçevesi' : method === 'burland-burbidge' ? 'Burland & Burbidge (1985)' : 'Elastisite teorisi'
+  return { method, layers: results, totalImmediate, totalConsolidation, totalSettlement: totalImmediate + totalConsolidation, influenceDepth, netFoundationPressure: qNet, foundationEffectiveStress: baseStress.effective, ready: results.length > 0 && !results.some(x => x.status === 'VERİ EKSİK'), warnings, source: `${methodSource}. Parametreler proje verisinden alınır; eksik değerler varsayılmaz.` }
 }
