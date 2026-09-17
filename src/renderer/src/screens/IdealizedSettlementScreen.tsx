@@ -3,7 +3,7 @@ import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '..
 import { subgradeReaction } from '../../core/calculations/engineering'
 import type { IdealizedSoilProfile } from '../../core/models/idealized-soil-profile'
 import type { BoreholeRecord } from '../../core/models/field-data'
-import { forceToBase, forceFromBase, stressToBase, stressFromBase } from '../../core/units/project-units'
+import { forceToBase, forceFromBase, stressFromBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
 import type { SubgradeReactionMethod, SubgradeSoilType } from '../../core/engineering/subgrade-reaction'
 import { useProjectInfo } from '../../core/state/project-store'
 import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
@@ -63,7 +63,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
   const b = boreholes.find(x => x.id === selected) ?? boreholes[0]
   const f = p.foundationParameters
   const qGross = finite(f.verticalLoad) && finite(f.footingWidth) && finite(f.footingLength)
-    ? stressToBase(forceToBase(f.verticalLoad, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9), p.unitSystem)
+    ? forceToBase(f.verticalLoad, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
     : 0
 
   const result = useMemo(() => {
