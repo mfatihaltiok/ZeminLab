@@ -1,3 +1,4 @@
+import { calculateSubgradeReaction as authoritativeSubgradeReaction } from './subgrade-reaction'
 /**
  * Advanced geotechnical calculation services migrated from the legacy ZeminLab engine.
  *
@@ -33,6 +34,7 @@ export interface SubgradeReactionInput {
   Es?: number
   nu?: number
   B: number
+  L?: number
   q?: number
   settlement?: number
   method?: 'elastic' | 'q/s'
@@ -42,21 +44,13 @@ export interface SubgradeReactionResult {
   method: 'elastic' | 'q/s'
   source: string
   formula: string
+  unit: string
+  assumptions: string[]
 }
 
 export function subgradeReaction(i: SubgradeReactionInput): SubgradeReactionResult {
-  const B = Math.max(i.B, 1e-9)
-  if (i.method === 'q/s' && i.q != null && i.settlement != null && i.settlement > 0) {
-    return { ks: i.q / i.settlement, method: 'q/s', source: 'Project load/settlement definition of Winkler modulus', formula: 'ks = q/s' }
-  }
-  if (i.Es == null || i.nu == null || i.Es <= 0) throw new Error('Elastic ks requires positive Es and nu.')
-  const nu = Math.min(0.499, Math.max(-0.49, i.nu))
-  return {
-    ks: i.Es / (B * (1 - nu * nu)),
-    method: 'elastic',
-    source: 'Elastic half-space approximation; project-specific plate/foundation calibration may govern.',
-    formula: 'ks ≈ Es / [B(1−ν²)]'
-  }
+  const r=authoritativeSubgradeReaction({...i,method:i.method??'elastic'})
+  return {ks:r.ks,method:r.method==='q/s'?'q/s':'elastic',source:r.source,formula:r.formula,unit:r.unit,assumptions:r.assumptions}
 }
 
 export interface LayerSettlementInput {

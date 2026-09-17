@@ -1,262 +1,102 @@
-export type BearingMethod = 'Terzaghi' | 'Meyerhof' | 'Hansen' | 'Vesic'
+import { calculateSurfaceFoundation } from './surface-foundation'
 
-export interface CalculationStep {
-  symbol: string
-  title: string
-  formula: string
-  value?: number
-  unit?: string
-  note?: string
+export type BearingMethod='Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
+export interface CalculationStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string;source?:string}
+export interface CalculationResult<T>{value:T;steps:CalculationStep[];method:string;source:string;warnings?:string[]}
+const rad=(d:number)=>d*Math.PI/180
+const clamp=(x:number,a:number,b:number)=>Math.max(a,Math.min(b,x))
+
+export interface BearingInput{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS:number;method:BearingMethod;waterReduction?:number}
+function factors(phiDeg:number,method:BearingMethod){
+ const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi))
+ const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
+ const Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
+ let Ngamma=0
+ if(phi>0){
+  if(method==='Terzaghi'){const Kpy=3*(1+Math.sin(rad(phi)))/Math.max(1-Math.sin(rad(phi)),1e-9);Ngamma=.5*t*(Kpy/Math.cos(rad(phi))**2-1)}
+  else if(method==='Meyerhof')Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
+  else if(method==='Hansen')Ngamma=1.5*(Nq-1)*t
+  else Ngamma=2*(Nq+1)*t
+ }
+ return{phi,t,Nq,Nc,Ngamma}
+}
+function classicalFactors(method:BearingMethod,B:number,L:number,Df:number,phi:number,Nq:number,Nc:number){
+ const r=Math.min(B,L)/Math.max(B,L,1e-9),t=Math.tan(rad(phi)),Nphi=Math.tan(Math.PI/4+rad(phi)/2)**2
+ if(method==='Terzaghi')return{sc:Math.abs(B-L)<1e-9?1.3:1,sq:1,sg:Math.abs(B-L)<1e-9?.8:1,dc:1,dq:1,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
+ const sc=method==='Meyerhof'?1+.2*Nphi*r:1+(Nq/Math.max(Nc,1e-9))*r
+ const sq=method==='Meyerhof'?(phi>10?1+.1*Nphi*r:1):1+r*t
+ const sg=method==='Meyerhof'?(phi>10?sq:1):Math.max(.6,1-.4*r)
+ const k=Df/Math.max(B,1e-9),kk=k<=1?k:Math.atan(k)
+ const dc=method==='Meyerhof'?1+.2*Math.sqrt(Nphi)*k:1+.4*kk
+ const dq=method==='Meyerhof'?(phi>10?1+.1*Math.sqrt(Nphi)*k:1):1+2*t*(1-Math.sin(rad(phi)))**2*kk
+ return{sc,sq,sg,dc,dq,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
+}
+export function bearingCapacity(i:BearingInput):CalculationResult<any>{
+ if(i.B<=0||i.L<=0||i.Df<0||i.gamma<=0||i.c<0||i.FS<=0)throw new Error('Taşıma gücü girdileri geçersiz.')
+ const f=factors(i.phi,i.method),m=classicalFactors(i.method,i.B,i.L,i.Df,f.phi,f.Nq,f.Nc),q=i.gamma*i.Df,gammaTerm=i.waterReduction??1
+ const ultimate=i.c*f.Nc*m.sc*m.dc*m.ic*m.gc*m.bc+q*f.Nq*m.sq*m.dq*m.iq*m.gq*m.bq+.5*i.gamma*i.B*f.Ngamma*m.sg*m.dg*m.ig*m.gg*m.bg*gammaTerm
+ const netUltimate=ultimate-q
+ const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:m.sc,sq:m.sq,sg:m.sg,dc:m.dc,dq:m.dq,dg:m.dg,ultimate,netUltimate,allowableGross:ultimate/i.FS,allowableNet:netUltimate/i.FS}
+ return{value,method:i.method,source:'Terzaghi, Meyerhof, Hansen ve Vesic yöntemleri; yöntem-spesifik Nγ, şekil ve derinlik katsayıları.',steps:[
+  {symbol:'Nq',title:'Taşıma gücü katsayısı',formula:'Nq=exp(πtanφ)·tan²(45°+φ/2)',value:f.Nq},
+  {symbol:'Nc',title:'Kohezyon katsayısı',formula:'Nc=(Nq−1)cotφ',value:f.Nc},
+  {symbol:'Nγ',title:'Birim hacim ağırlığı katsayısı',formula:'Seçilen yöntemin Nγ bağıntısı',value:f.Ngamma},
+  {symbol:'s',title:'Şekil katsayıları',formula:'sc,sq,sγ',value:m.sc},
+  {symbol:'d',title:'Derinlik katsayıları',formula:'dc,dq,dγ',value:m.dc},
+  {symbol:'qult',title:'Nihai taşıma gücü',formula:'Genel taşıma gücü denklemi',value:ultimate,unit:'kPa'},
+  {symbol:'qallow',title:'İzin verilen gross',formula:'qult/FS',value:value.allowableGross,unit:'kPa'}
+ ]}
 }
 
-export interface CalculationResult<T> {
-  value: T
-  steps: CalculationStep[]
-  method: string
-  source: string
+export interface TbdyBearingInput{B:number;L:number;Df:number;gamma1:number;gamma2:number;c:number;phi:number;verticalLoad:number;horizontalLoad:number;momentX:number;momentY:number;groundSlope:number;baseSlope:number;resistanceFactor:number}
+export function tbdyBearingCapacity(i:TbdyBearingInput):CalculationResult<any>{
+ const r=calculateSurfaceFoundation({B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma1,gamma2:i.gamma2,c:i.c,phi:i.phi,verticalLoad:i.verticalLoad,horizontalLoad:i.horizontalLoad,momentX:i.momentX,momentY:i.momentY,groundSlope:i.groundSlope,baseSlope:i.baseSlope,resistanceFactor:i.resistanceFactor,method:'TBDY-2018'})
+ return{value:r,steps:r.steps,method:r.method,source:r.source,warnings:r.warnings}
 }
 
-const rad = (deg: number) => deg * Math.PI / 180
-const clamp = (x: number, min: number, max: number) => Math.max(min, Math.min(max, x))
-
-export interface BearingInput {
-  B: number; L: number; Df: number; gamma: number; c: number; phi: number; FS: number
-  method: BearingMethod; waterReduction?: number
+export interface SettlementInput{B:number;q:number;Es:number;nu:number;layers?:{thickness:number;Cc?:number;e0?:number;sigma0?:number;dSigma?:number}[]}
+export function settlement(i:SettlementInput):CalculationResult<{immediate:number;consolidation:number;total:number}>{
+ if(i.B<=0||i.q<0||i.Es<=0||i.nu<=-1||i.nu>=.5)throw new Error('Oturma girdileri geçersiz.')
+ const immediate=i.q*i.B*(1-i.nu*i.nu)/i.Es
+ const consolidation=(i.layers??[]).reduce((sum,l)=>l.Cc!=null&&l.e0!=null&&l.sigma0!=null&&l.dSigma!=null&&l.sigma0>0&&l.Cc>=0&&l.e0>-1?sum+l.thickness*l.Cc/(1+l.e0)*Math.log10(Math.max(l.sigma0+l.dSigma,l.sigma0)/l.sigma0):sum,0)
+ return{value:{immediate,consolidation,total:immediate+consolidation},method:'Elastik + açık konsolidasyon parametreleri',source:'Eksik parametreler varsayılmaz.',steps:[
+  {symbol:'si',title:'Elastik oturma',formula:'s=qB(1−ν²)/Es',value:immediate,unit:'m'},
+  {symbol:'sc',title:'Konsolidasyon',formula:'ΣH·Cc/(1+e0)·log10(σ1/σ0)',value:consolidation,unit:'m'},
+  {symbol:'st',title:'Toplam',formula:'st=si+sc',value:immediate+consolidation,unit:'m'}
+ ]}
 }
 
-export function bearingCapacity(i: BearingInput): CalculationResult<{
-  Nq: number; Nc: number; Ngamma: number; sc: number; sq: number; sg: number
-  ultimate: number; netUltimate: number; allowableGross: number; allowableNet: number
-}> {
-  const phi = clamp(i.phi, 0, 89.9)
-  const t = Math.tan(rad(phi))
-  const Nq = Math.exp(Math.PI * t) * Math.tan(Math.PI / 4 + rad(phi) / 2) ** 2
-  const Nc = phi < 1e-8 ? 5.14 : (Nq - 1) / t
-  const Ngamma = i.method === 'Terzaghi' ? 2 * (Nq + 1) * t : 2 * (Nq - 1) * t
-  const ratio = Math.min(i.B, i.L) / Math.max(i.B, i.L, 1e-9)
-  const sc = i.method === 'Terzaghi' ? 1 : 1 + 0.2 * ratio
-  const sq = i.method === 'Terzaghi' ? 1 : 1 + 0.1 * ratio
-  const sg = i.method === 'Terzaghi' ? 1 : Math.max(0.6, 1 - 0.4 * ratio)
-  const ultimate = i.c * Nc * sc + i.gamma * i.Df * Nq * sq + 0.5 * i.gamma * i.B * Ngamma * sg * (i.waterReduction ?? 1)
-  const netUltimate = ultimate - i.gamma * i.Df
-  const value = {
-    Nq, Nc, Ngamma, sc, sq, sg, ultimate, netUltimate,
-    allowableGross: ultimate / Math.max(i.FS, 1e-9),
-    allowableNet: netUltimate / Math.max(i.FS, 1e-9)
-  }
-  return {
-    value,
-    method: i.method,
-    source: 'Seçilen literatür taşıma gücü yöntemi; TBDY 2018 Denklem 16.8 için kullanılan düzeltme katsayıları ayrıca raporlanır.',
-    steps: [
-      { symbol: 'Nq', title: 'Taşıma gücü katsayısı', formula: 'Nq = e^(π tanφ) · tan²(45° + φ/2)', value: Nq },
-      { symbol: 'Nc', title: 'Kohezyon katsayısı', formula: 'Nc = (Nq − 1) / tanφ', value: Nc },
-      { symbol: 'Nγ', title: 'Birim hacim ağırlık katsayısı', formula: 'Nγ = seçilen yönteme göre', value: Ngamma },
-      { symbol: 'qᵤ', title: 'Nihai taşıma gücü', formula: 'qᵤ = cNcsc + γDfNqsq + 0.5γBNγsγ', value: ultimate },
-      { symbol: 'qₙ,allow', title: 'İzin verilen net değer', formula: 'qₙ,allow = (qᵤ − γDf) / FS', value: value.allowableNet }
-    ]
-  }
+export interface LiquefactionInput{Mw:number;Sds:number;depth:number;N160f:number;sigmaV:number;sigmaVPrime:number}
+export function liquefaction(i:LiquefactionInput):CalculationResult<any>{
+ const z=Math.max(i.depth,.01),rd=z<=9.15?1-.00765*z:z<=23?1.174-.0267*z:z<=30?.744-.008*z:.5,N=clamp(i.N160f,.1,33.9)
+ const CRRM75=N>=29.9?2:1/(34-N)+N/135+50/(10*N+45)**2-.005
+ const CM=10**2.24/Math.max(i.Mw,1)**2.56,Rtau=CRRM75*CM*Math.max(i.sigmaVPrime,0),tau=.65*.4*Math.max(i.Sds,0)*Math.max(i.sigmaV,0)*Math.max(rd,0),ratio=Rtau/Math.max(tau,1e-9)
+ return{value:{rd,CRRM75,CM,Rtau,tau,ratio,safe:ratio>=1.1},method:'TBDY 2018 Ek 16B',source:'TBDY 2018 Ek 16B; SPT düzeltmeleri merkezi SPT motorundan gelir.',steps:[{symbol:'rd',title:'Gerilme azaltma',formula:'TBDY Ek 16B',value:rd},{symbol:'CRR7.5',title:'Çevrimsel dayanım',formula:'CRR bağıntısı',value:CRRM75},{symbol:'FS',title:'Sıvılaşma güvenlik oranı',formula:'FS=Rτ/τdeprem',value:ratio}]}
 }
 
-export interface TbdyBearingInput {
-  B: number; L: number; Df: number; gamma1: number; gamma2: number; c: number; phi: number
-  verticalLoad: number; horizontalLoad: number; momentX: number; momentY: number
-  groundSlope: number; baseSlope: number; resistanceFactor: number
+export interface FoundationInput{B:number;L:number;N:number;V:number;Mx:number;My:number;delta?:number;cu?:number;area?:number}
+export function foundationChecks(i:FoundationInput){
+ if(i.B<=0||i.L<=0)throw new Error('Temel boyutları pozitif olmalıdır.')
+ const N=i.N,ex=N!==0?i.My/N:0,ey=N!==0?i.Mx/N:0,qAvg=N/(i.B*i.L),qMax=qAvg*(1+6*Math.abs(ex)/i.L+6*Math.abs(ey)/i.B),qMin=qAvg*(1-6*Math.abs(ex)/i.L-6*Math.abs(ey)/i.B),resistance=Math.max(0,N)*Math.tan(i.delta??0)+Math.max(0,i.cu??0)*(i.area??i.B*i.L),slidingFS=Math.abs(i.V)>0?resistance/Math.abs(i.V):Infinity,warnings:string[]=[]
+ if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
+ if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Çekirdek dışı yükleme: qmin<0 olabilir.')
+ return{value:{ex,ey,qAvg,qMax,qMin,contactRatio:qMin>=0?1:Math.max(0,1-6*Math.abs(ex)/i.L)*Math.max(0,1-6*Math.abs(ey)/i.B),slidingFS,warnings},steps:[{symbol:'ex',title:'Eksantriklik',formula:'ex=My/N',value:ex,unit:'m'},{symbol:'ey',title:'Eksantriklik',formula:'ey=Mx/N',value:ey,unit:'m'},{symbol:'qmax',title:'Maksimum taban gerilmesi',formula:'qmax=q̄(1+6e/L)',value:qMax},{symbol:'qmin',title:'Minimum taban gerilmesi',formula:'qmin=q̄(1−6e/L)',value:qMin}],method:'Temel taban gerilmesi / eksantriklik',source:'TBDY 2018 Bölüm 16.7–16.8'}
 }
 
-export function tbdyBearingCapacity(i: TbdyBearingInput): CalculationResult<{
-  Nq: number; Nc: number; Ngamma: number; sc: number; sq: number; sg: number
-  dc: number; dq: number; dg: number; ic: number; iq: number; ig: number
-  gc: number; gq: number; gg: number; bc: number; bq: number; bg: number; surcharge: number
-  ex: number; ey: number; Be: number; Le: number
-  qk: number; qt: number; qo: number; utilization: number; adequate: boolean
-}> {
-  const phi = clamp(i.phi, 0, 89.9)
-  const t = Math.tan(rad(phi))
-  const Nq = Math.exp(Math.PI * t) * Math.tan(Math.PI / 4 + rad(phi) / 2) ** 2
-  const Nc = phi < 1e-8 ? 5.14 : (Nq - 1) / t
-  const Ngamma = 2 * (Nq - 1) * t
-  const P = Math.max(Math.abs(i.verticalLoad), 1e-9)
-  const V = Math.abs(i.horizontalLoad)
-  const ex = i.momentY / P
-  const ey = i.momentX / P
-  const Be = Math.max(i.B - 2 * Math.abs(ex), 1e-9)
-  const Le = Math.max(i.L - 2 * Math.abs(ey), 1e-9)
-  const Bp = Math.min(Be, Le)
-  const Lp = Math.max(Be, Le)
-  const ratio = Bp / Math.max(Lp, 1e-9)
-  const sc = 1 + ratio * (Nq / Math.max(Nc, 1e-9))
-  const sq = 1 + ratio * t
-  const sg = Math.max(0, 1 - 0.4 * ratio)
-  const k = Math.atan2(i.Df, Math.max(i.B, 1e-9))
-  const dc = 1 + 0.4 * k
-  const dq = 1 + 2 * k * t * (1 - Math.sin(rad(phi))) ** 2
-  const dg = 1
-  const loadRatio = Math.min(1, V / P)
-  const m = (2 + ratio) / (1 + ratio)
-  const common = Math.max(0, 1 - loadRatio)
-  const ic = phi < 1e-8 ? 1 : Math.max(0, 1 - V / Math.max(i.B * i.L * i.c * Nc, 1e-9))
-  const iq = phi < 1e-8 ? 1 : common ** m
-  const ig = phi < 1e-8 ? 1 : common ** (m + 1)
-  const beta = rad(Math.abs(i.groundSlope))
-  const eta = rad(Math.abs(i.baseSlope))
-  const gq = Math.max(0, (1 - Math.tan(beta) ** 2) ** 2)
-  const gc = Math.max(0, 1 - Math.abs(i.groundSlope) / 147)
-  const gg = gc
-  const bq = Math.max(0, (1 - Math.tan(eta) * t) ** 2)
-  const bc = Math.max(0, 1 - Math.abs(i.baseSlope) / 147)
-  const bg = bq
-  const surcharge = Math.max(0, i.Df * i.gamma1)
-  const qk = i.c * Nc * sc * dc * ic * gc * bc + surcharge * Nq * sq * dq * iq * gq * bq + 0.5 * i.gamma2 * Bp * Ngamma * sg * dg * ig * gg * bg
-  const qt = qk / Math.max(i.resistanceFactor, 1e-9)
-  const qo = P / Math.max(Be * Le, 1e-9)
-  const utilization = qo / Math.max(qt, 1e-9)
-  const value = { Nq, Nc, Ngamma, sc, sq, sg, dc, dq, dg, ic, iq, ig, gc, gq, gg, bc, bq, bg, surcharge, ex, ey, Be, Le, qk, qt, qo, utilization, adequate: qo <= qt }
-  return {
-    value,
-    method: 'TBDY 2018 Denklem 16.8 tabanlı yüzeysel temel taşıma gücü',
-    source: 'TBDY 2018 Bölüm 16.8.3.2 / Denklem 16.8. Düzeltme katsayıları literatür bağıntıları olarak açıkça raporlanır.',
-    steps: [
-      { symbol: 'eₓ', title: 'Yük eksantrikliği', formula: 'eₓ = Mᵧ / N', value: ex, unit: 'm' },
-      { symbol: 'eᵧ', title: 'Yük eksantrikliği', formula: 'eᵧ = Mₓ / N', value: ey, unit: 'm' },
-      { symbol: 'Bₑ,Lₑ', title: 'Etkin temel boyutları', formula: 'Bₑ = B − 2|eₓ| ; Lₑ = L − 2|eᵧ|', value: Math.min(Be, Le), unit: 'm' },
-      { symbol: 's', title: 'Şekil katsayıları', formula: 's꜀, sq, sᵧ', value: sc },
-      { symbol: 'd', title: 'Derinlik katsayıları', formula: 'd꜀, dq, dᵧ', value: dc },
-      { symbol: 'i', title: 'Yük eğikliği katsayıları', formula: 'i꜀, iq, iᵧ', value: ic },
-      { symbol: 'g', title: 'Zemin eğimi katsayıları', formula: 'g꜀, gq, gᵧ', value: gc },
-      { symbol: 'b', title: 'Temel tabanı eğimi katsayıları', formula: 'b꜀, bq, bᵧ', value: bc },
-      { symbol: 'q', title: 'Sürşarj', formula: 'q = Df · γ₁', value: surcharge },
-      { symbol: 'qₖ', title: 'Karakteristik taşıma gücü', formula: 'Denklem 16.8 katsayılarıyla', value: qk },
-      { symbol: 'qₜ', title: 'Tasarım taşıma gücü', formula: 'qₜ = qₖ / γRv', value: qt },
-      { symbol: 'q₀', title: 'Temel tabanındaki tasarım etkisi', formula: 'q₀ = N / (BₑLₑ)', value: qo },
-      { symbol: 'η', title: 'Kullanım oranı', formula: 'η = q₀ / qₜ', value: utilization }
-    ]
-  }
+export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number}){
+ const Ac=Math.PI*i.columnDiameter**2/4,ratio=Math.min(1,Ac/Math.max(i.spacing**2,1e-9)),composite=(1-ratio)*i.qultSoil+ratio*i.qultColumn*i.improvementFactor
+ return{value:{Ac,ratio,composite,allowable:composite/Math.max(i.FS,1e-9),columnLoad:Ac*i.columnStrength/Math.max(i.FS,1e-9)},steps:[{symbol:'Ac',title:'Kolon alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio}],method:'Jet Grout kompozit ön model',source:'Proje kaynak paketi'}
 }
 
-export interface SettlementInput {
-  B: number; q: number; Es: number; nu: number
-  layers?: { thickness: number; Cc?: number; e0?: number; sigma0?: number; dSigma?: number }[]
+export function stressAtDepth(depth:number,layers:{top:number;bottom:number;gamma:number;gammaSat:number}[],gwt:number){
+ let sigmaV=0
+ for(const layer of [...layers].filter(x=>x.bottom>x.top).sort((a,b)=>a.top-b.top)){
+  const z0=Math.max(0,layer.top),z1=Math.min(depth,layer.bottom);if(z1<=z0)continue
+  const dry=gwt>=0?Math.max(0,Math.min(z1,gwt)-z0):z1-z0,sat=Math.max(0,z1-z0-dry)
+  sigmaV+=dry*layer.gamma+sat*layer.gammaSat
+ }
+ const u=gwt>=0&&depth>gwt?9.80665*(depth-gwt):0
+ return{sigmaV,sigmaVPrime:Math.max(0,sigmaV-u),u}
 }
 
-export function settlement(i: SettlementInput): CalculationResult<{ immediate: number; consolidation: number; total: number }> {
-  const immediate = i.q * i.B * (1 - i.nu * i.nu) / Math.max(i.Es, 1)
-  const consolidation = (i.layers ?? []).reduce((sum, layer) => {
-    if (layer.Cc == null || layer.e0 == null || layer.sigma0 == null || layer.dSigma == null || layer.sigma0 <= 0) return sum
-    return sum + layer.thickness * layer.Cc / (1 + layer.e0) * Math.log10((layer.sigma0 + layer.dSigma) / layer.sigma0)
-  }, 0)
-  const value = { immediate, consolidation, total: immediate + consolidation }
-  return {
-    value,
-    method: 'Elastik + konsolidasyon',
-    source: 'Eksik konsolidasyon parametreleri mevcut değilse yalnızca hesaplanabilir elastik bileşen gösterilir.',
-    steps: [
-      { symbol: 'sᵢ', title: 'Elastik oturma', formula: 'sᵢ = q·B·(1−ν²) / Eₛ', value: immediate, unit: 'm' },
-      { symbol: 's꜀', title: 'Konsolidasyon oturması', formula: 'Σ H·Cc/(1+e₀)·log₁₀[(σ′₀+Δσ′)/σ′₀]', value: consolidation, unit: 'm' },
-      { symbol: 'sₜ', title: 'Toplam oturma', formula: 'sₜ = sᵢ + s꜀', value: value.total, unit: 'm' }
-    ]
-  }
-}
-
-export interface LiquefactionInput {
-  Mw: number; Sds: number; depth: number; N160f: number; sigmaV: number; sigmaVPrime: number
-}
-
-export function liquefaction(i: LiquefactionInput): CalculationResult<{
-  rd: number; CRRM75: number; CM: number; Rtau: number; tau: number; ratio: number; safe: boolean
-}> {
-  const z = Math.max(i.depth, 0.01)
-  const rd = Math.exp(-1.012 - 0.01126 * z + 0.5133 / z)
-  const N = clamp(i.N160f, 0.1, 33.9)
-  const CRRM75 = 1 / (34 - N) + N / 135 + 50 / (10 * N + 45) ** 2 - 1 / 200
-  const CM = 10 ** (2.24 / Math.max(i.Mw, 4) ** 2.56)
-  const Rtau = CRRM75 * CM * Math.max(i.sigmaVPrime, 0)
-  const tau = 0.65 * (0.4 * i.Sds) * i.sigmaV * rd
-  const ratio = Rtau / Math.max(tau, 1e-9)
-  const value = { rd, CRRM75, CM, Rtau, tau, ratio, safe: ratio >= 1.1 }
-  return {
-    value,
-    method: 'TBDY 2018 Ek 16B SPT tabanlı sıvılaşma ön değerlendirmesi',
-    source: 'TBDY 2018 Ek 16B.3–16B.5: N1,60f, CRRM7.5, CM ve deprem kayma gerilmesi bağıntıları. İnce dane düzeltmesi ve SPT düzeltmeleri merkezi SPT motorundan gelmelidir.',
-    steps: [
-      { symbol: 'rᵈ', title: 'Gerilme azaltma katsayısı', formula: 'rᵈ = exp(−1.012 − 0.01126z + 0.5133/z)', value: rd },
-      { symbol: 'CRR₇.₅', title: 'Çevrimsel dayanım oranı', formula: 'Denklem 16B.4b', value: CRRM75 },
-      { symbol: 'Cᴹ', title: 'Deprem büyüklüğü düzeltmesi', formula: 'Cᴹ = 10^(2.24/Mw^2.56)', value: CM },
-      { symbol: 'τᴿ', title: 'Sıvılaşma direnci', formula: 'τᴿ = CRR₇.₅·Cᴹ·σ′ᵥ₀', value: Rtau },
-      { symbol: 'τdeprem', title: 'Deprem kayma gerilmesi', formula: 'τdeprem = 0.65·(0.4SDS)·σᵥ₀·rᵈ', value: tau },
-      { symbol: 'FS', title: 'Sıvılaşma güvenlik oranı', formula: 'FS = τᴿ / τdeprem ≥ 1.1', value: ratio }
-    ]
-  }
-}
-
-export interface FoundationInput {
-  B: number; L: number; N: number; V: number; Mx: number; My: number
-  delta?: number; cu?: number; area?: number
-}
-
-export function foundationChecks(i: FoundationInput) {
-  const N = Math.max(Math.abs(i.N), 1e-9)
-  const ex = i.My / N
-  const ey = i.Mx / N
-  const qAvg = i.N / Math.max(i.B * i.L, 1e-9)
-  const qMax = qAvg * (1 + 6 * Math.abs(ex) / Math.max(i.L, 1e-9) + 6 * Math.abs(ey) / Math.max(i.B, 1e-9))
-  const qMin = qAvg * (1 - 6 * Math.abs(ex) / Math.max(i.L, 1e-9) - 6 * Math.abs(ey) / Math.max(i.B, 1e-9))
-  const delta = i.delta ?? 0
-  const resistance = Math.max(0, i.N) * Math.tan(delta) + (i.cu ?? 0) * (i.area ?? i.B * i.L)
-  const contactRatio = qMin >= 0 ? 1 : Math.max(0, 1 - 6 * Math.abs(ex) / Math.max(i.L, 1e-9)) * Math.max(0, 1 - 6 * Math.abs(ey) / Math.max(i.B, 1e-9))
-  return {
-    value: { ex, ey, qAvg, qMax, qMin, contactRatio, slidingFS: Math.abs(i.V) > 0 ? resistance / Math.abs(i.V) : Infinity },
-    steps: [
-      { symbol: 'eₓ', title: 'Eksantriklik', formula: 'eₓ = Mᵧ / N', value: ex, unit: 'm' },
-      { symbol: 'eᵧ', title: 'Eksantriklik', formula: 'eᵧ = Mₓ / N', value: ey, unit: 'm' },
-      { symbol: 'q̄', title: 'Ortalama taban gerilmesi', formula: 'q̄ = N/(B·L)', value: qAvg },
-      { symbol: 'qmax', title: 'Maksimum taban gerilmesi', formula: 'qmax = q̄(1+6eₓ/L+6eᵧ/B)', value: qMax },
-      { symbol: 'qmin', title: 'Minimum taban gerilmesi', formula: 'qmin = q̄(1−6eₓ/L−6eᵧ/B)', value: qMin }
-    ],
-    method: 'Temel gerilme / eksantriklik kontrolü',
-    source: 'TBDY 2018 Bölüm 16.7–16.8 temel tasarım kontrolleri.'
-  }
-}
-
-export function jetGrout(i: {
-  columnDiameter: number; spacing: number; qultSoil: number; qultColumn: number
-  improvementFactor: number; FS: number; columnStrength: number
-}) {
-  const Ac = Math.PI * i.columnDiameter ** 2 / 4
-  const ratio = Math.min(1, Ac / Math.max(i.spacing ** 2, 1e-9))
-  const composite = (1 - ratio) * i.qultSoil + ratio * i.qultColumn * i.improvementFactor
-  return {
-    value: { Ac, ratio, composite, allowable: composite / Math.max(i.FS, 1e-9), columnLoad: Ac * i.columnStrength / Math.max(i.FS, 1e-9) },
-    steps: [
-      { symbol: 'A꜀', title: 'Kolon alanı', formula: 'A꜀ = πd²/4', value: Ac, unit: 'm²' },
-      { symbol: 'ρ', title: 'İyileştirme oranı', formula: 'ρ = A꜀/s²', value: ratio },
-      { symbol: 'qcomp', title: 'Kompozit model', formula: '(1−ρ)qsoil + ρ·qcolumn·η', value: composite },
-      { symbol: 'qallow', title: 'İzin verilen değer', formula: 'qallow = qcomp/FS', value: composite / Math.max(i.FS, 1e-9) }
-    ],
-    method: 'Jet Grout kompozit ön model',
-    source: 'TBDY 2018 Bölüm 16 / Ek 16D; proje deneyleri ile doğrulama gerekir.'
-  }
-}
-
-export function stressAtDepth(depth: number, layers: { top: number; bottom: number; gamma: number; gammaSat: number }[], gwt: number) {
-  let sigmaV = 0
-  for (const layer of [...layers].sort((a, b) => a.top - b.top)) {
-    const z0 = Math.max(layer.top, 0)
-    const z1 = Math.min(layer.bottom, depth)
-    if (z1 <= z0) continue
-    const dryThickness = Math.max(0, Math.min(z1, gwt) - z0)
-    const saturatedThickness = Math.max(0, z1 - z0 - dryThickness)
-    sigmaV += dryThickness * layer.gamma + saturatedThickness * layer.gammaSat
-  }
-  const porePressure = Math.max(0, depth - gwt) * 9.80665
-  return { sigmaV, sigmaVPrime: Math.max(0.01, sigmaV - porePressure), u: porePressure }
-}
-
-export const SOURCE_NOTES = {
-  investigation: 'TBDY 2018 Bölüm 16 ve Ek 16A: zemin araştırmaları, SPT/laboratuvar verileri ve raporlama.',
-  liquefaction: 'TBDY 2018 Bölüm 16.6 ve Ek 16B: sıvılaşma değerlendirmesi. Yöntem ve varsayımlar hesap izinde ayrıca gösterilir.',
-  bearing: 'TBDY 2018 Bölüm 16.8.3.2 ve Denklem 16.8: yüzeysel temel taşıma gücü.',
-  settlement: 'TBDY 2018 Bölüm 16: taşıma gücü ve yerdeğiştirme koşulları birlikte değerlendirilir.',
-  foundation: 'TBDY 2018 Bölüm 16.7–16.8: temel tasarımı ve taban gerilmesi kontrolleri.',
-  jetGrout: 'TBDY 2018 Bölüm 16 / Ek 16D: zemin iyileştirmesi; proje deneyleri ile doğrulama gerekir.'
-}
+export const SOURCE_NOTES={investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',bearing:'TBDY 2018 Bölüm 16.8.3.2 / Denklem 16.8; klasik yöntemler Terzaghi, Meyerhof, Hansen ve Vesic.',settlement:'TBDY 2018 Bölüm 16.',foundation:'TBDY 2018 Bölüm 16.7–16.8.',jetGrout:'ZeminLab kaynak paketi; imalat doğrulaması gerekir.'}
