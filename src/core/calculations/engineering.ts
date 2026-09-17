@@ -44,5 +44,5 @@ export const SOURCE_NOTES = {
   stressSpread: '2:1 gerilme yayılımı; katmanlı oturma hesabında Δσ hesabı için kullanılır.',
   subgrade: 'Winkler ks için q/s ve elastik yarı-uzay yaklaşımı. Nihai proje değeri zemin/temel davranışı ile doğrulanmalıdır.',
   jetGrout: 'TBDY 2018 Bölüm 16 / Ek 16D: zemin iyileştirmesi; iyileştirme hedefleri ve kalite kontrolü proje deneyleriyle doğrulanmalıdır.',
-  jetGroutAdvanced: 'Birim hücre alan oranı ve kompozit rijitlik/yük paylaşımı modeli; Priebe bağıntıları taş kolon/vibro-replacement için geliştirilmiştir ve jet grout için doğrudan TBDY katsayısı olarak kullanılmamalıdır.'
+  jetGroutAdvanced: 'Birim hücre alan oranı, kompozit rijitlik ve yük paylaşımı modeli. Priebe bağıntıları taş kolon/vibro-replacement için geliştirilmiştir; jet grout için doğrudan TBDY katsayısı olarak uygulanmaz.'
 }
