@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { foundationChecks, jetGrout, liquefaction, SOURCE_NOTES, stressAtDepth, jetGroutAdvanced } from '../../core/calculations/engineering'
+import { foundationChecks, liquefaction, SOURCE_NOTES, jetGroutAdvanced } from '../../core/calculations/engineering'
 import { settlement as settlementEngine, type CalculationStep } from '../../core/engineering/calculation-engine'
 import { defaultElasticModulusMethod, estimateElasticModulus } from '../../core/engineering/correlation-registry'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
@@ -154,7 +154,7 @@ export function Liquefaction({ boreholes = [], labs = [] }: { boreholes?: Boreho
                     <tbody>{profileInput.rows.map((row, i) => <tr key={`${row.depth}-${i}`}>
                       <td>{row.depth.toFixed(2)}</td><td>{row.soil ?? '—'}</td><td>{row.fineContent != null ? row.fineContent.toFixed(1) : '—'}</td>
                       <td>{row.sigmaV.toFixed(2)}</td><td>{row.sigmaVPrime.toFixed(2)}</td><td>{row.n60.toFixed(2)}</td><td>{row.n1_60.toFixed(2)}</td><td>{row.n1_60f.toFixed(2)}</td>
-                      <td>{row.crrMM75 != null ? row.crrM75.toFixed(4) : '—'}</td><td>{row.tauEarthquake != null ? row.tauEarthquake.toFixed(2) : '—'}</td>
+                      <td>{row.crrM75 != null ? row.crrM75.toFixed(4) : '—'}</td><td>{row.tauEarthquake != null ? row.tauEarthquake.toFixed(2) : '—'}</td>
                       <td>{row.FS != null ? row.FS.toFixed(3) : '—'}</td>
                     </tr>)}</tbody>
                   </table>
