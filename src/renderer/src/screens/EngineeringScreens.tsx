@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { foundationChecks, jetGrout, liquefaction, SOURCE_NOTES, stressAtDepth } from '../../core/calculations/engineering'
+import { foundationChecks, jetGrout, liquefaction, SOURCE_NOTES, stressAtDepth, jetGroutAdvanced } from '../../core/calculations/engineering'
 import { settlement as settlementEngine, type CalculationStep } from '../../core/engineering/calculation-engine'
 import { defaultElasticModulusMethod, estimateElasticModulus } from '../../core/engineering/correlation-registry'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
@@ -154,18 +154,14 @@ export function Liquefaction({ boreholes = [], labs = [] }: { boreholes?: Boreho
                     <tbody>{profileInput.rows.map((row, i) => <tr key={`${row.depth}-${i}`}>
                       <td>{row.depth.toFixed(2)}</td><td>{row.soil ?? '—'}</td><td>{row.fineContent != null ? row.fineContent.toFixed(1) : '—'}</td>
                       <td>{row.sigmaV.toFixed(2)}</td><td>{row.sigmaVPrime.toFixed(2)}</td><td>{row.n60.toFixed(2)}</td><td>{row.n1_60.toFixed(2)}</td><td>{row.n1_60f.toFixed(2)}</td>
-                      <td>{row.crrM75 != null ? row.crrM75.toFixed(4) : '—'}</td><td>{row.tauEarthquake != null ? row.tauEarthquake.toFixed(2) : '—'}</td>
+                      <td>{row.crrMM75 != null ? row.crrM75.toFixed(4) : '—'}</td><td>{row.tauEarthquake != null ? row.tauEarthquake.toFixed(2) : '—'}</td>
                       <td>{row.FS != null ? row.FS.toFixed(3) : '—'}</td>
                     </tr>)}</tbody>
                   </table>
                 </div>
               </Card>
               {profileInput.rows.length > 0 && (
-                <CalculationTrace
-                  title="Seçili ilk SPT için ayrıntılı hesap zinciri"
-                  source={profileInput.source}
-                  rows={profileInput.rows[0].trace}
-                />
+                <CalculationTrace title="Seçili ilk SPT için ayrıntılı hesap zinciri" source={profileInput.source} rows={profileInput.rows[0].trace} />
               )}
             </>
           )}
@@ -213,29 +209,59 @@ export function JetGrout() {
   const [spacing, setSpacing] = useState('')
   const [soil, setSoil] = useState('')
   const [column, setColumn] = useState('')
-  const [factor, setFactor] = useState('')
-  const [fs, setFs] = useState('')
-  const ready = [d, spacing, soil, column, factor, fs].every(x => x !== '' && Number(x) > 0)
-  const r = ready ? jetGrout({ columnDiameter: Number(d), spacing: Number(spacing), qultSoil: Number(soil), qultColumn: Number(column), improvementFactor: Number(factor), FS: Number(fs), columnStrength: Number(column) }) : undefined
+  const [soilEs, setSoilEs] = useState('')
+  const [columnEs, setColumnEs] = useState('')
+  const [layout, setLayout] = useState<'square' | 'triangular'>('square')
+  const [load, setLoad] = useState('')
+  const [area, setArea] = useState('')
+  const ready = [d, spacing, soil, column].every(x => x !== '' && Number(x) > 0)
+  const r = ready ? jetGroutAdvanced({
+    columnDiameter: Number(d), spacing: Number(spacing), layout,
+    qSoil: Number(soil), qColumn: Number(column),
+    EsSoil: Number(soilEs) > 0 ? Number(soilEs) : undefined,
+    EsColumn: Number(columnEs) > 0 ? Number(columnEs) : undefined,
+    load: Number(load) > 0 ? Number(load) : undefined,
+    foundationArea: Number(area) > 0 ? Number(area) : undefined
+  }) : undefined
   return (
     <Frame screen="jet-grout">
-      <Source>{SOURCE_NOTES.jetGrout}</Source>
-      <Card title="JET GROUT TANIMI">
+      <Source>{SOURCE_NOTES.jetGroutAdvanced}</Source>
+      <Card title="JET GROUT BİRİM HÜCRESİ">
         <div className="form-grid">
           <Field label="Kolon çapı (m)" value={d} onChange={setD} />
           <Field label="Aks aralığı (m)" value={spacing} onChange={setSpacing} />
+          <label>Yerleşim<select value={layout} onChange={e => setLayout(e.target.value as 'square' | 'triangular')}><option value="square">Kare</option><option value="triangular">Üçgen</option></select></label>
           <Field label="Zemin taşıma kapasitesi" value={soil} onChange={setSoil} />
-          <Field label="Kolon dayanımı" value={column} onChange={setColumn} />
-          <Field label="İyileştirme katsayısı" value={factor} onChange={setFactor} />
-          <Field label="FS" value={fs} onChange={setFs} />
+          <Field label="Jet grout kolon kapasitesi" value={column} onChange={setColumn} />
+          <Field label="Zemin Es (opsiyonel)" value={soilEs} onChange={setSoilEs} />
+          <Field label="Kolon Es (opsiyonel)" value={columnEs} onChange={setColumnEs} />
+          <Field label="Temel yükü (opsiyonel)" value={load} onChange={setLoad} />
+          <Field label="Temel alanı (opsiyonel)" value={area} onChange={setArea} />
         </div>
       </Card>
-      {r && <CalculationTrace title="Jet Grout kompozit model" source={SOURCE_NOTES.jetGrout} rows={[
-        { symbol: 'A꜀', title: 'Kolon alanı', formula: 'A꜀ = πd²/4', value: r.Ac, unit: 'm²' },
-        { symbol: 'ρ', title: 'İyileştirme oranı', formula: 'ρ = A꜀ / s²', value: r.ratio },
-        { symbol: 'qcomp', title: 'Kompozit taşıma gücü', formula: '(1−ρ)qsoil + ρ·qcolumn·η', value: r.composite },
-        { symbol: 'qallow', title: 'İzin verilen değer', formula: 'qallow = qcomp / FS', value: r.allowable }
-      ]} />}
+      {!r ? (
+        <Card title="HESAP İÇİN VERİ DURUMU"><div className="inline-empty">Birim hücre hesabı için kolon çapı, aks aralığı, zemin kapasitesi ve kolon kapasitesi gereklidir.</div></Card>
+      ) : (
+        <>
+          <div className="metric-strip">
+            <Metric label="A꜀" value={r.areaColumn.toFixed(4)} unit="m²" />
+            <Metric label="Hücre alanı" value={r.cellArea.toFixed(4)} unit="m²" />
+            <Metric label="Alan oranı" value={(r.areaReplacementRatio * 100).toFixed(2)} unit="%" />
+            <Metric label="Kompozit kapasite" value={r.compositeCapacity.toFixed(3)} />
+            <Metric label="Kolon yük payı" value={(r.columnLoadShare * 100).toFixed(1)} unit="%" />
+          </div>
+          <CalculationTrace title="Jet Grout kompozit hesap zinciri" source={SOURCE_NOTES.jetGroutAdvanced} rows={[
+            { symbol: 'A꜀', title: 'Kolon kesit alanı', formula: 'A꜀ = πd²/4', value: r.areaColumn, unit: 'm²' },
+            { symbol: 'Acell', title: `${layout === 'triangular' ? 'Üçgen' : 'Kare'} birim hücre alanı`, formula: layout === 'triangular' ? 'Acell = √3·s²/2' : 'Acell = s²', value: r.cellArea, unit: 'm²' },
+            { symbol: 'ρ', title: 'Alan değiştirme oranı', formula: 'ρ = A꜀/Acell', value: r.areaReplacementRatio },
+            { symbol: 'qcomp', title: 'Kompozit taşıma kapasitesi', formula: 'qcomp = ρ·qcolumn + (1−ρ)·qsoil', value: r.compositeCapacity },
+            { symbol: 'ηL', title: 'Kolon yük payı', formula: 'Es oranından birim hücre yük paylaşımı', value: r.columnLoadShare },
+            ...(r.compositeModulus != null ? [{ symbol: 'Ecomp', title: 'Kompozit elastisite modülü', formula: 'Ecomp = ρ·Es,column + (1−ρ)·Es,soil', value: r.compositeModulus }] : []),
+            ...(r.capacityFS != null ? [{ symbol: 'FS', title: 'Temel yüküne göre kapasite güvenliği', formula: 'FS = qcomp·A / P', value: r.capacityFS }] : []),
+            ...(r.treatedSettlementFactor != null ? [{ symbol: 'Rₛ', title: 'İyileştirilmiş oturma katsayısı', formula: 'Rₛ = 1/[1+(n−1)ρ]', value: r.treatedSettlementFactor }] : [])
+          ]} />
+        </>
+      )}
     </Frame>
   )
 }
