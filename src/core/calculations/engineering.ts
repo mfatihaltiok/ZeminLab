@@ -10,8 +10,8 @@ export function stressAtDepth(depth:number,layers:Pick<SoilLayerInput,'top'|'bot
 export function sptCorrection(x:SptInput,sigmaVPrime:number){const r=calculateSpt({nField:x.nField,energyRatio:x.energyRatio,boreholeDiameterMm:x.boreholeDiameter,sampler:x.sampler==='without-liner'?'without-liner':'standard',effectiveStress:sigmaVPrime,fineContent:x.fines,applyOverburden:true,applyDilatancy:false});return{CE:r.ce,CB:r.cb,CS:r.cs,CR:r.cr,CN:r.cn,N60:r.n60,N160:r.n1_60,N160f:r.n1_60,alpha:0,beta:1,sigmaVPrime}}
 export function bearingCapacity(i:{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS:number;method:BearingMethod;waterReduction?:number}){return{...bearingEngine(i).value,method:i.method}}
 export type TbdyBearingInput={B:number;L:number;Df:number;gamma1:number;gamma2:number;c:number;phi:number;verticalLoad:number;horizontalLoad:number;momentX:number;momentY:number;groundSlope:number;baseSlope:number;resistanceFactor:number}
-/** Returns the complete calculation result so UI/report consumers retain value, steps, method and source. */
-export function tbdyBearingCapacity(i:TbdyBearingInput){return tbdyBearingEngine(i)}
+/** Keeps the structured calculation result and exposes flattened fields for legacy UI consumers. */
+export function tbdyBearingCapacity(i:TbdyBearingInput){const result=tbdyBearingEngine(i);return{...result,...result.value}}
 export function settlement(i:{B:number;q:number;Es:number;nu:number;layers?:{thickness:number;Cc?:number;e0?:number;sigma0?:number;dSigma?:number}[]}){return settlementEngine(i).value}
 export function liquefaction(i:{Mw:number;Sds:number;depth:number;N160f:number;sigmaV:number;sigmaVPrime:number}){return liquefactionEngine(i)}
 export function liquefactionProfile(i:LiquefactionProfileInput){return liquefactionProfileEngine(i)}
