@@ -32,6 +32,7 @@ export interface IdealizedSoilLayer {
   frictionAngle?: number
   compressionIndexCc?: number
   recompressionIndexCr?: number
+  initialVoidRatio?: number
   preconsolidationPressure?: number
   constrainedModulus?: number
   oedometricModulus?: number
