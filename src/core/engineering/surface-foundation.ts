@@ -127,7 +127,7 @@ function methodFactors(method:SurfaceFoundationMethod,B:number,L:number,Df:numbe
   return{sc,sq,sg,dc,dq,dg:1,ic,iq,ig,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
 }
 
-function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number,baseGamma:number,baseC:number,basePhi:number,baseQ:number,N:number,f:{Nq:number;Nc:number;Ngamma:number},mf:ReturnType<typeof methodFactors>,method:SurfaceFoundationMethod){
+function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number,baseQ:number,mf:ReturnType<typeof methodFactors>,method:SurfaceFoundationMethod){
   if(!layers?.length)return[]
   const active=layers.filter(l=>l.bottomDepth>Df&&l.topDepth<Df+influence&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
   return active.map(l=>{
@@ -159,7 +159,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const qt=qk/Math.max(resistanceFactor,1e-9)
   const qo=effectiveArea>0?N/effectiveArea:0
   const utilization=qt>0?qo/qt:Infinity
-  const checks=layerChecks(i.layers,i.Df,2*Bp,water.gammaBelow,i.c,i.phi,water.surcharge,N,f,mf,method)
+  const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,mf,method)
   if(checks.length){
     const min=Math.min(...checks.map(x=>x.qk))
     checks.forEach(x=>x.controlling=Math.abs(x.qk-min)<1e-9)

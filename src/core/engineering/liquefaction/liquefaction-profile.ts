@@ -52,7 +52,7 @@ export function liquefactionProfile(i:LiquefactionProfileInput):LiquefactionProf
   const spt=calculateSpt({...record, effectiveStress:st.sigmaVPrime, fineContent:record.fines??record.fineContent??layer?.finesContent, applyOverburden:!cohesive, applyDilatancy:false})
   const cn=spt.cn, n60=spt.n60, n1_60=spt.n1_60
   const n1_60_dilatancy=n1_60
-  const fines=record.fines??record.fineContent??layer?.finesContent??0,fine=fineContentCorrection(fines),rr=rd(record.depth)
+  const fines=record.fines??record.fineContent??layer?.finesContent??0,fc=fineContentCorrection(fines),fine={...fc,n1_60f:fc.alpha+fc.beta*n1_60},rr=rd(record.depth)
   const csr=.65*(.4*i.Sds)*(st.sigmaV/Math.max(.1,st.sigmaVPrime))*rr,crr=crrM75(fine.n1_60f)
   const tauEarthquake=.65*(.4*i.Sds)*st.sigmaV*rr,tauResistance=crr*CM*st.sigmaVPrime,fsL=tauEarthquake>0?tauResistance/tauEarthquake:9.9
   let claySofteningRisk:LiquefactionProfileRow['claySofteningRisk']='VERİ YOK',clayExplanation='';const w=record.waterContent??layer?.waterContent,ll=record.liquidLimit??layer?.liquidLimit
