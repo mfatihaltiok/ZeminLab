@@ -260,7 +260,9 @@ export const SOURCE_NOTES = {
   settlement: 'TBDY 2018 Bölüm 16: taşıma gücü ve yerdeğiştirme koşulları birlikte değerlendirilir.',
   foundation: 'TBDY 2018 Bölüm 16.7–16.8: temel tasarımı ve taban gerilmesi kontrolleri.',
   jetGrout: 'TBDY 2018 Bölüm 16 / Ek 16D: zemin iyileştirmesi; proje deneyleri ile doğrulama gerekir.'
-}export function tbdyBearingCapacity(i: TbdyBearingInput): CalculationResult<any> {
+}
+
+export function tbdyBearingCapacity(i: TbdyBearingInput): CalculationResult<any> {
   const result=calculateSurfaceFoundation({
     B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma1,gamma2:i.gamma2,c:i.c,phi:i.phi,
     verticalLoad:i.verticalLoad,horizontalLoad:i.horizontalLoad,momentX:i.momentX,momentY:i.momentY,
