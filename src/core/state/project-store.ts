@@ -1,28 +1,23 @@
+import { normalizeProjectInfo, type ProjectInfo } from '../models/project'
 import { useSyncExternalStore } from 'react'
-import {
-  defaultProjectInfo,
-  type ProjectInfo
-} from '../models/project'
+import type { BoreholeRecord, LaboratoryRecord } from '../models/field-data'
+import type { IdealizedSoilProfile } from '../models/idealized-soil-profile'
 
-type Listener = () => void
-
-let projectInfo: ProjectInfo = { ...defaultProjectInfo }
-const listeners = new Set<Listener>()
-
-function subscribe(listener: Listener) {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
+export const PROJECT_SCHEMA_VERSION = 2
+export type ProjectDocument = { projectInfo:ProjectInfo; boreholes:BoreholeRecord[]; labs:LaboratoryRecord[]; idealizedSoilProfile?:IdealizedSoilProfile }
+export type ProjectEnvelope = { format:'ZeminLab'; version:number; savedAt:string; data:unknown }
+export function migrateProjectData(value:unknown,version:number):ProjectDocument {
+  if(!value || typeof value!=='object') throw new Error('Geçersiz ZeminLab proje verisi.')
+  const d=value as Partial<ProjectDocument>
+  if(!d.projectInfo || !Array.isArray(d.boreholes) || !Array.isArray(d.labs)) throw new Error('ZeminLab proje verisi eksik veya bozuk.')
+  if(version>PROJECT_SCHEMA_VERSION) throw new Error(`Bu proje dosyası daha yeni bir ZeminLab sürümüne ait (v${version}).`)
+  return {projectInfo:normalizeProjectInfo(d.projectInfo),boreholes:d.boreholes,labs:d.labs,idealizedSoilProfile:d.idealizedSoilProfile}
 }
 
-function getSnapshot() {
-  return projectInfo
-}
-
-export function updateProjectInfo(next: ProjectInfo) {
-  projectInfo = next
-  listeners.forEach((listener) => listener())
-}
-
-export function useProjectInfo() {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-}
+type Listener=()=>void
+let projectInfo:ProjectInfo=normalizeProjectInfo({})
+const listeners=new Set<Listener>()
+function subscribe(listener:Listener){listeners.add(listener);return()=>listeners.delete(listener)}
+function getSnapshot(){return projectInfo}
+export function updateProjectInfo(next:ProjectInfo){projectInfo=normalizeProjectInfo(next);listeners.forEach(l=>l())}
+export function useProjectInfo(){return useSyncExternalStore(subscribe,getSnapshot,getSnapshot)}
