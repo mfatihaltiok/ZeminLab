@@ -3,7 +3,8 @@ import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '..
 import { subgradeReaction } from '../../core/calculations/engineering'
 import type { IdealizedSoilProfile } from '../../core/models/idealized-soil-profile'
 import type { BoreholeRecord } from '../../core/models/field-data'
-import { forceToBase, stressToBase, stressFromBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
+import { forceToBase, forceFromBase, stressToBase, stressFromBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
+import type { SubgradeReactionMethod, SubgradeSoilType } from '../../core/engineering/subgrade-reaction'
 import { useProjectInfo } from '../../core/state/project-store'
 import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
@@ -55,6 +56,9 @@ function ProfileDiagram({ result }: { result: ReturnType<typeof calculateIdealiz
 export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile?: IdealizedSoilProfile; boreholes?: BoreholeRecord[] }) {
   const p = useProjectInfo()
   const [method, setMethod] = useState<IdealizedSettlementMethod>('burland-burbidge')
+  const [ksMethod, setKsMethod] = useState<SubgradeReactionMethod>('erol-plate')
+  const [kv1Input, setKv1Input] = useState('')
+  const [ksSoilType, setKsSoilType] = useState<SubgradeSoilType>('cohesive')
   const [selected, setSelected] = useState(boreholes[0]?.id ?? '')
   const b = boreholes.find(x => x.id === selected) ?? boreholes[0]
   const f = p.foundationParameters
@@ -77,10 +81,31 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
 
   const surfaceLayer = profile?.layers.find(x => x.bottomDepth > f.footingDepth)
   const ks = useMemo(() => {
-    const Es = surfaceLayer?.constrainedModulus ?? surfaceLayer?.oedometricModulus
-    if (!Es || Es <= 0 || f.footingWidth <= 0) return undefined
-    return subgradeReaction({ B: f.footingWidth, Es, nu: surfaceLayer?.poissonRatio ?? 0.30, method: 'elastic' })
-  }, [surfaceLayer, f.footingWidth])
+    if (f.footingWidth <= 0 || f.footingLength <= 0) return undefined
+    const common = { B: f.footingWidth, L: f.footingLength, method: ksMethod, unitSystem: 'kN-m' as const }
+    if (ksMethod === 'q/s') {
+      if (!result || result.totalSettlement <= 0 || qGross <= 0) return undefined
+      return subgradeReaction({ ...common, q: qGross, settlement: result.totalSettlement / 1000 })
+    }
+    if (ksMethod === 'elastic') {
+      const Es = surfaceLayer?.constrainedModulus ?? surfaceLayer?.oedometricModulus
+      if (!Es || Es <= 0) return undefined
+      return subgradeReaction({ ...common, Es, nu: surfaceLayer?.poissonRatio ?? 0.30 })
+    }
+    const kv1Project = Number(kv1Input)
+    if (!Number.isFinite(kv1Project) || kv1Project <= 0) return undefined
+    return subgradeReaction({
+      ...common,
+      Kv1: forceToBase(kv1Project, p.unitSystem),
+      soilType: ksSoilType
+    })
+  }, [surfaceLayer, f.footingWidth, f.footingLength, ksMethod, kv1Input, ksSoilType, p.unitSystem, result, qGross])
+
+  const ksMethodLabel: Record<SubgradeReactionMethod, string> = {
+    'q/s': 'q/s',
+    elastic: 'Elastik yarı-uzay eşdeğeri',
+    'erol-plate': 'Erol & Çekinmez 6.8.1'
+  }
 
   const methodLabel: Record<IdealizedSettlementMethod, string> = {
     'burland-burbidge': 'Burland & Burbidge',
@@ -139,6 +164,37 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
             {ks && <Metric label="ks" value={ks.ks.toFixed(2)} unit="kN/m³" />}
           </div>
 
+          <Card title="ZEMİN YATAK KATSAYISI · ks">
+            <div className="form-grid">
+              <label>Yatak katsayısı yöntemi
+                <select value={ksMethod} onChange={e => setKsMethod(e.target.value as SubgradeReactionMethod)}>
+                  <option value="q/s">Yöntem 1 · q/s</option>
+                  <option value="elastic">Yöntem 2 · Elastik yarı-uzay eşdeğeri</option>
+                  <option value="erol-plate">Yöntem 3 · Erol &amp; Çekinmez · Plaka yükleme</option>
+                </select>
+              </label>
+              {ksMethod === 'erol-plate' && <>
+                <label>Kv1 · 30×30 cm plaka deneyi
+                  <input type="number" min="0" step="any" value={kv1Input} onChange={e => setKv1Input(e.target.value)} placeholder={PROJECT_UNIT_LABELS.unitWeight} />
+                </label>
+                <label>Zemin tipi
+                  <select value={ksSoilType} onChange={e => setKsSoilType(e.target.value as SubgradeSoilType)}>
+                    <option value="cohesive">Kohezyonlu</option>
+                    <option value="cohesionless">Kohezyonsuz</option>
+                  </select>
+                </label>
+              </>}
+              <Metric label="Sonuç" value={ks ? ks.ks.toFixed(3) : '—'} unit={p.unitSystem === 'kN-m' ? 'kN/m³' : 'tonf/m³'} />
+            </div>
+            <div className="inline-empty">
+              {ksMethod === 'erol-plate'
+                ? 'Erol & Çekinmez (2014) Bölüm 6.8.1: Kv1, 30×30 cm plaka yükleme deneyinden alınır; ardından temel boyutuna göre Denk. 6.15a, 6.15b veya 6.16 uygulanır.'
+                : ksMethod === 'q/s'
+                  ? 'Winkler yaklaşımı: ks = q/s. Buradaki q ve s, seçilen hesap zincirindeki temel basıncı ve toplam oturmayı temsil eder.'
+                  : 'Es tabanlı elastik yarı-uzay yaklaşımı yardımcı yöntemdir; yönetmelikte tek başına zorunlu ks değeri değildir.'}
+            </div>
+          </Card>
+
           <Card title="TABAKA ORTA NOKTALARI · EFEKTİF GERİLMELER">
             <ProfileDiagram result={result} />
           </Card>
@@ -157,19 +213,19 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
           </Card>
 
           <div className="dashboard-grid">
-            <Card title="ZEMİN YATAK KATSAYISI · ks">
+            <Card title="YATAK KATSAYISI SONUCU">
               {ks ? (
                 <Table headers={['Parametre','Değer','Birim']} rows={[
                   ['Yöntem', ks.method, ''],
-                  ['Es', (surfaceLayer?.constrainedModulus ?? surfaceLayer?.oedometricModulus)!.toFixed(1), 'kPa'],
-                  ['ν', (surfaceLayer?.poissonRatio ?? 0.30).toFixed(3), ''],
                   ['B', f.footingWidth.toFixed(3), 'm'],
-                  ['ks', ks.ks.toFixed(3), 'kPa/m ≈ kN/m³']
+                  ['L', f.footingLength.toFixed(3), 'm'],
+                  ['ks', ks.ks.toFixed(3), 'kN/m³'],
+                  ['Proje birimi', p.unitSystem === 'kN-m' ? 'kN/m³' : 'tonf/m³', '']
                 ]} />
-              ) : <div className="inline-empty">ks için temel genişliği ve profilin temel altındaki ilk tabakasında Eoed/E gereklidir.</div>}
+              ) : <div className="inline-empty">Seçilen yatak katsayısı yöntemi için gerekli veriler girilmelidir.</div>}
             </Card>
             <Card title="HESAP YÖNTEMİ / KAYNAK">
-              <div className="inline-empty">Aktif yöntem: <b>{methodLabel[method]}</b>. Katman gerilmeleri orta nokta yaklaşımıyla raporlanır. 2:1, Janbu ve Schmertmann sonuçları proje parametreleriyle doğrulanmalıdır.</div>
+              <div className="inline-empty">Aktif oturma yöntemi: <b>{methodLabel[method]}</b>. Yatak katsayısı: <b>{ksMethodLabel[ksMethod]}</b>. Katman gerilmeleri orta nokta yaklaşımıyla raporlanır. Taşıma gücü, oturma ve yatak katsayısı sonuçları proje verileriyle birlikte değerlendirilmelidir.</div>
             </Card>
           </div>
 
@@ -180,7 +236,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
             { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: method === 'burland-burbidge' ? 'Σ[fS·fL·Ic·qnet·B^0.7]' : method === 'elasticity' ? 'Σ[(Δσ′/E)·H·(1−ν²)]' : method === '2to1-layer' ? 'Σ[Δσ₂:₁·H/E]' : method === 'janbu' ? 'Σ[Δσ′·H/M]' : 'Σ[C1·C2·q·Iz/Es·Δz]', value: result.totalImmediate, unit: 'mm' },
             { symbol: 's꜀', title: 'Toplam konsolidasyon', formula: 'Σ[Cc/(1+e₀)·H·log10(σ′vf/σ′v0)]', value: result.totalConsolidation, unit: 'mm' },
             { symbol: 'sₜ', title: 'Toplam oturma', formula: 'sₜ = sᵢ + s꜀', value: result.totalSettlement, unit: 'mm' },
-            ...(ks ? [{ symbol: 'ks', title: 'Winkler yatak katsayısı', formula: 'ks ≈ Es/[B(1−ν²)]', value: ks.ks, unit: 'kN/m³' }] : [])
+            ...(ks ? [{ symbol: 'ks', title: 'Winkler yatak katsayısı', formula: ks.formula, value: ks.ks, unit: 'kN/m³' }] : [])
           ]} />
         </>
       )}
