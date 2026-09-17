@@ -1,70 +1,273 @@
-import { calculateSpt, type SptEngineInput } from '../spt/spt-engine'
+import type { SptEngineInput } from '../spt/spt-engine'
 
 export interface SoilLayerStressInput { top: number; bottom: number; gamma: number; gammaSat: number }
-export interface LiquefactionSptRecord extends SptEngineInput { depth: number; fines?: number; id?: string }
-export interface LiquefactionProfileInput { Mw: number; Sds: number; groundwaterDepth: number; layers: SoilLayerStressInput[]; spt: LiquefactionSptRecord[] }
+
+/** Inputs needed to reproduce the legacy ZeminLab liquefaction path. */
+export interface LiquefactionSptRecord extends SptEngineInput {
+  depth: number
+  fines?: number
+  id?: string
+  soilType?: string
+  plasticityIndex?: number
+  liquidLimit?: number
+  waterContent?: number
+  unitWeightTPerM3?: number
+  testType?: 'SPT' | 'UD'
+}
+
+export interface LiquefactionProfileInput {
+  Mw: number
+  Sds: number
+  groundwaterDepth: number
+  layers: SoilLayerStressInput[]
+  spt: LiquefactionSptRecord[]
+}
+
 export interface LiquefactionProfileRow {
-  id?: string; depth: number; sigmaV: number; sigmaVPrime: number; u: number; nField: number
-  ce: number; cb: number; cs: number; cr: number; cn: number; n60: number; n1_60: number
-  fines: number; alpha: number; beta: number; n1_60f: number; rd: number; crrM75: number; cm: number
-  tauResistance: number; tauEarthquake: number; fs: number; liquefiable: boolean; note?: string
+  id?: string
+  depth: number
+  soilType: string
+  nField: number
+  sigmaV: number
+  sigmaVPrime: number
+  u: number
+  ce: number
+  cb: number
+  cs: number
+  cr: number
+  cn: number
+  n60: number
+  n1_60: number
+  n1_60_dilatancy: number
+  fines: number
+  alpha: number
+  beta: number
+  n1_60f: number
+  rd: number
+  csr: number
+  crr: number
+  msf: number
+  gsL: number
+  fsL: number
+  tauResistance: number
+  tauEarthquake: number
+  sds: number
+  isCohesive: boolean
+  claySofteningRisk: 'YÜKSEK' | 'ORTA' | 'DÜŞÜK' | 'VERİ YOK'
+  clayLL?: number
+  clayW?: number
+  clayExplanation?: string
+  conclusion: 'SIVILAŞMA VAR' | 'SIVILAŞMA YOK'
+  isLiquefiable: 'YÜKSEK' | 'ORTA' | 'SIVILAŞMA YOK'
+  explanation: string
 }
-export interface LiquefactionProfileResult { rows: LiquefactionProfileRow[]; source: string; method: string }
 
-function stressAtDepth(depth: number, layers: SoilLayerStressInput[], gwt: number) {
-  let sigmaV = 0
-  for (const layer of [...layers].sort((a, b) => a.top - b.top)) {
-    const z0 = Math.max(layer.top, 0)
-    const z1 = Math.min(layer.bottom, depth)
-    if (z1 <= z0) continue
-    const dry = Math.max(0, Math.min(z1, gwt) - z0)
-    const saturated = Math.max(0, z1 - z0 - dry)
-    sigmaV += dry * layer.gamma + saturated * layer.gammaSat
-  }
-  const u = Math.max(0, depth - gwt) * 9.80665
-  return { sigmaV, sigmaVPrime: Math.max(0.01, sigmaV - u), u }
+export interface LiquefactionProfileResult {
+  rows: LiquefactionProfileRow[]
+  source: string
+  method: string
 }
 
-function finesCorrection(n1_60: number, fines = 0) {
+function isCohesiveSoil(soilType: string) {
+  const code = (soilType || '').trim().toUpperCase().replace(/İ/g, 'I')
+  if (!code) return false
+  if (['GR', 'SAGR', 'SIGR', 'CLGR', 'SA', 'GRSA', 'SISA', 'CLSA', 'GP', 'GW', 'SP', 'SW', 'SM', 'SC'].includes(code)) return false
+  if (['SI', 'GRSI', 'SASI', 'CLSI', 'CL', 'CH', 'CIL', 'CIM', 'CIH', 'SIL', 'SIM', 'SIH', 'ML', 'MH', 'OR', 'PE', 'MG'].includes(code)) return true
+  if (code.includes('KILLI KUM') || code.includes('SILTLI KUM') || code.includes('CAKILLI KUM') || code.includes('KILLI CAKIL') || code.includes('SILTLI CAKIL')) return false
+  return code.includes('KIL') || code.includes('CLAY') || code.includes('SILT') || code.includes('ORGANIK') || code.includes('TURBA') || code.includes('BALCIK')
+}
+
+function layerAt(depth: number, layers: SoilLayerStressInput[]) {
+  return [...layers].sort((a, b) => a.top - b.top).find(l => depth >= l.top && depth < l.bottom) ?? layers[layers.length - 1]
+}
+
+/** Exact legacy stress path: laboratory gamma + water content, with layer fallback. */
+function legacyStress(depth: number, record: LiquefactionSptRecord, layers: SoilLayerStressInput[], gwt: number) {
+  const layer = layerAt(depth, layers)
+  const gammaT = record.unitWeightTPerM3 != null && record.unitWeightTPerM3 > 0
+    ? record.unitWeightTPerM3
+    : (layer?.gamma != null && layer.gamma > 0 ? layer.gamma / 10 : 1.70)
+  const wn = record.waterContent != null && Number.isFinite(record.waterContent)
+    ? record.waterContent
+    : (depth < gwt ? 5.5 : 15.0)
+  const gammaK = Number((gammaT / (1 + wn / 100) * 10).toFixed(2))
+  const sigmaV = depth * gammaK
+  const u = depth > gwt ? 9.81 * (depth - gwt) : 0
+  const sigmaVPrime = sigmaV - u
+  return { sigmaV, sigmaVPrime: Math.max(0.1, sigmaVPrime), u, gammaK }
+}
+
+function correctionFactors(record: LiquefactionSptRecord) {
+  const er = Number.isFinite(record.energyRatio) && record.energyRatio! > 0 ? record.energyRatio! : 60
+  const ce = er / 60
+  const diameter = record.boreholeDiameterMm
+  const cb = diameter != null ? (diameter <= 120 ? 1 : diameter <= 150 ? 1.05 : 1.15) : 1
+  const cs = record.sampler === 'without-liner' ? 1.2 : 1
+  const cr = record.rodLengthM != null && record.rodLengthM > 0
+    ? (record.rodLengthM < 4 ? 0.75 : record.rodLengthM < 6 ? 0.85 : record.rodLengthM < 10 ? 0.95 : 1)
+    : (record.depth < 4 ? 0.75 : record.depth < 6 ? 0.85 : record.depth < 10 ? 0.95 : 1)
+  return { ce, cb, cs, cr }
+}
+
+function fineCorrection(n1_60: number, fines = 0) {
   const fc = Math.max(0, fines)
-  if (fc <= 5) return { alpha: 0, beta: 1, n1_60f: n1_60 }
-  if (fc < 35) {
-    const alpha = Math.exp(1.76 - (190 / (fc * fc)))
+  if (fc > 5 && fc < 35) {
+    const alpha = Math.exp(1.76 - 190 / Math.pow(fc, 2))
     const beta = 0.99 + Math.pow(fc, 1.5) / 1000
     return { alpha, beta, n1_60f: alpha + beta * n1_60 }
   }
-  return { alpha: 5, beta: 1.2, n1_60f: 5 + 1.2 * n1_60 }
+  if (fc >= 35) return { alpha: 5, beta: 1.2, n1_60f: 5 + 1.2 * n1_60 }
+  return { alpha: 0, beta: 1, n1_60f: n1_60 }
 }
 
-function rd(z: number) { const depth = Math.max(z, 0.01); return Math.exp(-1.012 - 0.01126 * depth + 0.5133 / depth) }
-function crrM75(n1_60f: number) { const n = Math.min(30, Math.max(0.1, n1_60f)); return 1 / (34 - n) + n / 135 + 50 / Math.pow(10 * n + 45, 2) - 1 / 200 }
-function magnitudeCorrection(mw: number) { return Math.pow(10, 2.24 / Math.pow(Math.max(mw, 4), 2.56)) }
+function legacyRd(depth: number) {
+  if (depth <= 9.15) return 1 - 0.00765 * depth
+  if (depth <= 23) return 1.174 - 0.0267 * depth
+  if (depth <= 30) return 0.744 - 0.008 * depth
+  return 0.5
+}
 
-/** TBDY 2018 Ek 16B SPT profile calculation. */
+function crrM75(n1_60f: number) {
+  if (n1_60f >= 29.9) return 2
+  const n = Math.max(0, n1_60f)
+  return Math.max(0.01, 1 / (34 - n) + n / 135 + 50 / Math.pow(10 * n + 45, 2) - 1 / 200)
+}
+
+function legacyMsf(Mw: number) {
+  return Math.max(0.5, Math.min(2.2, Math.pow(10, 2.24) / Math.pow(Math.max(Mw, 1e-9), 2.56)))
+}
+
+/**
+ * Legacy-compatible liquefaction calculation migrated from the original ZeminLab.
+ * The calculation order and decision branches intentionally follow the old code.
+ */
 export function liquefactionProfile(i: LiquefactionProfileInput): LiquefactionProfileResult {
   if (!Number.isFinite(i.Mw) || i.Mw <= 0) throw new Error('Mw geçerli olmalıdır.')
   if (!Number.isFinite(i.Sds) || i.Sds < 0) throw new Error('SDS geçerli olmalıdır.')
-  const rows = [...i.spt].filter(x => Number.isFinite(x.depth) && x.depth > 0 && Number.isFinite(x.nField) && x.nField >= 0).sort((a, b) => a.depth - b.depth).map(x => {
-    const stress = stressAtDepth(x.depth, i.layers, i.groundwaterDepth)
-    const spt = calculateSpt({ ...x, effectiveStress: stress.sigmaVPrime, fineContent: x.fines, applyOverburden: true, applyDilatancy: false })
-    const correction = finesCorrection(spt.n1_60, x.fines)
-    const r = rd(x.depth)
-    const crr = crrM75(correction.n1_60f)
-    const cm = magnitudeCorrection(i.Mw)
-    const tauResistance = crr * cm * stress.sigmaVPrime
-    const tauEarthquake = 0.65 * (0.4 * i.Sds) * stress.sigmaV * r
-    const fs = tauResistance / Math.max(tauEarthquake, 1e-9)
-    return {
-      id: x.id, depth: x.depth, sigmaV: stress.sigmaV, sigmaVPrime: stress.sigmaVPrime, u: stress.u, nField: x.nField,
-      ce: spt.ce, cb: spt.cb, cs: spt.cs, cr: spt.cr, cn: spt.cn, n60: spt.n60, n1_60: spt.n1_60,
-      fines: x.fines ?? 0, alpha: correction.alpha, beta: correction.beta, n1_60f: correction.n1_60f,
-      rd: r, crrM75: crr, cm, tauResistance, tauEarthquake, fs, liquefiable: fs < 1.1,
-      note: (x.fines ?? 0) >= 35 ? 'IDI ≥ %35: TBDY Ek 16B ince dane düzeltmesi uygulandı.' : undefined
-    }
-  })
+
+  const pga = 0.4 * i.Sds
+  const msf = legacyMsf(i.Mw)
+
+  const rows = [...i.spt]
+    .filter(x => x.testType !== 'UD' && Number.isFinite(x.depth) && x.depth > 0 && Number.isFinite(x.nField) && x.nField >= 0)
+    .sort((a, b) => a.depth - b.depth)
+    .map(record => {
+      const layer = layerAt(record.depth, i.layers)
+      const soilType = record.soilType || ''
+      const cohesive = isCohesiveSoil(soilType)
+      const stress = legacyStress(record.depth, record, i.layers, i.groundwaterDepth)
+      const factors = correctionFactors(record)
+      const n60 = record.nField * factors.ce * factors.cb * factors.cs * factors.cr
+      const belowGwt = i.groundwaterDepth >= 0 && record.depth >= i.groundwaterDepth
+      const dilatancyApplied = belowGwt && !cohesive && n60 > 15
+      const n60Dilatancy = dilatancyApplied ? 15 + 0.5 * (n60 - 15) : n60
+      const cn = cohesive ? 1 : Math.min(2, Math.sqrt(100 / Math.max(10, stress.sigmaVPrime)))
+      const n1_60 = n60 * cn
+      const fines = record.fines ?? layer?.finesContent ?? 0
+      const fine = fineCorrection(n1_60, fines)
+      const rd = legacyRd(record.depth)
+      const csr = 0.65 * pga * (stress.sigmaV / Math.max(0.1, stress.sigmaVPrime)) * rd
+      const crr = crrM75(fine.n1_60f)
+      const tauEarthquake = 0.65 * pga * stress.sigmaV * rd
+      const tauResistance = crr * msf * stress.sigmaVPrime
+      const fsL = tauEarthquake > 0 ? tauResistance / tauEarthquake : 9.9
+      const gsL = fsL
+
+      let claySofteningRisk: LiquefactionProfileRow['claySofteningRisk'] = 'VERİ YOK'
+      let clayExplanation = ''
+      const w = record.waterContent
+      const ll = record.liquidLimit
+      if (cohesive) {
+        if (ll && ll > 0 && w && w > 0) {
+          const ratio = w / ll
+          if (ll < 37 && ratio > 0.85) {
+            claySofteningRisk = 'YÜKSEK'
+            clayExplanation = `Bray & Sancio (2006) YÜKSEK: LL (${ll}%) < 37 & w/LL (${ratio.toFixed(2)}) > 0.85.`
+          } else if (ll <= 47 && ratio >= 0.80) {
+            claySofteningRisk = 'ORTA'
+            clayExplanation = `Bray & Sancio (2006) GEÇİŞ (ORTA): LL (${ll}%) ≤ 47 & w/LL (${ratio.toFixed(2)}) ≥ 0.80.`
+          } else {
+            claySofteningRisk = 'DÜŞÜK'
+            clayExplanation = `Bray & Sancio (2006) DÜŞÜK: LL (${ll}%) > 47 veya w/LL (${ratio.toFixed(2)}) düşük.`
+          }
+        } else {
+          clayExplanation = 'Kil sismik yumuşama analizi için laboratuvar LL/w değerleri eksik.'
+        }
+      }
+
+      const pi = record.plasticityIndex ?? layer?.plasticityIndex ?? (cohesive ? 12 : 0)
+      const codeUpper = soilType.toUpperCase().replace(/İ/g, 'I')
+      const isSandySoil = ['SA', 'SISA', 'CLSA', 'GRSA'].includes(codeUpper) || codeUpper.includes('KUM') || !cohesive
+
+      let conclusion: LiquefactionProfileRow['conclusion'] = 'SIVILAŞMA YOK'
+      let explanation = ''
+      if (!belowGwt) {
+        explanation = 'YAS üzeri'
+      } else if (record.depth > 20) {
+        explanation = 'Derinlik > 20m limitinin altındadır (Sıvılaşma yok)'
+      } else if (cohesive) {
+        const hasSoftening = claySofteningRisk === 'YÜKSEK' || claySofteningRisk === 'ORTA'
+        explanation = hasSoftening ? `kilde yumuşama - ${clayExplanation || 'Bray & Sancio riski'}` : 'Suya doygun killi zemin (Plastisite İndisi yüksek, sıvılaşma yok)'
+      } else if (fsL < 1.10) {
+        conclusion = 'SIVILAŞMA VAR'
+        explanation = `Düşük sıkılıkta suya doygun zemin (GS = ${fsL.toFixed(3)} < 1.10, sıvılaşma var)`
+      } else if (fine.n1_60f >= 30.0) {
+        explanation = `Düzeltilmiş darbe sayısı (N1)60f = ${fine.n1_60f.toFixed(1)} >= 30, sıkı zemin (GS = ${fsL.toFixed(3)} >= 1.10, sıvılaşma yok)`
+      } else if (isSandySoil && (codeUpper === 'CLSA' || codeUpper.includes('KIL') || codeUpper.includes('CIL')) && pi > 10) {
+        explanation = `Killi kum (PI = ${pi.toFixed(1)} > 10, plastik ince dane, GS = ${fsL.toFixed(3)} >= 1.10, sıvılaşma yok)`
+      } else if (isSandySoil && fines > 35 && n1_60 > 20) {
+        explanation = `Yüksek ince dane oranı (FC = ${fines.toFixed(1)}% > 35% ve (N1)60 = ${n1_60.toFixed(1)} > 20, GS = ${fsL.toFixed(3)} >= 1.10, sıvılaşma yok)`
+      } else {
+        explanation = `Suya doygun kum katmanı (GS = ${fsL.toFixed(3)} >= 1.10, sıvılaşma yok)`
+      }
+
+      let isLiquefiable: LiquefactionProfileRow['isLiquefiable'] = 'SIVILAŞMA YOK'
+      if (conclusion === 'SIVILAŞMA VAR' || (cohesive && claySofteningRisk === 'YÜKSEK') || fsL < 1.10) isLiquefiable = 'YÜKSEK'
+      else if (fsL < 1.30) isLiquefiable = 'ORTA'
+
+      return {
+        id: record.id,
+        depth: record.depth,
+        soilType,
+        nField: record.nField,
+        sigmaV: stress.sigmaV,
+        sigmaVPrime: stress.sigmaVPrime,
+        u: stress.u,
+        ce: factors.ce,
+        cb: factors.cb,
+        cs: factors.cs,
+        cr: factors.cr,
+        cn,
+        n60,
+        n1_60,
+        n1_60_dilatancy: n60Dilatancy,
+        fines,
+        alpha: fine.alpha,
+        beta: fine.beta,
+        n1_60f: fine.n1_60f,
+        rd,
+        csr,
+        crr,
+        msf,
+        gsL,
+        fsL,
+        tauResistance,
+        tauEarthquake,
+        sds: i.Sds,
+        isCohesive: cohesive,
+        claySofteningRisk,
+        clayLL: ll,
+        clayW: w,
+        clayExplanation,
+        conclusion,
+        isLiquefiable,
+        explanation
+      }
+    })
+
   return {
     rows,
-    method: 'TBDY 2018 Ek 16B · SPT tabanlı basitleştirilmiş sıvılaşma değerlendirmesi',
-    source: 'TBDY 2018 Ek 16B.2–16B.4; güvenlik koşulu Denk. 16.3: τR / τdeprem ≥ 1.10. Sıvılaşma sonrası dayanım, rijitlik ve yerdeğiştirmeler ayrıca değerlendirilmelidir.'
+    method: 'Legacy ZeminLab · SPT → σv/σ′v → N60 → CN → (N1)60 → ince dane düzeltmesi → rd → CSR/CRR → MSF → FS',
+    source: 'Eski ZeminLab geotechUtils.ts analyzeLiquefaction/correctSpt mantığı; TBDY 2018 Ek 16B ve Seed, Idriss & Boulanger (2008) ile ilişkilendirilen hesap adımları. Kod davranışı eski sürümle uyumlu tutulmuştur.'
   }
 }
