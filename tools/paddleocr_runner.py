@@ -58,7 +58,6 @@ def main() -> int:
         )
 
     kwargs = {
-        "pipeline_version": "v1",
         "use_doc_orientation_classify": orientation_model_dir.is_dir(),
         "use_doc_unwarping": unwarping_model_dir.is_dir(),
         "use_layout_detection": True,
