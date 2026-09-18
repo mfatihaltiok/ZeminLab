@@ -74,18 +74,58 @@ export function liquefaction(i:LiquefactionInput):CalculationResult<any>{
  return{value:{rd,CRRM75,CM,Rtau,tau,ratio,safe:ratio>=1.1},method:'TBDY 2018 Ek 16B',source:'TBDY 2018 Ek 16B; SPT düzeltmeleri merkezi SPT motorundan gelir.',steps:[{symbol:'rd',title:'Gerilme azaltma',formula:'TBDY Ek 16B',value:rd},{symbol:'CRR7.5',title:'Çevrimsel dayanım',formula:'CRR bağıntısı',value:CRRM75},{symbol:'FS',title:'Sıvılaşma güvenlik oranı',formula:'FS=Rτ/τdeprem',value:ratio}]}
 }
 
-export interface FoundationInput{B:number;L:number;N:number;V:number;Mx:number;My:number;delta?:number;cu?:number;area?:number}
+export interface FoundationInput{
+ B:number;L:number;N:number;Vx?:number;Vy?:number;V?:number;Mx:number;My:number
+ deltaTan?:number;cu?:number;area?:number
+}
 export function foundationChecks(i:FoundationInput){
  if(i.B<=0||i.L<=0)throw new Error('Temel boyutları pozitif olmalıdır.')
- const N=i.N,ex=N!==0?i.My/N:0,ey=N!==0?i.Mx/N:0,qAvg=N/(i.B*i.L),qMax=qAvg*(1+6*Math.abs(ex)/i.L+6*Math.abs(ey)/i.B),qMin=qAvg*(1-6*Math.abs(ex)/i.L-6*Math.abs(ey)/i.B),resistance=Math.max(0,N)*Math.tan(i.delta??0)+Math.max(0,i.cu??0)*(i.area??i.B*i.L),slidingFS=Math.abs(i.V)>0?resistance/Math.abs(i.V):Infinity,warnings:string[]=[]
+ const N=Math.max(0,i.N),ex=N!==0?i.My/N:0,ey=N!==0?i.Mx/N:0
+ const qAvg=N/(i.B*i.L)
+ const qMax=qAvg*(1+6*Math.abs(ex)/i.L+6*Math.abs(ey)/i.B)
+ const qMin=qAvg*(1-6*Math.abs(ex)/i.L-6*Math.abs(ey)/i.B)
+ const deltaTan=i.deltaTan??0.6
+ const rh=1.1
+ const frictionDesign=N*deltaTan/rh
+ const vx=Math.abs(i.Vx??i.V??0),vy=Math.abs(i.Vy??0)
+ const slidingCapacityX=frictionDesign
+ const slidingCapacityY=frictionDesign
+ const slidingUtilizationX=slidingCapacityX>0?vx/slidingCapacityX:Infinity
+ const slidingUtilizationY=slidingCapacityY>0?vy/slidingCapacityY:Infinity
+ const slidingSafeX=vx<=slidingCapacityX
+ const slidingSafeY=vy<=slidingCapacityY
+ const resistance=Math.max(0,N)*deltaTan+Math.max(0,i.cu??0)*(i.area??i.B*i.L)
+ const slidingFS=Math.abs(i.V??0)>0?resistance/Math.abs(i.V):Infinity
+ const warnings:string[]=[]
  if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Çekirdek dışı yükleme: qmin<0 olabilir.')
- return{value:{ex,ey,qAvg,qMax,qMin,contactRatio:qMin>=0?1:Math.max(0,1-6*Math.abs(ex)/i.L)*Math.max(0,1-6*Math.abs(ey)/i.B),slidingFS,warnings},steps:[{symbol:'ex',title:'Eksantriklik',formula:'ex=My/N',value:ex,unit:'m'},{symbol:'ey',title:'Eksantriklik',formula:'ey=Mx/N',value:ey,unit:'m'},{symbol:'qmax',title:'Maksimum taban gerilmesi',formula:'qmax=q̄(1+6e/L)',value:qMax},{symbol:'qmin',title:'Minimum taban gerilmesi',formula:'qmin=q̄(1−6e/L)',value:qMin}],method:'Temel taban gerilmesi / eksantriklik',source:'TBDY 2018 Bölüm 16.7–16.8'}
+ if((i.Vx??0)!==0||(i.Vy??0)!==0)warnings.push('Yatayda kayma kontrolü TBDY 2018 16.8.4 uyarınca Vtx/Vty için ayrı doğrultularda yapılır; sürtünme direncinde γRh=1.10 ve tanδ=0.60 kullanılmıştır. Tanδ, saha verisi yoksa yerinde dökme beton-sıkıştırılmış temel tabanı için Tablo 16.3 üst sınırıdır.')
+ return{
+   value:{
+     ex,ey,qAvg,qMax,qMin,
+     contactRatio:qMin>=0?1:Math.max(0,1-6*Math.abs(ex)/i.L)*Math.max(0,1-6*Math.abs(ey)/i.B),
+     slidingFS,
+     slidingCapacityX,slidingCapacityY,slidingUtilizationX,slidingUtilizationY,slidingSafeX,slidingSafeY,
+     slidingResistanceFactor:rh,slidingTanDelta:deltaTan
+   },
+   steps:[
+     {symbol:'ex',title:'Eksantriklik',formula:'ex=My/N',value:ex,unit:'m'},
+     {symbol:'ey',title:'Eksantriklik',formula:'ey=Mx/N',value:ey,unit:'m'},
+     {symbol:'qmax',title:'Maksimum taban gerilmesi',formula:'qmax=q̄(1+6e/L)',value:qMax},
+     {symbol:'qmin',title:'Minimum taban gerilmesi',formula:'qmin=q̄(1−6e/L)',value:qMin},
+     {symbol:'Rth,x',title:'X doğrultusu tasarım sürtünme direnci',formula:'Rth=Ptv·tanδ/γRh',value:slidingCapacityX,unit:'kN'},
+     {symbol:'Rth,y',title:'Y doğrultusu tasarım sürtünme direnci',formula:'Rth=Ptv·tanδ/γRh',value:slidingCapacityY,unit:'kN'},
+     {symbol:'ηx',title:'X doğrultusu kayma oranı',formula:'ηx=|Vtx|/Rth,x',value:slidingUtilizationX},
+     {symbol:'ηy',title:'Y doğrultusu kayma oranı',formula:'ηy=|Vty|/Rth,y',value:slidingUtilizationY}
+   ],
+   method:'Temel taban gerilmesi + TBDY 2018 16.8.4 yatayda kayma',
+   source:'TBDY 2018 Bölüm 16.7.3.3, 16.8.4, Tablo 16.2 ve Tablo 16.3'
+ }
 }
 
 export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number}){
  const Ac=Math.PI*i.columnDiameter**2/4,ratio=Math.min(1,Ac/Math.max(i.spacing**2,1e-9)),composite=(1-ratio)*i.qultSoil+ratio*i.qultColumn*i.improvementFactor
- return{value:{Ac,ratio,composite,allowable:composite/Math.max(i.FS,1e-9),columnLoad:Ac*i.columnStrength/Math.max(i.FS,1e-9)},steps:[{symbol:'Ac',title:'Kolon alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio}],method:'Jet Grout kompozit ön model',source:'Proje kaynak paketi'}
+ return{value:{Ac,ratio,composite,allowable:composite/Math.max(i.FS,1e-9),columnLoad:Ac*i.columnStrength/Math.max(i.FS,1e-9)},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio}],method:'Jet Grout kompozit ön model',source:'Proje kaynak paketi'}
 }
 
 export function stressAtDepth(depth:number,layers:{top:number;bottom:number;gamma:number;gammaSat:number}[],gwt:number){
@@ -99,4 +139,4 @@ export function stressAtDepth(depth:number,layers:{top:number;bottom:number;gamm
  return{sigmaV,sigmaVPrime:Math.max(0,sigmaV-u),u}
 }
 
-export const SOURCE_NOTES={investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',bearing:'TBDY 2018 Bölüm 16.8.3.2 / Denklem 16.8; klasik yöntemler Terzaghi, Meyerhof, Hansen ve Vesic.',settlement:'TBDY 2018 Bölüm 16.',foundation:'TBDY 2018 Bölüm 16.7–16.8.',jetGrout:'ZeminLab kaynak paketi; imalat doğrulaması gerekir.'}
+export const SOURCE_NOTES={investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',bearing:'TBDY 2018 Bölüm 16.8.3.2 / Denklem 16.8; klasik yöntemler Terzaghi, Meyerhof, Hansen ve Vesic.',settlement:'TBDY 2018 Bölüm 16.',foundation:'TBDY 2018 Bölüm 16.7.3.3 ve 16.8.4; yatayda kayma için Tablo 16.2–16.3.'}
