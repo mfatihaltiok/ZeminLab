@@ -37,6 +37,19 @@ def main() -> int:
     os.environ["PADDLE_PDX_OFFLINE"] = "1"
     os.environ["PYTHONNOUSERSITE"] = "1"
 
+    # PaddleOCR 3.3.2 / PaddlePaddle 3.2.x still touches legacy NumPy aliases.
+    # NumPy 1.26.4 is retained for the VL runtime; restore only the aliases
+    # required by the framework before importing Paddle/PaddleOCR.
+    import numpy as np
+    if not hasattr(np, "long"):
+        np.long = np.int64
+    if not hasattr(np, "int"):
+        np.int = int
+    if not hasattr(np, "bool"):
+        np.bool = np.bool_
+    if not hasattr(np, "float"):
+        np.float = float
+
     try:
         from paddleocr import PaddleOCRVL
     except ModuleNotFoundError as error:
