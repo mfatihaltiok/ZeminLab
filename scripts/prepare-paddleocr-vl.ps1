@@ -11,9 +11,10 @@ $tempRoot = Join-Path $env:TEMP "zeminlab-paddleocr-build"
 
 New-Item -ItemType Directory -Force -Path $resourceRoot,$tempRoot | Out-Null
 
-Write-Host "ZeminLab yerel OCR runtime hazırlanıyor..."
+Write-Host "ZeminLab yerel PaddleOCR runtime hazırlanıyor..."
 if (Test-Path $runtimeRoot) { Remove-Item -Recurse -Force $runtimeRoot }
-New-Item -ItemType Directory -Force -Path $runtimeRoot | Out-Null
+if (Test-Path $modelRoot) { Remove-Item -Recurse -Force $modelRoot }
+New-Item -ItemType Directory -Force -Path $runtimeRoot,$modelRoot | Out-Null
 
 $zipPath = Join-Path $tempRoot $pythonZip
 Write-Host "1/4 Python embedded runtime indiriliyor..."
@@ -35,46 +36,48 @@ Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
 & $runtimePython $getPip --disable-pip-version-check --no-warn-script-location
 if ($LASTEXITCODE -ne 0) { throw "Bundled Python pip kurulumu başarısız." }
 
-Write-Host "3/4 PaddleOCR bağımlılıkları bundled runtime içine kuruluyor..."
-& $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location --upgrade "numpy==1.26.4" "paddleocr[doc-parser]==3.3.2" "paddlepaddle==3.2.2"
+Write-Host "3/4 CPU uyumlu PaddleOCR bağımlılıkları kuruluyor..."
+& $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location --upgrade `
+    "numpy==1.26.4" `
+    "scipy==1.13.1" `
+    "scikit-learn==1.7.1" `
+    "paddleocr==3.3.2" `
+    "paddlepaddle==3.2.2"
 if ($LASTEXITCODE -ne 0) { throw "PaddleOCR/PaddlePaddle bundled runtime kurulumu başarısız." }
 
-Write-Host "4/4 PaddleOCR-VL modelleri bundled paket içine alınıyor..."
-if (Test-Path $modelRoot) { Remove-Item -Recurse -Force $modelRoot }
-New-Item -ItemType Directory -Force -Path $modelRoot | Out-Null
-
+Write-Host "4/4 PP-OCRv5 Türkçe modelleri yerel pakete alınıyor..."
 $env:PADDLE_PDX_CACHE_HOME = $modelRoot
 $env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "1"
 
 $bootstrap = @'
-from paddleocr import PaddleOCRVL
-pipeline = PaddleOCRVL(
+import os
+from paddleocr import PaddleOCR
+
+pipeline = PaddleOCR(
+    lang="tr",
+    ocr_version="PP-OCRv5",
+    device="cpu",
     use_doc_orientation_classify=True,
     use_doc_unwarping=True,
-    use_layout_detection=True,
+    use_textline_orientation=True,
+    enable_mkldnn=True,
+    cpu_threads=8,
 )
-print("PaddleOCR-VL v1 model indirme/önbelleğe alma tamamlandı.")
+print("PP-OCRv5 Türkçe yerel model önbelleği hazır.")
 '@
 
 $tempScript = Join-Path $tempRoot "download-models.py"
 Set-Content -Path $tempScript -Value $bootstrap -Encoding UTF8
 & $runtimePython $tempScript
-if ($LASTEXITCODE -ne 0) { throw "PaddleOCR-VL modellerinin indirilmesi başarısız." }
+if ($LASTEXITCODE -ne 0) { throw "PP-OCRv5 modellerinin indirilmesi başarısız." }
 
-$cache = Join-Path $modelRoot "official_models"
-$required = @("PaddleOCR-VL","PP-DocLayoutV2","PP-LCNet_x1_0_doc_ori","UVDoc")
-foreach ($name in $required) {
-  $source = Join-Path $cache $name
-  $target = Join-Path $modelRoot $name
-  if (-not (Test-Path $source)) { throw "Beklenen model bulunamadı: $source" }
-  if (Test-Path $target) { Remove-Item -Recurse -Force $target }
-  Move-Item -Path $source -Destination $target
-  Write-Host "Paketlendi: $name"
-}
-if (Test-Path $cache) { Remove-Item -Recurse -Force $cache }
+$marker = Join-Path $modelRoot "zeminlab-ocr-runtime.ready"
+Set-Content -Path $marker -Value "PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 / PP-OCRv5 / tr / CPU" -Encoding UTF8
+
 Remove-Item -Force $getPip,$tempScript,$zipPath -ErrorAction SilentlyContinue
 
 Write-Host ""
-Write-Host "ZeminLab OCR runtime hazır:"
+Write-Host "ZeminLab yerel OCR runtime hazır:"
 Write-Host "  Python : $runtimeRoot"
 Write-Host "  Modeller: $modelRoot"
+Write-Host "  Motor  : PP-OCRv5 / Türkçe / CPU"
