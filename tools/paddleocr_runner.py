@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 
@@ -22,37 +19,6 @@ def result_to_dict(result):
     return {}
 
 
-def load_paddleocr_vl():
-    try:
-        from paddleocr import PaddleOCRVL
-        return PaddleOCRVL
-    except ModuleNotFoundError as error:
-        if error.name != "paddleocr":
-            raise
-
-    commands = [
-        [
-            sys.executable, "-m", "pip", "install",
-            "-U", "paddleocr[doc-parser]",
-            "paddlepaddle>=3.2.1",
-            "--index-url", "https://pypi.org/simple",
-        ]
-    ]
-
-    last_error = None
-    for command in commands:
-        try:
-            subprocess.check_call(command)
-            from paddleocr import PaddleOCRVL
-            return PaddleOCRVL
-        except subprocess.CalledProcessError as error:
-            last_error = error
-
-    raise RuntimeError(
-        "PaddleOCR-VL kurulamadı. PaddlePaddle >=3.2.1 ve paddleocr[doc-parser] kurulumu başarısız."
-    ) from last_error
-
-
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
@@ -64,19 +30,26 @@ def main() -> int:
     if not image_path.is_file():
         raise FileNotFoundError(f"Görsel bulunamadı: {image_path}")
 
-    PaddleOCRVL = load_paddleocr_vl()
+    try:
+        from paddleocr import PaddleOCRVL
+    except ModuleNotFoundError as error:
+        raise RuntimeError(
+            "Bundled PaddleOCR runtime bulunamadı. ZeminLab kurulumu "
+            "resources/python-runtime ve PaddleOCR paketini içermelidir."
+        ) from error
 
-    bundled_root = Path(__file__).resolve().parent.parent / "resources" / "paddleocr-vl-v1"
-    model_root = Path(os.environ.get("ZEMINLAB_PADDLEOCR_VL_MODEL", "").strip() or bundled_root)
+    model_root = Path(__file__).resolve().parent.parent / "resources" / "paddleocr-vl-v1"
     vl_model_dir = model_root / "PaddleOCR-VL"
     layout_model_dir = model_root / "PP-DocLayoutV2"
     orientation_model_dir = model_root / "PP-LCNet_x1_0_doc_ori"
     unwarping_model_dir = model_root / "UVDoc"
+
     if not vl_model_dir.is_dir() or not layout_model_dir.is_dir():
         raise RuntimeError(
             "PaddleOCR-VL yerel model paketi bulunamadı. "
-            "resources/paddleocr-vl-v1 klasörünün setup içine paketlendiğini kontrol edin."
+            "ZeminLab kurulumunun resources/paddleocr-vl-v1 klasörünü içerdiğini kontrol edin."
         )
+
     kwargs = {
         "pipeline_version": "v1",
         "use_doc_orientation_classify": orientation_model_dir.is_dir(),
@@ -89,6 +62,7 @@ def main() -> int:
         kwargs["doc_orientation_classify_model_dir"] = str(orientation_model_dir)
     if unwarping_model_dir.is_dir():
         kwargs["doc_unwarping_model_dir"] = str(unwarping_model_dir)
+
     pipeline = PaddleOCRVL(**kwargs)
     result = pipeline.predict(str(image_path))
 
