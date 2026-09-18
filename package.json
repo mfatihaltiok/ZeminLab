@@ -13,13 +13,13 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
-    "build": "npm run prepare:ocr && npm run typecheck && electron-vite build",
+    "build": "npm run typecheck && electron-vite build",
     "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
+    "prepare:ocr-runtime": "powershell -ExecutionPolicy Bypass -File scripts/prepare-paddleocr-vl.ps1",
+    "build:win": "npm run build && npm run prepare:ocr-runtime && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
-    "postinstall": "electron-builder install-app-deps",
-    "prepare:ocr": "powershell -ExecutionPolicy Bypass -File scripts/prepare-paddleocr-vl.ps1"
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
@@ -29,7 +29,6 @@
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
     "@electron-toolkit/eslint-config-ts": "^3.1.0",
-    "@electron-toolkit/tsconfig": "^2.0.0",
     "@types/node": "^22.19.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
