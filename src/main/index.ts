@@ -34,7 +34,7 @@ async function runLocalDocumentIntelligence(dataUrl:string){
   const tempRoot=join(app.getPath('temp'),'zeminlab-document-intelligence')
   await fs.mkdir(tempRoot,{recursive:true})
   const token=Date.now().toString(36)+Math.random().toString(36).slice(2,8)
-  const extension=match[1].toLowerCase()==='application/pdf'?'.pdf':'.png'
+  const extension=match[1].toLowerCase()==='application/pdf'?'.pdf':(match[1].toLowerCase()==='image/jpeg'||match[1].toLowerCase()==='image/jpg'?'.jpg':'.png')
   const inputPath=join(tempRoot,token+extension),outputPath=join(tempRoot,token+'.json')
 
   try{
