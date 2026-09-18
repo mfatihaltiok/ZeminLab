@@ -36,7 +36,7 @@ Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
 if ($LASTEXITCODE -ne 0) { throw "Bundled Python pip kurulumu başarısız." }
 
 Write-Host "3/4 PaddleOCR bağımlılıkları bundled runtime içine kuruluyor..."
-& $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location "paddleocr[doc-parser]==3.3.2" "paddlepaddle>=3.2.1,<3.3"
+& $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location --upgrade "numpy==1.26.4" "paddleocr[doc-parser]==3.3.2" "paddlepaddle==3.2.2"
 if ($LASTEXITCODE -ne 0) { throw "PaddleOCR/PaddlePaddle bundled runtime kurulumu başarısız." }
 
 Write-Host "4/4 PaddleOCR-VL modelleri bundled paket içine alınıyor..."
