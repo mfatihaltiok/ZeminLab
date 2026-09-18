@@ -12,15 +12,15 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
-    "dev": "npm run ensure:ocr-runtime && electron-vite dev",
+    "dev": "npm run ensure:document-intelligence && electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
     "build:unpack": "npm run build && electron-builder --dir",
-    "prepare:ocr-runtime": "powershell -ExecutionPolicy Bypass -File scripts/prepare-paddleocr-vl.ps1",
-    "ensure:ocr-runtime": "powershell -ExecutionPolicy Bypass -File scripts/ensure-paddleocr-runtime.ps1",
-    "build:win": "npm run build && npm run prepare:ocr-runtime && electron-builder --win",
+    "build:win": "npm run build && npm run prepare:document-intelligence && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "prepare:document-intelligence": "powershell -ExecutionPolicy Bypass -File scripts/prepare-document-intelligence.ps1",
+    "ensure:document-intelligence": "powershell -ExecutionPolicy Bypass -File scripts/ensure-document-intelligence.ps1"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
