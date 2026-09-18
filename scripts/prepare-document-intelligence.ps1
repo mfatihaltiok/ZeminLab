@@ -50,7 +50,7 @@ $doclingTools = Join-Path $runtimeRoot "Scripts\docling-tools.exe"
 & $doclingTools models download layout tableformer -o $doclingRoot
 if ($LASTEXITCODE -ne 0) { throw "Docling modelleri indirilemedi." }
 
-Write-Host "5/5 Offline runtime doğrulanıyor..."
+Write-Host "5/6 PaddleOCR modelleri yerel cache içine indiriliyor..."\n$env:PADDLE_PDX_CACHE_HOME = $paddleRoot\n$env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "1"\n$env:PYTHONNOUSERSITE = "1"\n& $runtimePython -c "from paddleocr import PaddleOCR; PaddleOCR(lang=\"tr\", ocr_version=\"PP-OCRv5\", device=\"cpu\", use_doc_orientation_classify=False, use_doc_unwarping=False, use_textline_orientation=True, text_det_limit_side_len=4096, text_det_limit_type=\"max\", enable_mkldnn=True)"\nif ($LASTEXITCODE -ne 0) { throw "PP-OCRv5 modelleri yerel cache içine indirilemedi." }\n\nWrite-Host "6/6 Offline runtime doğrulanıyor..."
 $env:PADDLE_PDX_CACHE_HOME = $paddleRoot
 $env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "1"
 $env:PADDLE_PDX_OFFLINE = "1"
