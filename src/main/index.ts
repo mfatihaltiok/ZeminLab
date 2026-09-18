@@ -16,8 +16,9 @@ async function runLocalPaddleOcr(dataUrl:string){
   const match=/^data:image\/(png|jpeg|jpg);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl)
   if(!match)throw new Error('OCR için yalnızca PNG veya JPG görseli kabul edilir.')
 
-  const resourceRoot=app.isPackaged?process.resourcesPath:join(app.getAppPath(),'resources')
-  const toolRoot=app.isPackaged?process.resourcesPath:app.getAppPath()
+  const appRoot=app.getAppPath()
+  const resourceRoot=app.isPackaged?join(process.resourcesPath,'resources'):join(appRoot,'resources')
+  const toolRoot=app.isPackaged?process.resourcesPath:appRoot
   const python=join(resourceRoot,'python-runtime','python.exe')
   const runner=join(toolRoot,'tools','paddleocr_runner.py')
   const modelRoot=join(resourceRoot,'paddleocr-vl-v1')
