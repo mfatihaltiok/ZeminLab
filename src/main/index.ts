@@ -13,11 +13,11 @@ const PROJECT_SCHEMA_VERSION=2
 const execFileAsync=promisify(execFile)
 
 async function runLocalDocumentIntelligence(dataUrl:string){
-  const match=/^data:(image\\/(?:png|jpeg|jpg)|application\\/pdf);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl)
+  const match=/^data:(image\/(?:png|jpeg|jpg)|application\/pdf);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl)
   if(!match)throw new Error('Belge analizi için yalnızca PNG, JPG veya PDF kabul edilir.')
 
   const appRoot=app.getAppPath()
-  const resourceRoot=app.isPackaged?join(process.resourcesPath,'resources'):join(appRoot,'resources')
+  const resourceRoot=app.isPackaged?process.resourcesPath:join(appRoot,'resources')
   const toolRoot=app.isPackaged?process.resourcesPath:appRoot
   const python=join(resourceRoot,'python-runtime','python.exe')
   const runner=join(toolRoot,'tools','document_intelligence.py')
