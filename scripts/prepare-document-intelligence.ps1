@@ -54,7 +54,7 @@ Write-Host "5/6 PaddleOCR modelleri yerel cache içine indiriliyor..."
 $env:PADDLE_PDX_CACHE_HOME = $paddleRoot
 $env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "1"
 $env:PYTHONNOUSERSITE = "1"
-& $runtimePython -c 'from paddleocr import TextDetection, TextRecognition; TextDetection(model_name="PP-OCRv5_mobile_det", model_dir=r"$paddleRoot\models\det"); TextRecognition(model_name="latin_PP-OCRv5_mobile_rec", model_dir=r"$paddleRoot\models\rec")'
+& $runtimePython -c "from paddleocr import TextDetection, TextRecognition; TextDetection(model_name='PP-OCRv5_mobile_det', model_dir=r'$paddleRoot\models\det'); TextRecognition(model_name='latin_PP-OCRv5_mobile_rec', model_dir=r'$paddleRoot\models\rec')"
 if ($LASTEXITCODE -ne 0) { throw "PP-OCRv5 modelleri yerel cache içine indirilemedi." }
 
 Write-Host "6/6 Offline runtime doğrulanıyor..."
