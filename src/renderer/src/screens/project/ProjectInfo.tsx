@@ -75,11 +75,25 @@ export default function ProjectInfo() {
         </section>
 
         <section className="calculation-card">
-          <div className="calculation-card-title">MERKEZİ TEMEL PARAMETRELERİ</div>
+          <div className="calculation-card-title">TEMEL TANIMI VE BOYUTLARI</div>
           <div className="project-form-grid">
+            <label>
+              Temel tipi
+              <select value={project.foundationParameters.foundationType} onChange={(e) => updateFoundation('foundationType', e.target.value as typeof project.foundationParameters.foundationType)}>
+                <option value="tekil">Tekil Temel</option>
+                <option value="surekli">Sürekli Temel</option>
+                <option value="radye">Radye Temel</option>
+              </select>
+            </label>
             <label>Temel genişliği B<input type="number" step="0.01" min="0" value={project.foundationParameters.footingWidth} onChange={(e) => updateFoundation('footingWidth', Number(e.target.value))} /><span>m</span></label>
+            <label>Temel uzunluğu L<input type="number" step="0.01" min="0" value={project.foundationParameters.footingLength} onChange={(e) => updateFoundation('footingLength', Number(e.target.value))} /><span>m</span></label>
             <label>Temel derinliği Df<input type="number" step="0.01" min="0" value={project.foundationParameters.footingDepth} onChange={(e) => updateFoundation('footingDepth', Number(e.target.value))} /><span>m</span></label>
-            <label>Güvenlik katsayısı FS<input type="number" step="0.1" min="0" value={project.foundationParameters.safetyFactor} onChange={(e) => updateFoundation('safetyFactor', Number(e.target.value))} /><span>FS</span></label>
+            <label>Vtx · temele gelen deprem kuvveti<input type="number" step="0.01" value={project.foundationParameters.vtX} onChange={(e) => updateFoundation('vtX', Number(e.target.value))} /><span>kN</span></label>
+            <label>Vty · temele gelen deprem kuvveti<input type="number" step="0.01" value={project.foundationParameters.vtY} onChange={(e) => updateFoundation('vtY', Number(e.target.value))} /><span>kN</span></label>
+            <label>Yapı ağırlığı (G+Q kombinasyonu)<input type="number" step="0.01" min="0" value={project.foundationParameters.structuralWeight} onChange={(e) => updateFoundation('structuralWeight', Number(e.target.value))} /><span>kN</span></label>
+          </div>
+          <div className="project-documents-note">
+            Vtx ve Vty, TBDY 2018 Bölüm 16.8.4 yatayda kayma kontrolünde temel tabanına gelen tasarım yatay kuvvetleri olarak kullanılır. FS kullanıcıdan alınmaz; ilgili dayanım katsayıları hesap motorunda uygulanır.
           </div>
         </section>
 
