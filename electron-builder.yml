@@ -13,7 +13,7 @@ asarUnpack:
   - resources/**
   - python-runtime/**
   - tools/paddleocr_runner.py
-  - paddleocr-vl-0.9b/**
+  - resources/paddleocr-vl-v1/**
 win:
   executableName: ZeminLab
 nsis:
