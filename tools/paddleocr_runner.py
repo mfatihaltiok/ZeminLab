@@ -68,6 +68,7 @@ def main() -> int:
 
     model_dir = os.environ.get("ZEMINLAB_PADDLEOCR_VL_MODEL", "").strip()
     kwargs = {
+        "pipeline_version": "v1",
         "use_doc_orientation_classify": True,
         "use_doc_unwarping": True,
         "use_layout_detection": True,
@@ -77,7 +78,6 @@ def main() -> int:
     # Model yolu verilmezse PaddleOCR kendi yerel önbelleğini kullanır.
     if model_dir:
         kwargs["vl_rec_model_dir"] = model_dir
-        kwargs["vl_rec_backend"] = "transformers"
 
     pipeline = PaddleOCRVL(**kwargs)
     result = pipeline.predict(str(image_path))
