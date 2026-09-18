@@ -66,27 +66,29 @@ def main() -> int:
 
     PaddleOCRVL = load_paddleocr_vl()
 
-    model_dir = os.environ.get("ZEMINLAB_PADDLEOCR_VL_MODEL", "").strip()
-    if not model_dir:
-        for candidate in (
-            Path(__file__).resolve().parent.parent / "resources" / "paddleocr-vl-0.9b",
-            Path(__file__).resolve().parent / "paddleocr-vl-0.9b",
-        ):
-            if candidate.is_dir():
-                model_dir = str(candidate)
-                break
+    bundled_root = Path(__file__).resolve().parent.parent / "resources" / "paddleocr-vl-v1"
+    model_root = Path(os.environ.get("ZEMINLAB_PADDLEOCR_VL_MODEL", "").strip() or bundled_root)
+    vl_model_dir = model_root / "PaddleOCR-VL"
+    layout_model_dir = model_root / "PP-DocLayoutV2"
+    orientation_model_dir = model_root / "PP-LCNet_x1_0_doc_ori"
+    unwarping_model_dir = model_root / "UVDoc"
+    if not vl_model_dir.is_dir() or not layout_model_dir.is_dir():
+        raise RuntimeError(
+            "PaddleOCR-VL yerel model paketi bulunamadı. "
+            "resources/paddleocr-vl-v1 klasörünün setup içine paketlendiğini kontrol edin."
+        )
     kwargs = {
         "pipeline_version": "v1",
-        "use_doc_orientation_classify": True,
-        "use_doc_unwarping": True,
+        "use_doc_orientation_classify": orientation_model_dir.is_dir(),
+        "use_doc_unwarping": unwarping_model_dir.is_dir(),
         "use_layout_detection": True,
+        "vl_rec_model_dir": str(vl_model_dir),
+        "layout_detection_model_dir": str(layout_model_dir),
     }
-
-    # Setup paketine model konduğunda tamamen offline çalışır.
-    # Model yolu verilmezse PaddleOCR kendi yerel önbelleğini kullanır.
-    if model_dir:
-        kwargs["vl_rec_model_dir"] = model_dir
-
+    if orientation_model_dir.is_dir():
+        kwargs["doc_orientation_classify_model_dir"] = str(orientation_model_dir)
+    if unwarping_model_dir.is_dir():
+        kwargs["doc_unwarping_model_dir"] = str(unwarping_model_dir)
     pipeline = PaddleOCRVL(**kwargs)
     result = pipeline.predict(str(image_path))
 
