@@ -13,8 +13,7 @@ export const SCREEN_META:Record<ScreenId,{title:string;group:string;description:
  liquefaction:{title:'Sıvılaşma',group:'ANALİZ',description:'SPT, gerilme ve deprem girdileri kaynaklarıyla birlikte katman bazında değerlendirilir.'},
  foundation:{title:'Temel Tasarımı',group:'TASARIM',description:'Geometri, yükler ve zemin tepkisi aynı tasarım nesnesi üzerinden kontrol edilir.'},
  'jet-grout':{title:'Jet Grout',group:'TASARIM',description:'Kolon geometrisi, malzeme dayanımı, düzen ve yük paylaşımı proje deneyleriyle ilişkilendirilir.'},
- report:{title:'Mühendislik Raporu',group:'RAPOR',description:'Girdi → yöntem → ara hesap → sonuç → kontrol zincirini okunaklı rapor sayfalarına dönüştürür.'},
- 'ocr-settings':{title:'OCR / İnternet Ayarları',group:'ARAÇLAR',description:'OCR ve internet bağlantısı durumunu yönetin.'}
+ report:{title:'Mühendislik Raporu',group:'RAPOR',description:'Girdi → yöntem → ara hesap → sonuç → kontrol zincirini okunaklı rapor sayfalarına dönüştürür.'}
 }
 export function Frame({screen,children}:{screen:ScreenId;children:ReactNode}){const m=SCREEN_META[screen];return <section className="engineering-screen"><header className="engineering-header"><div><div className="engineering-header-category">{m.group}</div><h2>{m.title}</h2></div></header><div className="engineering-content">{children}</div></section>}
 export function Field({label,value,onChange,type='number'}:{label:string;value:string|number|undefined;onChange:(v:string)=>void;type?:string}){return <label><span>{label}</span><input type={type} value={value??''} onChange={e=>onChange(e.target.value)}/></label>}
