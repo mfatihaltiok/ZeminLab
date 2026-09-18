@@ -12,12 +12,31 @@ def result_to_dict(result):
         value = value()
     if isinstance(value, str):
         try:
-            return json.loads(value)
+            value = json.loads(value)
         except json.JSONDecodeError:
             return {}
-    if isinstance(value, dict):
-        return value
-    return {}
+    if not isinstance(value, dict):
+        return {}
+
+    # PaddleOCR 3.x pipeline sonuçları çoğunlukla {"res": {...}}
+    # biçiminde gelir. Önceki kod dış sarmalı açmadığı için OCR gerçekten
+    # metin bulsa bile ZeminLab'a boş liste gönderiyordu.
+    data = value.get("res")
+    if isinstance(data, dict):
+        return data
+
+    return value
+
+
+def _as_list(value):
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    try:
+        return value.tolist()
+    except AttributeError:
+        return [value]
 
 
 def main() -> int:
@@ -41,6 +60,7 @@ def main() -> int:
     os.environ["PYTHONNOUSERSITE"] = "1"
 
     import numpy as np
+
     if not hasattr(np, "long"):
         np.long = np.int64
     if not hasattr(np, "int"):
@@ -58,8 +78,6 @@ def main() -> int:
             "resources/python-runtime ve PaddleOCR paketini içermelidir."
         ) from error
 
-    # Evrensel taban: yalnızca CPU. Böylece hedef bilgisayarın GPU/CUDA
-    # markası veya sürümü OCR'un çalışması için gerekli değildir.
     cpu_threads = max(1, min(8, os.cpu_count() or 1))
 
     try:
@@ -67,10 +85,13 @@ def main() -> int:
             lang="tr",
             ocr_version="PP-OCRv5",
             device="cpu",
-            use_doc_orientation_classify=True,
-            use_doc_unwarping=True,
+            # SPT ekran görüntülerinde belge düzeltme metni bozabilir.
+            # PP-OCRv5 dokümantasyonu da yardımcı ön işlemlerin her zaman
+            # doğruluğu artırmadığını belirtiyor.
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
             use_textline_orientation=True,
-            text_det_limit_side_len=2048,
+            text_det_limit_side_len=4096,
             text_det_limit_type="max",
             enable_mkldnn=True,
             cpu_threads=cpu_threads,
@@ -86,12 +107,14 @@ def main() -> int:
         data = result_to_dict(item)
         structured.append(data)
 
-        texts = data.get("rec_texts") or data.get("text") or []
-        scores = data.get("rec_scores") or []
-        boxes = data.get("rec_boxes") or data.get("rec_polys") or []
+        texts = _as_list(data.get("rec_texts"))
+        if not texts:
+            texts = _as_list(data.get("text"))
 
-        if isinstance(texts, str):
-            texts = [texts]
+        scores = _as_list(data.get("rec_scores"))
+        boxes = _as_list(data.get("rec_boxes"))
+        if not boxes:
+            boxes = _as_list(data.get("rec_polys"))
 
         for index, text in enumerate(texts):
             text = str(text).strip()
@@ -106,14 +129,19 @@ def main() -> int:
                     score = None
 
             box = boxes[index] if index < len(boxes) else None
-            lines.append({
-                "text": text,
-                "score": score,
-                "box": box,
-            })
+            lines.append(
+                {
+                    "text": text,
+                    "score": score,
+                    "box": box,
+                }
+            )
 
-    if not lines and not structured:
-        raise RuntimeError("PaddleOCR görüntüyü işledi ancak okunabilir sonuç üretmedi.")
+    if not lines:
+        raise RuntimeError(
+            "PaddleOCR çalıştı ancak metin satırı çıkaramadı. "
+            "Girdi görselinin çözünürlüğünü ve kırpmasını kontrol edin."
+        )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
