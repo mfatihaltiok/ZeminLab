@@ -67,6 +67,14 @@ def main() -> int:
     PaddleOCRVL = load_paddleocr_vl()
 
     model_dir = os.environ.get("ZEMINLAB_PADDLEOCR_VL_MODEL", "").strip()
+    if not model_dir:
+        for candidate in (
+            Path(__file__).resolve().parent.parent / "resources" / "paddleocr-vl-0.9b",
+            Path(__file__).resolve().parent / "paddleocr-vl-0.9b",
+        ):
+            if candidate.is_dir():
+                model_dir = str(candidate)
+                break
     kwargs = {
         "pipeline_version": "v1",
         "use_doc_orientation_classify": True,
