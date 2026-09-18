@@ -53,8 +53,9 @@ export function Settlement({ boreholes = [] }: { boreholes?: BoreholeRecord[] })
   const soilType = b && s.finesContent >= 15 ? 'sand-with-fines' : 'sand'
   const correlationId = defaultElasticModulusMethod(soilType)
   const correlation = derived ? estimateElasticModulus(correlationId, derived.n60) : undefined
-  const q = finite(f.verticalLoad) && finite(f.footingWidth) && finite(f.footingLength)
-    ? forceToBase(f.verticalLoad, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
+  const verticalLoad = f.structuralWeight
+  const q = finite(verticalLoad) && finite(f.footingWidth) && finite(f.footingLength)
+    ? forceToBase(verticalLoad, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
     : 0
   const Es = correlation ? correlation.value * 98.0665 : 0
   const ready = !!correlation && q > 0 && f.footingWidth > 0
@@ -174,8 +175,9 @@ export function Liquefaction({ boreholes = [], labs = [] }: { boreholes?: Boreho
 export function Foundation() {
   const p = useProjectInfo()
   const f = p.foundationParameters
-  const ready = finite(f.footingWidth) && finite(f.footingLength) && finite(f.verticalLoad)
-  const r = ready ? foundationChecks({ B: f.footingWidth, L: f.footingLength, N: forceToBase(f.verticalLoad, p.unitSystem), V: forceToBase(f.horizontalLoad, p.unitSystem), Mx: forceToBase(f.momentX, p.unitSystem), My: forceToBase(f.momentY, p.unitSystem) }) : undefined
+  const verticalLoad = f.structuralWeight
+  const ready = finite(f.footingWidth) && finite(f.footingLength) && finite(verticalLoad)
+  const r = ready ? foundationChecks({ B: f.footingWidth, L: f.footingLength, N: forceToBase(verticalLoad, p.unitSystem), V: forceToBase(f.horizontalLoad, p.unitSystem), Mx: forceToBase(f.momentX, p.unitSystem), My: forceToBase(f.momentY, p.unitSystem) }) : undefined
   return (
     <Frame screen="foundation">
       <Source>{SOURCE_NOTES.foundation}</Source>
