@@ -76,8 +76,8 @@ def main() -> int:
     # Setup paketine model konduğunda tamamen offline çalışır.
     # Model yolu verilmezse PaddleOCR kendi yerel önbelleğini kullanır.
     if model_dir:
-        kwargs["vl_rec_backend"] = "vllm"
-        kwargs["vl_rec_server_url"] = model_dir
+        kwargs["vl_rec_model_dir"] = model_dir
+        kwargs["vl_rec_backend"] = "transformers"
 
     pipeline = PaddleOCRVL(**kwargs)
     result = pipeline.predict(str(image_path))
