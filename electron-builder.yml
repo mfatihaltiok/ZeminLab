@@ -14,6 +14,7 @@ asarUnpack:
   - python-runtime/**
   - tools/document_intelligence.py
   - resources/paddleocr-v5/**
+  - resources/docling/**
 win:
   executableName: ZeminLab
 nsis:
