@@ -11,23 +11,42 @@ const projectOpenFilter=[{name:'ZeminLab Projesi',extensions:['zlproj','zlab']}]
 const pdfFilter=[{name:'PDF Belgesi',extensions:['pdf']}]
 const PROJECT_SCHEMA_VERSION=2
 const execFileAsync=promisify(execFile)
+
 async function runLocalPaddleOcr(dataUrl:string){
   const match=/^data:image\/(png|jpeg|jpg);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl)
   if(!match)throw new Error('OCR için yalnızca PNG veya JPG görseli kabul edilir.')
+
   const root=app.isPackaged?process.resourcesPath:app.getAppPath()
-  const pythonCandidates=[process.env.ZEMINLAB_PYTHON,join(root,'python-runtime','Scripts','python.exe'),join(root,'python-runtime','bin','python'),'python'].filter((x):x is string=>Boolean(x))
-  const runnerCandidates=[join(root,'tools','paddleocr_runner.py'),join(process.resourcesPath,'tools','paddleocr_runner.py')]
-  const runner=runnerCandidates.find(x=>existsSync(x))
-  if(!runner)throw new Error('Yerel PaddleOCR çalıştırıcısı bulunamadı: tools/paddleocr_runner.py')
-  const python=pythonCandidates.find(x=>x==='python'||existsSync(x))
-  if(!python)throw new Error('Yerel Python runtime bulunamadı. Kurulum paketinin python-runtime klasörünü kontrol edin.')
+  const python=join(root,'python-runtime','python.exe')
+  const runner=join(root,'tools','paddleocr_runner.py')
+  const modelRoot=join(root,'resources','paddleocr-vl-v1')
+
+  if(!existsSync(python)){
+    throw new Error('ZeminLab yerel Python runtime bulunamadı. Kurulumun resources/python-runtime klasörünü içerdiğini kontrol edin.')
+  }
+  if(!existsSync(runner)){
+    throw new Error('Yerel PaddleOCR çalıştırıcısı bulunamadı: tools/paddleocr_runner.py')
+  }
+  if(!existsSync(join(modelRoot,'PaddleOCR-VL'))){
+    throw new Error('PaddleOCR-VL yerel model paketi bulunamadı. Kurulumun resources/paddleocr-vl-v1 klasörünü içerdiğini kontrol edin.')
+  }
+
   const tempRoot=join(app.getPath('temp'),'zeminlab-ocr')
   await fs.mkdir(tempRoot,{recursive:true})
   const token=Date.now().toString(36)+Math.random().toString(36).slice(2,8)
   const inputPath=join(tempRoot,token+'.png'),outputPath=join(tempRoot,token+'.json')
+
   try{
     await fs.writeFile(inputPath,Buffer.from(match[2],'base64'))
-    await execFileAsync(python,[runner,'--input',inputPath,'--output',outputPath],{windowsHide:true,maxBuffer:20*1024*1024})
+    await execFileAsync(python,[runner,'--input',inputPath,'--output',outputPath],{
+      windowsHide:true,
+      maxBuffer:20*1024*1024,
+      env:{
+        ...process.env,
+        PYTHONNOUSERSITE:'1',
+        PYTHONPATH:'',
+      },
+    })
     const result=JSON.parse(await fs.readFile(outputPath,'utf8')) as {ok?:boolean;provider?:string;lines?:Array<{text:string;score?:number|null;box?:unknown}>;error?:string}
     if(!result.ok)throw new Error(result.error||'PaddleOCR başarısız oldu.')
     return result
@@ -92,7 +111,7 @@ app.whenReady().then(()=>{
   ipcMain.handle('report:export-pdf',async event=>{
     const window=BrowserWindow.fromWebContents(event.sender)
     if(!window)return null
-    const result=await dialog.showSaveDialog(window,{title:'Mühendislik Raporunu PDF Olarak Kaydet',defaultPath:'ZeminLab-Muhendislik-Raporu.pdf',filters:pdfFilter})
+    const result=await dialog.showSaveDialog(window,{title:'Mühendislik Raporunu PDF Olarak Kaydet',defaultPath:'ZeminLab-Mühendislik-Raporu.pdf',filters:pdfFilter})
     if(result.canceled||!result.filePath)return null
     const pdf=await window.webContents.printToPDF({landscape:false,pageSize:'A4',printBackground:true,displayHeaderFooter:false,margins:{top:0,bottom:0,left:0,right:0}})
     const filePath=result.filePath.endsWith('.pdf')?result.filePath:`${result.filePath}.pdf`
