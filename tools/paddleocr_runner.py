@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 
@@ -29,6 +30,12 @@ def main() -> int:
     output_path = Path(args.output).resolve()
     if not image_path.is_file():
         raise FileNotFoundError(f"Görsel bulunamadı: {image_path}")
+
+    model_root = Path(__file__).resolve().parent.parent / "resources" / "paddleocr-vl-v1"
+    os.environ["PADDLE_PDX_CACHE_HOME"] = str(model_root)
+    os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "1"
+    os.environ["PADDLE_PDX_OFFLINE"] = "1"
+    os.environ["PYTHONNOUSERSITE"] = "1"
 
     try:
         from paddleocr import PaddleOCRVL
