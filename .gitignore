@@ -4,3 +4,5 @@ out
 .DS_Store
 .eslintcache
 *.log*
+resources/python-runtime/
+resources/paddleocr-vl-v1/
