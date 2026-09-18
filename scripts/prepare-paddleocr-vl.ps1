@@ -49,7 +49,6 @@ $env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "1"
 $bootstrap = @'
 from paddleocr import PaddleOCRVL
 pipeline = PaddleOCRVL(
-    pipeline_version="v1",
     use_doc_orientation_classify=True,
     use_doc_unwarping=True,
     use_layout_detection=True,
