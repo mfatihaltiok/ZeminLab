@@ -175,37 +175,77 @@ export function Liquefaction({ boreholes = [], labs = [] }: { boreholes?: Boreho
 export function Foundation() {
   const p = useProjectInfo()
   const f = p.foundationParameters
-  const verticalLoad = f.structuralWeight
-  const ready = finite(f.footingWidth) && finite(f.footingLength) && finite(verticalLoad)
-  const r = ready ? foundationChecks({ B: f.footingWidth, L: f.footingLength, N: forceToBase(verticalLoad, p.unitSystem), V: forceToBase(f.horizontalLoad, p.unitSystem), Mx: forceToBase(f.momentX, p.unitSystem), My: forceToBase(f.momentY, p.unitSystem) }) : undefined
+  const structuralWeight = forceToBase(f.structuralWeight, p.unitSystem)
+  const vtx = forceToBase(f.vtX, p.unitSystem)
+  const vty = forceToBase(f.vtY, p.unitSystem)
+  const ready = f.footingWidth > 0 && f.footingLength > 0 && structuralWeight > 0
+  const r = ready
+    ? foundationChecks({
+        B: f.footingWidth,
+        L: f.footingLength,
+        N: structuralWeight,
+        Vx: vtx,
+        Vy: vty,
+        Mx: 0,
+        My: 0
+      })
+    : undefined
+
   return (
     <Frame screen="foundation">
       <Source>{SOURCE_NOTES.foundation}</Source>
       {!ready ? (
-        <Card title="TEMEL VERİSİ BEKLENİYOR"><div className="inline-empty">Geometri ve yükler Proje Bilgileri / temel tanımından bağlanmalıdır.</div></Card>
+        <Card title="TEMEL VERİSİ BEKLENİYOR">
+          <div className="inline-empty">
+            Temel genişliği, temel uzunluğu ve G+Q yapı ağırlığı Proje Bilgileri ekranından girilmelidir.
+          </div>
+        </Card>
       ) : (
         <>
           <div className="metric-strip">
-            <Metric label="eX" value={r!.ex.toFixed(3)} unit="m" />
-            <Metric label="eY" value={r!.ey.toFixed(3)} unit="m" />
-            <Metric label="qort" value={stressFromBase(r!.qAvg, p.unitSystem).toFixed(3)} unit={PROJECT_UNIT_LABELS.stress} />
-            <Metric label="qmax" value={stressFromBase(r!.qMax, p.unitSystem).toFixed(3)} unit={PROJECT_UNIT_LABELS.stress} />
-            <Metric label="qmin" value={stressFromBase(r!.qMin, p.unitSystem).toFixed(3)} unit={PROJECT_UNIT_LABELS.stress} />
+            <Metric label="B" value={f.footingWidth.toFixed(2)} unit="m" />
+            <Metric label="L" value={f.footingLength.toFixed(2)} unit="m" />
+            <Metric label="G+Q" value={structuralWeight.toFixed(2)} unit="kN" />
+            <Metric label="Vtx" value={vtx.toFixed(2)} unit="kN" />
+            <Metric label="Vty" value={vty.toFixed(2)} unit="kN" />
           </div>
-          <CalculationTrace title="Temel gerilme ve eksantriklik hesabı" source={SOURCE_NOTES.foundation} rows={[
-            { symbol: 'eₓ', title: 'Eksantriklik', formula: 'eₓ = Mᵧ / N', value: r!.ex, unit: 'm' },
-            { symbol: 'eᵧ', title: 'Eksantriklik', formula: 'eᵧ = Mₓ / N', value: r!.ey, unit: 'm' },
-            { symbol: 'q̄', title: 'Ortalama taban gerilmesi', formula: 'q̄ = N / (B·L)', value: stressFromBase(r!.qAvg, p.unitSystem), unit: PROJECT_UNIT_LABELS.stress },
-            { symbol: 'qmax', title: 'Maksimum taban gerilmesi', formula: 'qmax = q̄[1 + 6eₓ/L + 6eᵧ/B]', value: stressFromBase(r!.qMax, p.unitSystem), unit: PROJECT_UNIT_LABELS.stress },
-            { symbol: 'qmin', title: 'Minimum taban gerilmesi', formula: 'qmin = q̄[1 − 6eₓ/L − 6eᵧ/B]', value: stressFromBase(r!.qMin, p.unitSystem), unit: PROJECT_UNIT_LABELS.stress },
-            { symbol: 'FSv', title: 'Kayma güvenliği', formula: 'FS = R / V', value: r!.slidingFS }
-          ]} />
+
+          <Card title="YATAYDA KAYMA KONTROLÜ · TBDY 2018 16.8.4">
+            <div className="metric-strip">
+              <Metric label="Rth,X" value={r!.slidingCapacityX.toFixed(2)} unit="kN" />
+              <Metric label="Rth,Y" value={r!.slidingCapacityY.toFixed(2)} unit="kN" />
+              <Metric label="ηX" value={r!.slidingUtilizationX.toFixed(3)} />
+              <Metric label="ηY" value={r!.slidingUtilizationY.toFixed(3)} />
+              <Metric label="tanδ" value={r!.slidingTanDelta.toFixed(2)} />
+              <Metric label="γRh" value={r!.slidingResistanceFactor.toFixed(2)} />
+            </div>
+            <div className="inline-empty">
+              X doğrultusu: {r!.slidingSafeX ? 'YETERLİ' : 'YETERSİZ'} · Y doğrultusu: {r!.slidingSafeY ? 'YETERLİ' : 'YETERSİZ'}
+            </div>
+          </Card>
+
+          <CalculationTrace
+            title="Temel gerilmesi ve yatay kayma hesap zinciri"
+            source={SOURCE_NOTES.foundation}
+            rows={[
+              { symbol: 'q̄', title: 'Ortalama taban gerilmesi', formula: 'q̄ = N / (B·L)', value: stressFromBase(r!.qAvg, p.unitSystem), unit: PROJECT_UNIT_LABELS.stress },
+              { symbol: 'Rth,X', title: 'X doğrultusu tasarım sürtünme direnci', formula: 'Rth = Ptv·tanδ / γRh', value: r!.slidingCapacityX, unit: 'kN' },
+              { symbol: 'Rth,Y', title: 'Y doğrultusu tasarım sürtünme direnci', formula: 'Rth = Ptv·tanδ / γRh', value: r!.slidingCapacityY, unit: 'kN' },
+              { symbol: 'ηX', title: 'X doğrultusu kayma oranı', formula: 'ηX = |Vtx| / Rth,X', value: r!.slidingUtilizationX },
+              { symbol: 'ηY', title: 'Y doğrultusu kayma oranı', formula: 'ηY = |Vty| / Rth,Y', value: r!.slidingUtilizationY }
+            ]}
+          />
+
+          {r!.warnings.length > 0 && (
+            <Card title="HESAP NOTLARI">
+              <div className="inline-empty">{r!.warnings.join(' ')}</div>
+            </Card>
+          )}
         </>
       )}
     </Frame>
   )
 }
-
 export function JetGrout() {
   const [d, setD] = useState('')
   const [spacing, setSpacing] = useState('')
