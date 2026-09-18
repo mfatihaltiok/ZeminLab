@@ -29,8 +29,8 @@ async function runLocalPaddleOcr(dataUrl:string){
   if(!existsSync(runner)){
     throw new Error('Yerel PaddleOCR çalıştırıcısı bulunamadı: tools/paddleocr_runner.py')
   }
-  if(!existsSync(join(modelRoot,'PaddleOCR-VL'))){
-    throw new Error('PaddleOCR-VL yerel model paketi bulunamadı. Kurulumun resources/paddleocr-vl-v1 klasörünü içerdiğini kontrol edin.')
+  if(!existsSync(join(modelRoot,'zeminlab-ocr-runtime.ready'))){
+    throw new Error('Yerel PaddleOCR runtime paketi bulunamadı. Kurulumun OCR runtime paketini içerdiğini kontrol edin.')
   }
 
   const tempRoot=join(app.getPath('temp'),'zeminlab-ocr')
