@@ -106,7 +106,7 @@ export function foundationChecks(i:FoundationInput){
      contactRatio:qMin>=0?1:Math.max(0,1-6*Math.abs(ex)/i.L)*Math.max(0,1-6*Math.abs(ey)/i.B),
      slidingFS,
      slidingCapacityX,slidingCapacityY,slidingUtilizationX,slidingUtilizationY,slidingSafeX,slidingSafeY,
-     slidingResistanceFactor:rh,slidingTanDelta:deltaTan
+     slidingResistanceFactor:rh,slidingTanDelta:deltaTan,warnings
    },
    steps:[
      {symbol:'ex',title:'Eksantriklik',formula:'ex=My/N',value:ex,unit:'m'},
