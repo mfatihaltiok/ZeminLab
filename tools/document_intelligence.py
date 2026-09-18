@@ -73,16 +73,18 @@ def _run_paddle(image_path: Path, model_root: Path) -> tuple[list[dict[str, Any]
     from paddleocr import PaddleOCR
 
     pipeline = PaddleOCR(
-        lang="tr",
-        ocr_version="PP-OCRv5",
-        device="cpu",
+        text_detection_model_name="PP-OCRv5_mobile_det",
+        text_detection_model_dir=str(model_root / "models" / "det"),
+        text_recognition_model_name="latin_PP-OCRv5_mobile_rec",
+        text_recognition_model_dir=str(model_root / "models" / "rec"),
         use_doc_orientation_classify=False,
         use_doc_unwarping=False,
-        use_textline_orientation=True,
+        use_textline_orientation=False,
         text_det_limit_side_len=4096,
         text_det_limit_type="max",
         enable_mkldnn=True,
         cpu_threads=max(1, min(8, os.cpu_count() or 1)),
+        device="cpu",
     )
 
     lines: list[dict[str, Any]] = []
