@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 def result_to_dict(result):
-    value = getattr(result, 'json', None)
+    value = getattr(result, "json", None)
     if callable(value):
         value = value()
     if isinstance(value, str):
@@ -19,95 +19,107 @@ def result_to_dict(result):
             return {}
     if isinstance(value, dict):
         return value
-    if isinstance(result, dict):
-        return result
     return {}
 
 
-def load_paddleocr():
+def load_paddleocr_vl():
     try:
-        from paddleocr import PaddleOCR
-        return PaddleOCR
+        from paddleocr import PaddleOCRVL
+        return PaddleOCRVL
     except ModuleNotFoundError as error:
-        if error.name != 'paddleocr':
+        if error.name != "paddleocr":
             raise
 
-    # Development bootstrap only. The previous implementation used the
-    # Paddle CPU index exclusively. On some Windows/Python 3.12 environments
-    # that index can return "No matching distribution", even though the same
-    # Windows cp312 wheel is published on PyPI. Try the official index first,
-    # then PyPI as a fallback.
     commands = [
         [
-            sys.executable, '-m', 'pip', 'install',
-            'paddlepaddle==3.2.0',
-            'paddleocr',
-            '-i', 'https://www.paddlepaddle.org.cn/packages/stable/cpu/',
-        ],
-        [
-            sys.executable, '-m', 'pip', 'install',
-            'paddlepaddle==3.2.0',
-            'paddleocr',
-            '--index-url', 'https://pypi.org/simple',
-        ],
+            sys.executable, "-m", "pip", "install",
+            "-U", "paddleocr[doc-parser]",
+            "paddlepaddle>=3.2.1",
+            "--index-url", "https://pypi.org/simple",
+        ]
     ]
 
     last_error = None
     for command in commands:
         try:
             subprocess.check_call(command)
-            from paddleocr import PaddleOCR
-            return PaddleOCR
+            from paddleocr import PaddleOCRVL
+            return PaddleOCRVL
         except subprocess.CalledProcessError as error:
             last_error = error
 
     raise RuntimeError(
-        'PaddleOCR kurulamadı. Önce resmi Paddle CPU deposu, ardından PyPI denendi.'
+        "PaddleOCR-VL kurulamadı. PaddlePaddle >=3.2.1 ve paddleocr[doc-parser] kurulumu başarısız."
     ) from last_error
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', required=True)
-    parser.add_argument('--output', required=True)
+    parser.add_argument("--input", required=True)
+    parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
     image_path = Path(args.input).resolve()
     output_path = Path(args.output).resolve()
     if not image_path.is_file():
-        raise FileNotFoundError(f'Görsel bulunamadı: {image_path}')
+        raise FileNotFoundError(f"Görsel bulunamadı: {image_path}")
 
-    PaddleOCR = load_paddleocr()
+    PaddleOCRVL = load_paddleocr_vl()
 
-    device = os.environ.get('ZEMINLAB_OCR_DEVICE', 'cpu')
-    ocr = PaddleOCR(
-        lang='tr',
-        device=device,
-        use_doc_orientation_classify=True,
-        use_doc_unwarping=True,
-        use_textline_orientation=True,
-    )
-    result = ocr.predict(str(image_path))
+    model_dir = os.environ.get("ZEMINLAB_PADDLEOCR_VL_MODEL", "").strip()
+    kwargs = {
+        "use_doc_orientation_classify": True,
+        "use_doc_unwarping": True,
+        "use_layout_detection": True,
+    }
+
+    # Setup paketine model konduğunda tamamen offline çalışır.
+    # Model yolu verilmezse PaddleOCR kendi yerel önbelleğini kullanır.
+    if model_dir:
+        kwargs["vl_rec_backend"] = "vllm"
+        kwargs["vl_rec_server_url"] = model_dir
+
+    pipeline = PaddleOCRVL(**kwargs)
+    result = pipeline.predict(str(image_path))
+
     lines = []
+    structured = []
     for item in result:
         data = result_to_dict(item)
-        texts = data.get('rec_texts') or []
-        scores = data.get('rec_scores') or []
-        boxes = data.get('rec_boxes') or data.get('rec_polys') or []
+        structured.append(data)
+
+        texts = data.get("rec_texts") or data.get("text") or []
+        scores = data.get("rec_scores") or []
+        boxes = data.get("rec_boxes") or data.get("rec_polys") or []
+
+        if isinstance(texts, str):
+            texts = [texts]
+
         for index, text in enumerate(texts):
             text = str(text).strip()
             if not text:
                 continue
             score = float(scores[index]) if index < len(scores) else None
             box = boxes[index] if index < len(boxes) else None
-            lines.append({'text': text, 'score': score, 'box': box})
+            lines.append({"text": text, "score": score, "box": box})
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        json.dumps({'ok': True, 'provider': 'paddleocr-local', 'lines': lines}, ensure_ascii=False, indent=2),
-        encoding='utf-8',
+        json.dumps(
+            {
+                "ok": True,
+                "provider": "paddleocr-vl-0.9b-local",
+                "model": "PaddleOCR-VL-0.9B",
+                "lines": lines,
+                "structured": structured,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
     )
+    return 0
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    raise SystemExit(main())
