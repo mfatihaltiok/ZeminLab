@@ -17,7 +17,7 @@ if (Test-Path $doclingRoot) { Remove-Item -Recurse -Force $doclingRoot }
 New-Item -ItemType Directory -Force -Path $runtimeRoot,$paddleRoot,$doclingRoot | Out-Null
 
 $zipPath = Join-Path $tempRoot $pythonZip
-Write-Host "1/5 Bundled Python hazırlanıyor..."
+Write-Host "1/6 Bundled Python hazırlanıyor..."
 Invoke-WebRequest -Uri $pythonUrl -OutFile $zipPath
 Expand-Archive -Path $zipPath -DestinationPath $runtimeRoot -Force
 
@@ -35,22 +35,29 @@ Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
 & $runtimePython $getPip --disable-pip-version-check --no-warn-script-location
 if ($LASTEXITCODE -ne 0) { throw "Bundled Python pip kurulumu başarısız." }
 
-Write-Host "2/5 PaddleOCR PP-OCRv5 kuruluyor..."
+Write-Host "2/6 PaddleOCR PP-OCRv5 kuruluyor..."
 $paddlePackages = @("numpy==1.26.4","scipy==1.13.1","scikit-learn==1.7.1","paddleocr==3.3.2","paddlepaddle==3.2.2")
 & $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location $paddlePackages
 if ($LASTEXITCODE -ne 0) { throw "PaddleOCR runtime kurulumu başarısız." }
 
-Write-Host "3/5 Docling belge yapısı motoru kuruluyor..."
+Write-Host "3/6 Docling belge yapısı motoru kuruluyor..."
 & $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location "docling==2.128.0"
 if ($LASTEXITCODE -ne 0) { throw "Docling kurulumu başarısız." }
 
-Write-Host "4/5 Yalnızca gerekli Docling layout + table modelleri indiriliyor..."
+Write-Host "4/6 Yalnızca gerekli Docling layout + table modelleri indiriliyor..."
 $env:DOCLING_ARTIFACTS_PATH = $doclingRoot
 $doclingTools = Join-Path $runtimeRoot "Scripts\docling-tools.exe"
 & $doclingTools models download layout tableformer -o $doclingRoot
 if ($LASTEXITCODE -ne 0) { throw "Docling modelleri indirilemedi." }
 
-Write-Host "5/6 PaddleOCR modelleri yerel cache içine indiriliyor..."\n$env:PADDLE_PDX_CACHE_HOME = $paddleRoot\n$env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "1"\n$env:PYTHONNOUSERSITE = "1"\n& $runtimePython -c "from paddleocr import PaddleOCR; PaddleOCR(lang=\"tr\", ocr_version=\"PP-OCRv5\", device=\"cpu\", use_doc_orientation_classify=False, use_doc_unwarping=False, use_textline_orientation=True, text_det_limit_side_len=4096, text_det_limit_type=\"max\", enable_mkldnn=True)"\nif ($LASTEXITCODE -ne 0) { throw "PP-OCRv5 modelleri yerel cache içine indirilemedi." }\n\nWrite-Host "6/6 Offline runtime doğrulanıyor..."
+Write-Host "5/6 PaddleOCR modelleri yerel cache içine indiriliyor..."
+$env:PADDLE_PDX_CACHE_HOME = $paddleRoot
+$env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "1"
+$env:PYTHONNOUSERSITE = "1"
+& $runtimePython -c "from paddleocr import PaddleOCR; PaddleOCR(lang=\"tr\", ocr_version=\"PP-OCRv5\", device=\"cpu\", use_doc_orientation_classify=False, use_doc_unwarping=False, use_textline_orientation=True, text_det_limit_side_len=4096, text_det_limit_type=\"max\", enable_mkldnn=True)"
+if ($LASTEXITCODE -ne 0) { throw "PP-OCRv5 modelleri yerel cache içine indirilemedi." }
+
+Write-Host "6/6 Offline runtime doğrulanıyor..."
 $env:PADDLE_PDX_CACHE_HOME = $paddleRoot
 $env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "1"
 $env:PADDLE_PDX_OFFLINE = "1"
