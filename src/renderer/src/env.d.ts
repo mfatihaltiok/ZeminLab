@@ -5,24 +5,13 @@ declare global {
     api: {
       project: {
         save(payload: unknown, currentPath?: string): Promise<string | null>
+        saveAs(payload: unknown, currentPath?: string): Promise<string | null>
         open(): Promise<{ filePath: string; data: unknown; version: number } | null>
       }
-      ocr: {
-        analyzeImage(dataUrl: string): Promise<{
-          ok: boolean
-          provider?: string
-          engines?: { ocr?: string; layout_table?: string }
-          lines?: Array<{ text: string; score?: number | null; box?: unknown }>
-          structured?: unknown[]
-          document?: { text?: string; tables?: unknown[]; pages?: number }
-          warnings?: { paddle?: string | null; docling?: string | null }
-          policy?: {
-            no_guessing?: boolean
-            requires_user_review?: boolean
-            reject_ambiguous_values?: boolean
-          }
-          error?: string
-        }>
+      fieldCache: {
+        saveBoreholes(payload: unknown): Promise<{ cachePath: string; savedAt: string }>
+        saveLaboratories(payload: unknown): Promise<{ cachePath: string; savedAt: string }>
+        load(): Promise<{ boreholes?: unknown; laboratories?: unknown; savedAt?: string } | null>
       }
       report: {
         print(): Promise<boolean>
@@ -36,5 +25,4 @@ declare global {
     }
   }
 }
-
 export {}
