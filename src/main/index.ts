@@ -8,6 +8,7 @@ const projectSaveFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
 const projectOpenFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
 const pdfFilter=[{name:'PDF Belgesi',extensions:['pdf']}]
 const PROJECT_SCHEMA_VERSION=1
+const FIELD_CACHE_SCHEMA_VERSION=1
 
 function createWindow():void{
   const mainWindow=new BrowserWindow({
@@ -25,19 +26,32 @@ app.whenReady().then(()=>{
   electronApp.setAppUserModelId('com.faluzmn.app')
   app.on('browser-window-created',(_,window)=>optimizer.watchWindowShortcuts(window))
 
-  ipcMain.handle('project:save',async(_event,payload:unknown,currentPath?:string)=>{
-    let filePath=currentPath
-    if(!filePath){
-      const result=await dialog.showSaveDialog({title:'FALUZMN Projesini Kaydet',defaultPath:'Yeni Proje.falu',filters:projectSaveFilter})
-      if(result.canceled||!result.filePath)return null
-      filePath=result.filePath.endsWith('.falu')?result.filePath:`${result.filePath}.falu`
-    }
+  const writeProjectFile=async(filePath:string,payload:unknown)=>{
     const envelope={format:'FALUZMN',version:PROJECT_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:payload}
     await fs.writeFile(filePath,JSON.stringify(envelope,null,2),'utf8')
     return filePath
+  }
+
+  const chooseProjectSavePath=async(title:string,defaultPath:string)=>{
+    const result=await dialog.showSaveDialog({title,defaultPath,filters:projectSaveFilter})
+    if(result.canceled||!result.filePath)return null
+    return result.filePath.toLowerCase().endsWith('.falu')?result.filePath:`${result.filePath}.falu`
+  }
+
+  ipcMain.handle('project:save',async(_event,payload:unknown,currentPath?:string)=>{
+    const filePath=currentPath??await chooseProjectSavePath('FALUZMN Projesini Kaydet','Yeni Proje.falu')
+    if(!filePath)return null
+    return await writeProjectFile(filePath,payload)
   })
 
-  ipcMain.handle('project:open',async()=>{
+  ipcMain.handle('project:save-as',async(_event,payload:unknown,currentPath?:string)=>{
+    const defaultName=currentPath?currentPath.split(/[\\/]/).pop()??'Yeni Proje.falu':'Yeni Proje.falu'
+    const filePath=await chooseProjectSavePath('FALUZMN Projesini Farklı Kaydet',defaultName)
+    if(!filePath)return null
+    return await writeProjectFile(filePath,payload)
+  })
+
+  ipcMain.handle('project:open',,async()=>{
     const result=await dialog.showOpenDialog({title:'FALUZMN Projesi Aç',properties:['openFile'],filters:projectOpenFilter})
     if(result.canceled||!result.filePaths[0])return null
     const filePath=result.filePaths[0]
@@ -46,6 +60,24 @@ app.whenReady().then(()=>{
     if(envelope.format!=='FALUZMN'||typeof envelope.version!=='number'||envelope.data===undefined)throw new Error('Geçersiz veya desteklenmeyen FALUZMN proje dosyası.')
     if(envelope.version>PROJECT_SCHEMA_VERSION)throw new Error(`Bu proje dosyası daha yeni bir FALUZMN sürümüne ait (v${envelope.version}).`)
     return{filePath,data:envelope.data,version:envelope.version}
+  })
+
+  ipcMain.handle('field-cache:save',async(_event,payload:unknown)=>{
+    const cachePath=join(app.getPath('userData'),'FALUZMN-field-cache.json')
+    const envelope={format:'FALUZMN-FIELD-CACHE',version:FIELD_CACHE_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:payload}
+    await fs.mkdir(app.getPath('userData'),{recursive:true})
+    await fs.writeFile(cachePath,JSON.stringify(envelope,null,2),'utf8')
+    return {cachePath,savedAt:envelope.savedAt}
+  })
+
+  ipcMain.handle('field-cache:load',async()=>{
+    const cachePath=join(app.getPath('userData'),'FALUZMN-field-cache.json')
+    try{
+      const raw=await fs.readFile(cachePath,'utf8')
+      const envelope=JSON.parse(raw) as {format?:string;version?:number;data?:unknown;savedAt?:string}
+      if(envelope.format!=='FALUZMN-FIELD-CACHE'||envelope.version!==FIELD_CACHE_SCHEMA_VERSION)return null
+      return {data:envelope.data,savedAt:envelope.savedAt}
+    }catch{return null}
   })
 
   ipcMain.handle('report:print',async event=>{
