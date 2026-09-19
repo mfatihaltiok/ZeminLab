@@ -17,7 +17,7 @@ export interface SurfaceFoundationInput {
   L: number
   Df: number
   gamma1: number
-  gamma2: number
+  gamma2?: number
   c: number
   phi: number
   verticalLoad: number
@@ -91,7 +91,7 @@ function factors(phiDeg:number, method:SurfaceFoundationMethod){
 }
 
 function groundwater(Df:number,B:number,gammaNatural:number,gammaSat:number,gwt?:number){
-  const gs=Math.max(gammaSat-gammaW,0.001)
+  const gs=Math.max((finite(gammaSat)?gammaSat:gammaNatural)-gammaW,0.001)
   if(!finite(gwt)||gwt!<0)return{surcharge:gammaNatural*Df,gammaBelow:gammaNatural}
   if(gwt<=Df){
     return{surcharge:gammaNatural*Math.max(gwt,0)+gs*Math.max(Df-Math.max(gwt,0),0),gammaBelow:gs}
@@ -142,7 +142,8 @@ function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influen
 
 export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoundationResult{
   if(i.B<=0||i.L<=0||i.Df<0)throw new Error('Temel B ve L boyutları pozitif, Df negatif olmayan değer olmalıdır.')
-  if(i.gamma1<=0||i.gamma2<=0)throw new Error('γ ve γsat pozitif olmalıdır.')
+  if(i.gamma1<=0)throw new Error('γ doğal birim hacim ağırlığı pozitif olmalıdır.')
+  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=0))throw new Error('YASS tanımlandıysa γsat pozitif olmalıdır.')
   if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük ise negatif olamaz.')
   const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad,H=Math.abs(i.horizontalLoad??0)
   const warnings:string[]=[]
