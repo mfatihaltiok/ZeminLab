@@ -12,20 +12,17 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
-    "dev": "npm run ensure:document-intelligence && electron-vite dev",
+    "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
     "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && npm run prepare:document-intelligence && electron-builder --win",
+    "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
-    "postinstall": "electron-builder install-app-deps",
-    "prepare:document-intelligence": "powershell -ExecutionPolicy Bypass -File scripts/prepare-document-intelligence.ps1",
-    "ensure:document-intelligence": "powershell -ExecutionPolicy Bypass -File scripts/ensure-document-intelligence.ps1"
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
-    "@electron-toolkit/utils": "^4.0.0",
-    "pdfjs-dist": "6.3.289"
+    "@electron-toolkit/utils": "^4.0.0"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
