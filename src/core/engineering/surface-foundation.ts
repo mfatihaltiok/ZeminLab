@@ -90,7 +90,7 @@ function factors(phiDeg:number, method:SurfaceFoundationMethod){
   return {phi,t,Nq,Nc,Ngamma}
 }
 
-function groundwater(Df:number,B:number,gammaNatural:number,gammaSat:number,gwt?:number){
+function groundwater(Df:number,B:number,gammaNatural:number,gammaSat?:number,gwt?:number){
   const gs=Math.max((finite(gammaSat)?gammaSat:gammaNatural)-gammaW,0.001)
   if(!finite(gwt)||gwt!<0)return{surcharge:gammaNatural*Df,gammaBelow:gammaNatural}
   if(gwt<=Df){
