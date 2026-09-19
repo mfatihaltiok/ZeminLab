@@ -16,7 +16,7 @@ export const SCREEN_META:Record<ScreenId,{title:string;group:string;description:
  report:{title:'Mühendislik Raporu',group:'RAPOR',description:'Girdi → yöntem → ara hesap → sonuç → kontrol zincirini okunaklı rapor sayfalarına dönüştürür.'}
 }
 export function Frame({screen,children}:{screen:ScreenId;children:ReactNode}){const m=SCREEN_META[screen];return <section className="engineering-screen"><header className="engineering-header"><div><div className="engineering-header-category">{m.group}</div><h2>{m.title}</h2></div></header><div className="engineering-content">{children}</div></section>}
-export function Field({label,value,onChange,type='number'}:{label:string;value:string|number|undefined;onChange:(v:string)=>void;type?:string}){return <label><span>{label}title-separator">|</span><input type={type} value={value??''} onChange={e=>onChange(e.target.value)}/></label>}
+export function Field({label,value,onChange,type='number'}:{label:string;value:string|number|undefined;onChange:(v:string)=>void;type?:string}){return <label><span>{label}</span><input type={type} value={value??''} onChange={e=>onChange(e.target.value)}/></label>}
 export function Card({title,children}:{title:string;children:ReactNode}){return <div className="calculation-card"><div className="calculation-card-title">{title}</div>{children}</div>}
 export function Metric({label,value,unit,tone}:{label:string;value:string|number;unit?:string;tone?:string}){return <div className={`metric ${tone??''}`}><span>{label}</span><strong>{value}</strong>{unit&&<small>{unit}</small>}</div>}
 export function Source({children}:{children:ReactNode}){return <div className="engineering-note"><b>Kaynak / yöntem:</b> {children}</div>}
