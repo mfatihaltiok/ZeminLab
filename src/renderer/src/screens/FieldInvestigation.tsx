@@ -33,7 +33,7 @@ const LAB_NUMERIC: (keyof LaboratoryRecord)[] = [
 ]
 
 function fmt(v?: number, d = 2) { return v === undefined || !Number.isFinite(v) ? '—' : v.toFixed(d) }
-function sourceLabel(source: string, confirmed: boolean) { return confirmed ? 'Onaylandı' : source === 'image-review' ? 'Görsel inceleme' : source === 'imported' ? 'İçe aktarıldı' : 'Manuel' }
+function sourceLabel(source: string, confirmed: boolean) { return confirmed ? 'Onaylandı' : source === 'imported' ? 'İçe aktarıldı' : 'Manuel' }
 function experimentDepthTo(row: SptRecord) { return row.depthTo ?? row.depth + (row.testType === 'UD' ? 0.5 : 0.45) }
 
 function syncLabs(labs: LaboratoryRecord[], borehole: BoreholeRecord): LaboratoryRecord[] {
