@@ -6,10 +6,10 @@ import { promisify } from 'util'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
-const projectSaveFilter=[{name:'ZeminLab Projesi',extensions:['zlproj']}]
-const projectOpenFilter=[{name:'ZeminLab Projesi',extensions:['zlproj','zlab']}]
+const projectSaveFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
+const projectOpenFilter=[{name:'FALUZMN Projesi',extensions:['falu','zlproj','zlab']}]
 const pdfFilter=[{name:'PDF Belgesi',extensions:['pdf']}]
-const PROJECT_SCHEMA_VERSION=2
+const PROJECT_SCHEMA_VERSION=1
 const execFileAsync=promisify(execFile)
 
 async function runLocalDocumentIntelligence(dataUrl:string){
@@ -27,11 +27,11 @@ async function runLocalDocumentIntelligence(dataUrl:string){
   for(const [label,path] of [['Python',python],['Belge motoru',runner],['PP-OCRv5 modeli',paddleRoot],['Docling modelleri',doclingRoot]] as const){
     if(!existsSync(path))throw new Error(`Yerel ${label} bulunamadı. Kurulumun belge istihbarat paketini içerdiğini kontrol edin.`)
   }
-  if(!existsSync(join(paddleRoot,'zeminlab-document-intelligence.ready'))){
+  if(!existsSync(join(paddleRoot,'faluzmn-document-intelligence.ready'))){
     throw new Error('Yerel belge istihbarat runtime doğrulama işareti bulunamadı.')
   }
 
-  const tempRoot=join(app.getPath('temp'),'zeminlab-document-intelligence')
+  const tempRoot=join(app.getPath('temp'),'faluzmn-document-intelligence')
   await fs.mkdir(tempRoot,{recursive:true})
   const token=Date.now().toString(36)+Math.random().toString(36).slice(2,8)
   const extension=match[1].toLowerCase()==='application/pdf'?'.pdf':(match[1].toLowerCase()==='image/jpeg'||match[1].toLowerCase()==='image/jpg'?'.jpg':'.png')
@@ -85,17 +85,17 @@ function createWindow():void{
 }
 
 app.whenReady().then(()=>{
-  electronApp.setAppUserModelId('com.zeminlab.app')
+  electronApp.setAppUserModelId('com.faluzmn.app')
   app.on('browser-window-created',(_,window)=>optimizer.watchWindowShortcuts(window))
 
   ipcMain.handle('project:save',async(_event,payload:unknown,currentPath?:string)=>{
     let filePath=currentPath
     if(!filePath){
-      const result=await dialog.showSaveDialog({title:'ZeminLab Projesini Kaydet',defaultPath:'Yeni Proje.zlproj',filters:projectSaveFilter})
+      const result=await dialog.showSaveDialog({title:'FALUZMN Projesini Kaydet',defaultPath:'Yeni Proje.falu',filters:projectSaveFilter})
       if(result.canceled||!result.filePath)return null
-      filePath=result.filePath.endsWith('.zlproj')?result.filePath:`${result.filePath}.zlproj`
+      filePath=result.filePath.endsWith('.falu')?result.filePath:`${result.filePath}.zlproj`
     }
-    const envelope={format:'ZeminLab',version:PROJECT_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:payload}
+    const envelope={format:'FALUZMN',version:PROJECT_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:payload}
     await fs.writeFile(filePath,JSON.stringify(envelope,null,2),'utf8')
     return filePath
   })
@@ -106,8 +106,8 @@ app.whenReady().then(()=>{
     const filePath=result.filePaths[0]
     const raw=await fs.readFile(filePath,'utf8')
     const envelope=JSON.parse(raw) as {format?:string;version?:number;data?:unknown}
-    if(envelope.format!=='ZeminLab'||typeof envelope.version!=='number'||envelope.data===undefined)throw new Error('Geçersiz veya desteklenmeyen ZeminLab proje dosyası.')
-    if(envelope.version>PROJECT_SCHEMA_VERSION)throw new Error(`Bu proje dosyası daha yeni bir ZeminLab sürümüne ait (v${envelope.version}).`)
+    if(envelope.format!=='ZeminLab'||typeof envelope.version!=='number'||envelope.data===undefined)throw new Error('Geçersiz veya desteklenmeyen FALUZMN proje dosyası.')
+    if(envelope.version>PROJECT_SCHEMA_VERSION)throw new Error(`Bu proje dosyası daha yeni bir FALUZMN sürümüne ait (v${envelope.version}).`)
     return{filePath,data:envelope.data,version:envelope.version}
   })
 
