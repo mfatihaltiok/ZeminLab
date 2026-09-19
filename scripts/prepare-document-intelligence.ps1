@@ -13,7 +13,9 @@ $tempRoot = Join-Path $env:TEMP "zeminlab-document-intelligence-build"
 New-Item -ItemType Directory -Force -Path $resourceRoot,$tempRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $runtimeRoot,$paddleRoot,$doclingRoot | Out-Null
 
+$runtimePython = Join-Path $runtimeRoot "python.exe"
 $zipPath = Join-Path $tempRoot $pythonZip
+$getPip = $null
 Write-Host "1/6 Bundled Python kontrol ediliyor..."
 if (-not (Test-Path $runtimePython)) {
   Invoke-WebRequest -Uri $pythonUrl -OutFile $zipPath
@@ -28,7 +30,6 @@ $pthLines = Get-Content $pth.FullName
 if ($pthLines -notcontains "Lib\site-packages") { Add-Content -Path $pth.FullName -Value "Lib\site-packages" }
 if ($pthLines -notcontains "import site") { Add-Content -Path $pth.FullName -Value "import site" }
 
-$runtimePython = Join-Path $runtimeRoot "python.exe"
 if (-not (Test-Path $runtimePython)) { throw "Bundled Python bulunamadı: $runtimePython" }
 
 $pipCheck = & $runtimePython -m pip --version 2>$null
@@ -86,5 +87,6 @@ if ($LASTEXITCODE -ne 0) { throw "Yerel belge motorları import edilemedi." }
 $marker = Join-Path $paddleRoot "faluzmn-document-intelligence.ready"
 Set-Content -Path $marker -Value "FALUZMN PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 / PP-OCRv5 / Docling 2.128.0 / CPU / offline" -Encoding UTF8
 
-Remove-Item -Force $getPip,$zipPath -ErrorAction SilentlyContinue
+if ($getPip -and (Test-Path $getPip)) { Remove-Item -Force $getPip -ErrorAction SilentlyContinue }
+if ($zipPath -and (Test-Path $zipPath)) { Remove-Item -Force $zipPath -ErrorAction SilentlyContinue }
 Write-Host "FALUZMN belge istihbarat runtime hazır."
