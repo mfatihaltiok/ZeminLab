@@ -8,7 +8,48 @@ $doclingRoot = Join-Path $resourceRoot "docling"
 $pythonVersion = "3.12.10"
 $pythonZip = "python-$pythonVersion-embed-amd64.zip"
 $pythonUrl = "https://www.python.org/ftp/python/$pythonVersion/$pythonZip"
-$tempRoot = Join-Path $env:TEMP "zeminlab-document-intelligence-build"
+$tempRoot = Join-Path $env:TEMP "faluzmn-document-intelligence-build"
+
+function Invoke-NativeCommand {
+  param(
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [Parameter(Mandatory = $false)][string[]]$Arguments = @()
+  )
+
+  $savedPreference = $ErrorActionPreference
+  try {
+    # Paddle/PaddleX on Windows may invoke "where ccache" during import.
+    # Missing ccache is a benign diagnostic, not a runtime failure.
+    $ErrorActionPreference = "Continue"
+    $output = @(& $FilePath @Arguments 2>&1)
+    $exitCode = $LASTEXITCODE
+    return [pscustomobject]@{
+      ExitCode = $exitCode
+      Output = ($output | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
+    }
+  }
+  finally {
+    $ErrorActionPreference = $savedPreference
+  }
+}
+
+function Invoke-BundledPython {
+  param(
+    [Parameter(Mandatory = $true)][string[]]$Arguments
+  )
+  return Invoke-NativeCommand -FilePath $runtimePython -Arguments $Arguments
+}
+
+function Assert-NativeSuccess {
+  param(
+    [Parameter(Mandatory = $true)][psobject]$Result,
+    [Parameter(Mandatory = $true)][string]$Message
+  )
+  if ($Result.ExitCode -ne 0) {
+    $details = if ([string]::IsNullOrWhiteSpace($Result.Output)) { "" } else { " " + $Result.Output }
+    throw ($Message + " (exit code " + $Result.ExitCode + ")." + $details)
+  }
+}
 
 New-Item -ItemType Directory -Force -Path $resourceRoot,$tempRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $runtimeRoot,$paddleRoot,$doclingRoot | Out-Null
@@ -16,6 +57,7 @@ New-Item -ItemType Directory -Force -Path $runtimeRoot,$paddleRoot,$doclingRoot 
 $runtimePython = Join-Path $runtimeRoot "python.exe"
 $zipPath = Join-Path $tempRoot $pythonZip
 $getPip = $null
+
 Write-Host "1/6 Bundled Python kontrol ediliyor..."
 if (-not (Test-Path $runtimePython)) {
   Invoke-WebRequest -Uri $pythonUrl -OutFile $zipPath
@@ -32,33 +74,36 @@ if ($pthLines -notcontains "import site") { Add-Content -Path $pth.FullName -Val
 
 if (-not (Test-Path $runtimePython)) { throw "Bundled Python bulunamadı: $runtimePython" }
 
-$pipCheck = & $runtimePython -m pip --version 2>$null
-if ($LASTEXITCODE -ne 0) {
+$pipCheck = Invoke-BundledPython -Arguments @("-m","pip","--version")
+if ($pipCheck.ExitCode -ne 0) {
   $getPip = Join-Path $tempRoot "get-pip.py"
   Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
-  & $runtimePython $getPip --disable-pip-version-check --no-warn-script-location
-  if ($LASTEXITCODE -ne 0) { throw "Bundled Python pip kurulumu başarısız." }
+  $pipInstall = Invoke-BundledPython -Arguments @($getPip,"--disable-pip-version-check","--no-warn-script-location")
+  Assert-NativeSuccess -Result $pipInstall -Message "Bundled Python pip kurulumu başarısız."
 } else {
   Write-Host "pip zaten mevcut; yeniden kurulmayacak."
 }
 
 Write-Host "2/6 PaddleOCR runtime kontrol ediliyor..."
-$paddleProbe = & $runtimePython -c "import paddle, paddleocr; print(paddle.__version__); print(paddleocr.__version__)" 2>$null
-$paddleText = $paddleProbe -join " "
-if ($LASTEXITCODE -ne 0 -or $paddleText -notmatch "3.2.2" -or $paddleText -notmatch "3.3.2") {
+$paddleProbe = Invoke-BundledPython -Arguments @(
+  "-c",
+  "import paddle, paddleocr; print(paddle.__version__); print(paddleocr.__version__)"
+)
+$paddleText = $paddleProbe.Output
+if ($paddleProbe.ExitCode -ne 0 -or $paddleText -notmatch "3\.2\.2" -or $paddleText -notmatch "3\.3\.2") {
   $paddlePackages = @("numpy==1.26.4","scipy==1.13.1","scikit-learn==1.7.1","paddleocr==3.3.2","paddlepaddle==3.2.2")
-  & $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location $paddlePackages
-  if ($LASTEXITCODE -ne 0) { throw "PaddleOCR runtime kurulumu başarısız." }
+  $install = Invoke-BundledPython -Arguments (@("-m","pip","install","--disable-pip-version-check","--no-warn-script-location") + $paddlePackages)
+  Assert-NativeSuccess -Result $install -Message "PaddleOCR runtime kurulumu başarısız."
 } else {
   Write-Host "PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 zaten kurulu; yeniden indirilmiyor."
 }
 
 Write-Host "3/6 Docling belge yapısı motoru kontrol ediliyor..."
-$doclingProbe = & $runtimePython -c "import docling; print(docling.__version__)" 2>$null
-$doclingText = $doclingProbe -join " "
-if ($LASTEXITCODE -ne 0 -or $doclingText -notmatch "2.128.0") {
-  & $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location "docling==2.128.0"
-  if ($LASTEXITCODE -ne 0) { throw "Docling kurulumu başarısız." }
+$doclingProbe = Invoke-BundledPython -Arguments @("-c","import docling; print(docling.__version__)")
+$doclingText = $doclingProbe.Output
+if ($doclingProbe.ExitCode -ne 0 -or $doclingText -notmatch "2\.128\.0") {
+  $installDocling = Invoke-BundledPython -Arguments @("-m","pip","install","--disable-pip-version-check","--no-warn-script-location","docling==2.128.0")
+  Assert-NativeSuccess -Result $installDocling -Message "Docling kurulumu başarısız."
 } else {
   Write-Host "Docling 2.128.0 zaten kurulu; yeniden indirilmiyor."
 }
@@ -66,26 +111,49 @@ if ($LASTEXITCODE -ne 0 -or $doclingText -notmatch "2.128.0") {
 Write-Host "4/6 Yalnızca gerekli Docling layout + table modelleri indiriliyor..."
 $env:DOCLING_ARTIFACTS_PATH = $doclingRoot
 $doclingTools = Join-Path $runtimeRoot "Scripts\docling-tools.exe"
-& $doclingTools models download layout tableformer -o $doclingRoot
-if ($LASTEXITCODE -ne 0) { throw "Docling modelleri indirilemedi." }
+if (-not (Test-Path $doclingTools)) { throw "Docling CLI bulunamadı: $doclingTools" }
+$doclingDownload = Invoke-NativeCommand -FilePath $doclingTools -Arguments @("models","download","layout","tableformer","-o",$doclingRoot)
+Assert-NativeSuccess -Result $doclingDownload -Message "Docling modelleri indirilemedi."
 
 Write-Host "5/6 PaddleOCR modelleri yerel cache içine indiriliyor..."
 $env:PADDLE_PDX_CACHE_HOME = $paddleRoot
 $env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "1"
 $env:PYTHONNOUSERSITE = "1"
-& $runtimePython -c "from paddleocr import TextDetection, TextRecognition; TextDetection(model_name='PP-OCRv5_mobile_det', model_dir=r'$paddleRoot\models\det'); TextRecognition(model_name='latin_PP-OCRv5_mobile_rec', model_dir=r'$paddleRoot\models\rec')"
-if ($LASTEXITCODE -ne 0) { throw "PP-OCRv5 modelleri yerel cache içine indirilemedi." }
+$env:PADDLE_PDX_OFFLINE = $null
+
+# Do not pass model_dir while downloading. Official models are cached under:
+# PADDLE_PDX_CACHE_HOME\official_models\<model-name>
+$modelBootstrap = @(
+  "from paddleocr import TextDetection, TextRecognition",
+  "TextDetection(model_name='PP-OCRv5_mobile_det', device='cpu')",
+  "TextRecognition(model_name='latin_PP-OCRv5_mobile_rec', device='cpu')"
+) -join "; "
+$paddleModels = Invoke-BundledPython -Arguments @("-c",$modelBootstrap)
+Assert-NativeSuccess -Result $paddleModels -Message "PP-OCRv5 modelleri yerel cache içine indirilemedi."
+
+$officialModelsRoot = Join-Path $paddleRoot "official_models"
+$detModel = Join-Path $officialModelsRoot "PP-OCRv5_mobile_det"
+$recModel = Join-Path $officialModelsRoot "latin_PP-OCRv5_mobile_rec"
+if (-not (Test-Path (Join-Path $detModel "inference.pdiparams"))) {
+  throw "PP-OCRv5 detection modeli beklenen cache yolunda bulunamadı: $detModel"
+}
+if (-not (Test-Path (Join-Path $recModel "inference.pdiparams"))) {
+  throw "PP-OCRv5 recognition modeli beklenen cache yolunda bulunamadı: $recModel"
+}
 
 Write-Host "6/6 Offline runtime doğrulanıyor..."
 $env:PADDLE_PDX_CACHE_HOME = $paddleRoot
 $env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "1"
 $env:PADDLE_PDX_OFFLINE = "1"
 $env:PYTHONNOUSERSITE = "1"
-& $runtimePython -c "import paddle, paddleocr, docling; print('Paddle', paddle.__version__); print('PaddleOCR', paddleocr.__version__); print('Docling', docling.__version__)"
-if ($LASTEXITCODE -ne 0) { throw "Yerel belge motorları import edilemedi." }
+$offlineProbe = Invoke-BundledPython -Arguments @(
+  "-c",
+  "import paddle, paddleocr, docling; print('Paddle', paddle.__version__); print('PaddleOCR', paddleocr.__version__); print('Docling', docling.__version__)"
+)
+Assert-NativeSuccess -Result $offlineProbe -Message "Yerel belge motorları import edilemedi."
 
 $marker = Join-Path $paddleRoot "faluzmn-document-intelligence.ready"
-Set-Content -Path $marker -Value "FALUZMN PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 / PP-OCRv5 / Docling 2.128.0 / CPU / offline" -Encoding UTF8
+Set-Content -Path $marker -Value "FALUZMN PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 / PP-OCRv5 / Docling 2.128.0 / CPU / offline / official_models cache" -Encoding UTF8
 
 if ($getPip -and (Test-Path $getPip)) { Remove-Item -Force $getPip -ErrorAction SilentlyContinue }
 if ($zipPath -and (Test-Path $zipPath)) { Remove-Item -Force $zipPath -ErrorAction SilentlyContinue }
