@@ -39,6 +39,10 @@ export interface IdealizedSoilLayer {
   poissonRatio?: number
   parameterSources: Record<string, IdealizedParameterSource>
   userOverride: boolean
+  sourceBoreholeId?: string
+  sourceSptRecordId?: string
+  sourceLaboratoryRecordId?: string
+  thickness?: number
   notes?: string
 }
 
