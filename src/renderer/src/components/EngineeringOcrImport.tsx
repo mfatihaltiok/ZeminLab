@@ -102,7 +102,7 @@ function mapLaboratoryTableColumns(table: DocumentTable) {
   return { map, headerRows }
 }
 
-function parseLaboratoryTables(tables: DocumentTable[]): LabCandidate[] {
+function parseLaboratoryTables(tables: DocumentTable[], lines: OcrLine[] = []): LabCandidate[] {
   const candidates: LabCandidate[] = []
   for (const table of tables) {
     const rows = table.rows ?? []
@@ -136,6 +136,80 @@ function parseLaboratoryTables(tables: DocumentTable[]): LabCandidate[] {
   return candidates
 }
 
+function parseLaboratoryTableByGeometry(table: DocumentTable, lines: OcrLine[]): LabCandidate[] {
+  const tableBox = box(table.box)
+  if (!tableBox) return []
+  const inTable = lines.map(line => ({
+    line,
+    pos: center(line.box)
+  })).filter(item => {
+    const p = item.pos
+    return !!p && p.x >= tableBox[0] - 8 && p.x <= tableBox[2] + 8 && p.y >= tableBox[1] - 8 && p.y <= tableBox[3] + 8
+  })
+  if (inTable.length < 2) return []
+
+  const rows: Array<{ y: number; height: number; items: typeof inTable }> = []
+  for (const item of inTable.sort((a, b) => (a.pos!.y - b.pos!.y) || (a.pos!.x - b.pos!.x))) {
+    const p = item.pos!
+    const last = rows[rows.length - 1]
+    if (last && Math.abs(last.y - p.y) <= Math.max(10, last.height * 0.8, p.h * 0.8)) {
+      last.items.push(item)
+      last.y = (last.y * (last.items.length - 1) + p.y) / last.items.length
+      last.height = Math.max(last.height, p.h)
+    } else {
+      rows.push({ y: p.y, height: p.h, items: [item] })
+    }
+  }
+
+  const headerColumns: Array<{ field: string; x: number; rowIndex: number }> = []
+  let lastHeaderRow = -1
+  const headerScan = Math.min(5, rows.length)
+  for (let rowIndex = 0; rowIndex < headerScan; rowIndex++) {
+    let matched = 0
+    for (const item of rows[rowIndex].items) {
+      const field = laboratoryFieldFromText(item.line.text)
+      if (!field) continue
+      matched += 1
+      if (!headerColumns.some(column => column.field === field)) headerColumns.push({ field, x: item.pos!.x, rowIndex })
+    }
+    if (matched > 0) lastHeaderRow = rowIndex
+  }
+  if (!headerColumns.length) return []
+
+  const sortedColumns = [...headerColumns].sort((a, b) => a.x - b.x)
+  const candidates: LabCandidate[] = []
+  for (let rowIndex = lastHeaderRow + 1; rowIndex < rows.length; rowIndex++) {
+    const rowItems = rows[rowIndex].items
+    for (const item of rowItems) {
+      const text = item.line.text
+      const embeddedField = laboratoryFieldFromText(text)
+      if (embeddedField) {
+        const embeddedValue = numericCellValue(embeddedField, text)
+        if (embeddedValue !== undefined) candidates.push({ field: embeddedField, value: embeddedValue, score: Math.min(0.96, item.line.score ?? 0.9), rowIndex, raw: text, evidence: `OCR tablo geometrisi · satır ${rowIndex + 1}: ${text}` })
+        continue
+      }
+      const nums = numberTokens(text)
+      if (nums.length !== 1) continue
+      const value = nums[0]
+      let best: { field: string; distance: number } | undefined
+      for (const column of sortedColumns) {
+        if (!validValue(column.field, value)) continue
+        const distance = Math.abs(item.pos!.x - column.x)
+        if (!best || distance < best.distance) best = { field: column.field, distance }
+      }
+      if (!best) continue
+      candidates.push({
+        field: best.field,
+        value,
+        score: Math.min(0.94, item.line.score == null ? 0.82 : item.line.score * 0.85 + 0.13),
+        rowIndex,
+        raw: text,
+        evidence: `OCR tablo geometrisi · satır ${rowIndex + 1} · ${best.field}: ${text}`
+      })
+    }
+  }
+  return candidates
+}
 function mergeLaboratoryCandidates(candidates: LabCandidate[]) {
   const grouped = new Map<string, LabCandidate[]>()
   for (const candidate of candidates) {
@@ -164,7 +238,7 @@ function mergeLaboratoryCandidates(candidates: LabCandidate[]) {
 }
 
 function parseLaboratory(lines: OcrLine[], tables: DocumentTable[] = []): LabCandidate[] {
-  const tableCandidates = parseLaboratoryTables(tables)
+  const tableCandidates = parseLaboratoryTables(tables, lines)
   const entries = lines.map((line, index) => ({ line, index, text: norm(line.text), pos: center(line.box), nums: numberTokens(line.text) }))
   const ocrCandidates: LabCandidate[] = []
   for (const [field, labels] of LAB_FIELDS) {
@@ -188,7 +262,8 @@ function parseLaboratory(lines: OcrLine[], tables: DocumentTable[] = []): LabCan
       ocrCandidates.push(...nearby.sort((a, b) => b.score - a.score).slice(0, 3))
     }
   }
-  return mergeLaboratoryCandidates([...tableCandidates, ...ocrCandidates])
+  const geometryCandidates = tables.flatMap(table => parseLaboratoryTableByGeometry(table, lines))
+  return mergeLaboratoryCandidates([...tableCandidates, ...geometryCandidates, ...ocrCandidates])
 }
 
 function fileToDataUrl(file:File){return new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(reader.error??new Error('Belge okunamadı.'));reader.readAsDataURL(file)})}
