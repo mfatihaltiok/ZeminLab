@@ -20,7 +20,7 @@ export default function BoreholeLogScreen({ boreholes, labs, onBoreholesChange }
     return rows.map((row,i) => {
       const from=i===0?0:(rows[i-1].depth+row.depth)/2
       const to=i===rows.length-1?den:(row.depth+(rows[i+1]?.depth??den))/2
-      return { id: row.id, topDepth: Math.max(0,from), bottomDepth: Math.min(den,Math.max(from,to)), code: row.soilCode, description: row.soilDescription, colorClass: row.soilCode?.toLowerCase().includes('cl')||row.soilCode?.toLowerCase().includes('ci')?'clay':row.soilCode?.toLowerCase().includes('si')?'silt':row.soilCode?.toLowerCase().includes('gr')?'gravel':row.soilCode?.toLowerCase().includes('sa')?'sand':'fill' as const, sptN: row.n2!=null&&row.n3!=null?row.n2+row.n3:undefined }
+      return { id: row.id, topDepth: Math.max(0,from), bottomDepth: Math.min(den,Math.max(from,to)), code: row.soilCode, description: row.soilDescription, colorClass: (row.soilCode?.toLowerCase().includes('cl')||row.soilCode?.toLowerCase().includes('ci')?'clay':row.soilCode?.toLowerCase().includes('si')?'silt':row.soilCode?.toLowerCase().includes('gr')?'gravel':row.soilCode?.toLowerCase().includes('sa')?'sand':'fill') as 'fill'|'clay'|'silt'|'sand'|'gravel'|'rock', sptN: row.n2!=null&&row.n3!=null?row.n2+row.n3:undefined }
     })
   }, [borehole])
   const renderMarkers = useMemo(() => {
