@@ -57,28 +57,123 @@ const ranges:Record<string,[number,number]>={waterContent:[0,300],sieve10Passing
 function fieldMatches(text:string,label:string){const n=norm(text);if(label.startsWith('#'))return n.includes(label);if(label==='phi')return /(^|\s)phi(\s|$)/.test(n)||n.includes('φ');if(['ll','pl','pi'].includes(label))return new RegExp('(^|\\s)'+label+'(\\s|$)').test(n);return n.includes(norm(label))}
 function validValue(field:string,value:number){const range=ranges[field];return !!range&&value>=range[0]&&value<=range[1]&&Number.isFinite(value)}
 
-function parseLaboratory(lines:OcrLine[],tables:DocumentTable[]=[]):LabCandidate[]{
-  const entries=lines.map((line,index)=>({line,index,text:norm(line.text),pos:center(line.box),nums:numberTokens(line.text)})),out:LabCandidate[]=[]
-  for(const [field,labels] of LAB_FIELDS){
-    const labelLines=entries.filter(e=>labels.some(label=>fieldMatches(e.text,label))),candidates:{value:number;score:number;raw:string;evidence:string}[]=[]
-    for(const label of labelLines){
-      if(label.nums.length===1&&validValue(field,label.nums[0])){candidates.push({value:label.nums[0],score:label.line.score??0,raw:label.line.text,evidence:'aynı satır: '+label.line.text});continue}
-      const lp=label.pos
-      const nearby=entries.filter(e=>e.nums.length===1&&validValue(field,e.nums[0])&&e.index!==label.index).map(e=>{
-        const ep=e.pos;if(!lp||!ep)return null;const dy=Math.abs(ep.y-lp.y),dx=ep.x-lp.x,height=Math.max(lp.h,ep.h,8),sameRow=dy<=height*1.4,below=ep.y>lp.y&&dy<=height*3.5,right=dx>=-height*1.5
-        if(!sameRow&&!below)return null;if(sameRow&&!right)return null
-        const proximity=Math.max(0,1-Math.min(1,dy/(height*3.5))),direction=sameRow?(right?1:0.2):0.75,score=(e.line.score??0)*0.65+proximity*0.25+direction*0.10
-        return{value:e.nums[0],score,raw:e.line.text,evidence:label.line.text+' -> '+e.line.text}
-      }).filter(Boolean) as {value:number;score:number;raw:string;evidence:string}[]
-      candidates.push(...nearby.sort((a,b)=>b.score-a.score).slice(0,3))
-    }
-    for(const table of tables){for(const row of table.rows??[]){const rowText=row.join(' | ');if(!labels.some(label=>fieldMatches(rowText,label)))continue;const nums=numberTokens(rowText);if(nums.length===1&&validValue(field,nums[0]))candidates.push({value:nums[0],score:0.96,raw:rowText,evidence:'Docling tablo: '+rowText})}}
-    if(!candidates.length)continue;candidates.sort((a,b)=>b.score-a.score);const top=candidates[0],second=candidates.find(c=>c.value!==top.value);if(second&&Math.abs(second.score-top.score)<0.12)continue
-    out.push({field,value:top.value,score:Math.min(1,top.score),raw:top.raw,evidence:top.evidence})
-  }
-  return out
+function fieldAliasMatches(text: string, alias: string) {
+  const n = norm(text)
+  const a = norm(alias)
+  if (!a) return false
+  if (['ll', 'pl', 'pi', 'phi', 'c', 'e', 'w', 'n'].includes(a)) return new RegExp('(^|\\s)' + a + '(\\s|$|\\(|\\[)').test(n)
+  return n.includes(a)
 }
 
+function laboratoryFieldFromText(text: string): string | undefined {
+  for (const [field, labels] of LAB_FIELDS) if (labels.some(label => fieldAliasMatches(text, label))) return field
+  return undefined
+}
+
+function numericCellValue(field: string, text: string): number | undefined {
+  const values = numberTokens(text).filter(value => validValue(field, value))
+  return values.length === 1 ? values[0] : undefined
+}
+
+function mapLaboratoryTableColumns(table: DocumentTable) {
+  const columns = table.columns ?? []
+  const rows = table.rows ?? []
+  const map = new Map<string, number>()
+  columns.forEach((column, index) => {
+    const field = laboratoryFieldFromText(String(column ?? ''))
+    if (field && !map.has(field)) map.set(field, index)
+  })
+  const headerRows: number[] = []
+  for (let rowIndex = 0; rowIndex < Math.min(3, rows.length); rowIndex++) {
+    let matched = 0
+    for (const cell of rows[rowIndex] ?? []) if (laboratoryFieldFromText(String(cell ?? ''))) matched += 1
+    if (matched > 0) headerRows.push(rowIndex)
+    ;(rows[rowIndex] ?? []).forEach((cell, columnIndex) => {
+      const field = laboratoryFieldFromText(String(cell ?? ''))
+      if (field && !map.has(field)) map.set(field, columnIndex)
+    })
+  }
+  return { map, headerRows }
+}
+
+function parseLaboratoryTables(tables: DocumentTable[]): LabCandidate[] {
+  const candidates: LabCandidate[] = []
+  for (const table of tables) {
+    const rows = table.rows ?? []
+    if (!rows.length) continue
+    const { map, headerRows } = mapLaboratoryTableColumns(table)
+    rows.forEach((row, rowIndex) => {
+      if (headerRows.includes(rowIndex)) return
+      const cells = row.map(cell => String(cell ?? '').trim())
+      for (const [field, columnIndex] of map.entries()) {
+        const cell = cells[columnIndex] ?? ''
+        const value = numericCellValue(field, cell)
+        if (value === undefined) continue
+        candidates.push({ field, value, score: 0.98, raw: cell, evidence: `Docling tablo · satır ${rowIndex + 1} · sütun ${columnIndex + 1}: ${cell}` })
+      }
+      for (let columnIndex = 0; columnIndex < cells.length; columnIndex++) {
+        const field = laboratoryFieldFromText(cells[columnIndex])
+        if (!field) continue
+        const sameCell = numericCellValue(field, cells[columnIndex])
+        if (sameCell !== undefined) {
+          candidates.push({ field, value: sameCell, score: 0.97, raw: cells[columnIndex], evidence: `Docling tablo · satır ${rowIndex + 1}: ${cells[columnIndex]}` })
+          continue
+        }
+        const numericRight = cells.slice(columnIndex + 1).map((cell, offset) => ({ cell, columnIndex: columnIndex + offset + 1, value: numericCellValue(field, cell) })).filter((item): item is { cell: string; columnIndex: number; value: number } => item.value !== undefined)
+        if (numericRight.length === 1) {
+          const item = numericRight[0]
+          candidates.push({ field, value: item.value, score: 0.95, raw: item.cell, evidence: `Docling tablo · satır ${rowIndex + 1} · ${cells[columnIndex]} → ${item.cell}` })
+        }
+      }
+    })
+  }
+  return candidates
+}
+
+function mergeLaboratoryCandidates(candidates: LabCandidate[]) {
+  const grouped = new Map<string, LabCandidate[]>()
+  for (const candidate of candidates) grouped.set(candidate.field, [...(grouped.get(candidate.field) ?? []), candidate])
+  const result: LabCandidate[] = []
+  for (const list of grouped.values()) {
+    list.sort((a, b) => b.score - a.score)
+    const distinctValues = [...new Set(list.map(item => item.value))]
+    if (distinctValues.length > 1) {
+      const top = list[0]
+      const second = list.find(item => item.value !== top.value)
+      if (second && Math.abs(top.score - second.score) < 0.15) continue
+    }
+    result.push(list[0])
+  }
+  return result
+}
+
+function parseLaboratory(lines: OcrLine[], tables: DocumentTable[] = []): LabCandidate[] {
+  const tableCandidates = parseLaboratoryTables(tables)
+  const entries = lines.map((line, index) => ({ line, index, text: norm(line.text), pos: center(line.box), nums: numberTokens(line.text) }))
+  const ocrCandidates: LabCandidate[] = []
+  for (const [field, labels] of LAB_FIELDS) {
+    const labelLines = entries.filter(entry => labels.some(label => fieldAliasMatches(entry.text, label)))
+    for (const label of labelLines) {
+      if (label.nums.length === 1 && validValue(field, label.nums[0])) {
+        ocrCandidates.push({ field, value: label.nums[0], score: Math.min(0.92, Math.max(0, label.line.score ?? 0.75)), raw: label.line.text, evidence: 'OCR aynı satır: ' + label.line.text })
+        continue
+      }
+      const lp = label.pos
+      const nearby = entries.filter(entry => entry.nums.length === 1 && validValue(field, entry.nums[0]) && entry.index !== label.index).map(entry => {
+        const ep = entry.pos
+        if (!lp || !ep) return null
+        const dy = Math.abs(ep.y - lp.y), dx = ep.x - lp.x, height = Math.max(lp.h, ep.h, 8), sameRow = dy <= height * 1.4, below = ep.y > lp.y && dy <= height * 3.5, right = dx >= -height * 1.5
+        if (!sameRow && !below) return null
+        if (sameRow && !right) return null
+        const proximity = Math.max(0, 1 - Math.min(1, dy / (height * 3.5)))
+        const direction = sameRow ? (right ? 1 : 0.2) : 0.75
+        return { field, value: entry.nums[0], score: (entry.line.score ?? 0) * 0.65 + proximity * 0.25 + direction * 0.10, raw: entry.line.text, evidence: label.line.text + ' → ' + entry.line.text }
+      }).filter(Boolean) as LabCandidate[]
+      ocrCandidates.push(...nearby.sort((a, b) => b.score - a.score).slice(0, 3))
+    }
+  }
+  return mergeLaboratoryCandidates([...tableCandidates, ...ocrCandidates])
+}
 function fileToDataUrl(file:File){return new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(reader.error??new Error('Belge okunamadı.'));reader.readAsDataURL(file)})}
 
 export function EngineeringOcrImport({mode,laboratoryTargets=[],onSptImport,onLaboratoryImport}:{mode:Mode;laboratoryTargets?:Array<{id:string;sampleId:string;depth:number}>;onSptImport?:(rows:SptCandidate[])=>void;onLaboratoryImport?:(targetId:string,rows:LabCandidate[])=>void}){
