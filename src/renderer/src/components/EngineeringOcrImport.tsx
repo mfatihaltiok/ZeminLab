@@ -43,7 +43,7 @@ function dedupeSpt(rows:SptCandidate[]){const map=new Map<string,SptCandidate>()
 
 const LAB_FIELDS:Array<[string,string[]]>=[
   ['waterContent',['su muhtevasi','su icerigi','water content','w content','w']],
-  ['sieve10Passing',['#10','10 elek','10 gecen','no 10']],['sieve200Passing',['#200','200 elek','200 gecen','no 200','-0.075','0.075 mm']],
+  ['sieve10Passing',['#10','10 elek','10 gecen','no 10','4.75 mm']],['sieve200Passing',['#200','200 elek','200 gecen','no 200','-0.075','0.075 mm']],
   ['liquidLimit',['likit limit','liquid limit','ll']],['plasticLimit',['plastik limit','plastic limit','pl']],
   ['plasticityIndex',['plastisite indisi','plastisite indeksi','plasticity index','pi']],['unitWeight',['birim hacim agirlik','unit weight','gamma']],
   ['uuC',['uu kohezyon','uu c','uu cohesion']],['uuPhi',['uu phi','uu friction']],['consolidationCc',['konsolidasyon cc','compression index cc']],
@@ -85,10 +85,16 @@ function mapLaboratoryTableColumns(table: DocumentTable) {
   })
   const headerRows: number[] = []
   for (let rowIndex = 0; rowIndex < Math.min(3, rows.length); rowIndex++) {
+    const currentRow = rows[rowIndex] ?? []
     let matched = 0
-    for (const cell of rows[rowIndex] ?? []) if (laboratoryFieldFromText(String(cell ?? ''))) matched += 1
-    if (matched > 0) headerRows.push(rowIndex)
-    ;(rows[rowIndex] ?? []).forEach((cell, columnIndex) => {
+    let numericCellCount = 0
+    for (const cell of currentRow) {
+      const text = String(cell ?? '')
+      if (laboratoryFieldFromText(text)) matched += 1
+      if (numberTokens(text).length > 0) numericCellCount += 1
+    }
+    if (matched > 0 && numericCellCount === 0) headerRows.push(rowIndex)
+    currentRow.forEach((cell, columnIndex) => {
       const field = laboratoryFieldFromText(String(cell ?? ''))
       if (field && !map.has(field)) map.set(field, columnIndex)
     })
