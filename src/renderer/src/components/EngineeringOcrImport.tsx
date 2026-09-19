@@ -45,7 +45,7 @@ const LAB_FIELDS:Array<[string,string[]]>=[
   ['waterContent',['su muhtevasi','su icerigi','water content','w content','w']],
   ['sieve10Passing',['#10','10 elek','10 gecen','no 10','4.75 mm']],['sieve200Passing',['#200','200 elek','200 gecen','no 200','-0.075','0.075 mm']],
   ['liquidLimit',['likit limit','liquid limit','ll']],['plasticLimit',['plastik limit','plastic limit','pl']],
-  ['plasticityIndex',['plastisite indisi','plastisite indeksi','plasticity index','pi']],['unitWeight',['birim hacim agirlik','unit weight','gamma']],
+  ['plasticityIndex',['plastisite indisi','plastisite indeksi','plasticity index','pi']],['unitWeight',['birim hacim agirlik','unit weight','gamma','γ']],
   ['uuC',['uu kohezyon','uu c','uu cohesion']],['uuPhi',['uu phi','uu friction']],['consolidationCc',['konsolidasyon cc','compression index cc']],
   ['consolidationCs',['konsolidasyon cs','swelling index cs']],['elasticModulus',['elastic modulus','deformasyon modulu','es']],
   ['poissonRatio',['poisson','poisson orani']],['directShearC',['direkt kesme c','direct shear c']],['directShearPhi',['direkt kesme phi','direct shear phi']],
