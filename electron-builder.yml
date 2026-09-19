@@ -1,5 +1,5 @@
 appId: com.zeminlab.app
-productName: ZeminLab
+productName: FALUZMN
 directories:
   buildResources: build
 files:
@@ -19,7 +19,7 @@ extraResources:
   - from: tools/document_intelligence.py
     to: tools/document_intelligence.py
 win:
-  executableName: ZeminLab
+  executableName: FALUZMN
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -40,7 +40,7 @@ linux:
     - AppImage
     - snap
     - deb
-  maintainer: ZeminLab
+  maintainer: FALUZMN
   category: Science
 appImage:
   artifactName: ${name}-${version}.${ext}
