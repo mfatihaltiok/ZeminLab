@@ -1,10 +1,10 @@
-# ZeminLab
+# FALUZMN
 
-ZeminLab is a Windows-first geotechnical engineering desktop application built with Electron, React and TypeScript.
+FALUZMN is a Windows-first geotechnical engineering desktop application built with Electron, React and TypeScript.
 
-## Stage 3
+## v1.0
 
-Stage 3 adds the professional output/integration layer:
+v1.0 adds the professional output/integration layer:
 
 - A4 PDF report export infrastructure
 - Erol 2014 and Erol 2018 local source-pack indexing
@@ -15,9 +15,9 @@ Stage 3 adds the professional output/integration layer:
 - DXF soil-profile export utility
 - neutral SAP2000 interchange and OpenSees Tcl export adapters
 
-### Belge istihbaratı\n\nZeminLab uses two deterministic local layers: **PaddleOCR PP-OCRv5** for text recognition and **Docling 2.128.0** for document layout and table structure. Values are not inferred from fixed page coordinates. Ambiguous/conflicting candidates are rejected and the user must review OCR candidates before import. The runtime is CPU-first and prepared for offline operation. Docling's layout and TableFormer artifacts are prefetched into the application package.\n\nPaddleOCR itself can run locally, so the application does **not** require an API key for offline OCR. A remote OCR endpoint/API-key field may still be present for deployments that use a hosted OCR service. The key is stored encrypted through Electron's `safeStorage` when the operating system supports it.
+### Belge istihbaratı\n\nFALUZMN uses two deterministic local layers: **PaddleOCR PP-OCRv5** for text recognition and **Docling 2.128.0** for document layout and table structure. Values are not inferred from fixed page coordinates. Ambiguous/conflicting candidates are rejected and the user must review OCR candidates before import. The runtime is CPU-first and prepared for offline operation. Docling's layout and TableFormer artifacts are prefetched into the application package.\n\nPaddleOCR itself can run locally, so the application does **not** require an API key for offline OCR. A remote OCR endpoint/API-key field may still be present for deployments that use a hosted OCR service. The key is stored encrypted through Electron's `safeStorage` when the operating system supports it.
 
-### Stage 3 setup
+### v1.0 setup
 
 From PowerShell:
 
