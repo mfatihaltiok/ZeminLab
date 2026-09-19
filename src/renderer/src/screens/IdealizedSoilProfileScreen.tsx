@@ -15,7 +15,7 @@ function labPatch(lab:LaboratoryRecord|undefined):Partial<IdealizedSoilLayer>{
  if(!lab)return {}
  return {waterContent:lab.waterContent,liquidLimit:lab.liquidLimit,plasticLimit:lab.plasticLimit,plasticityIndex:lab.plasticityIndex,finesContent:lab.finesContent??lab.sieve200Passing,gamma:lab.unitWeight,cohesion:lab.directShearC??lab.c??lab.uuC,frictionAngle:lab.directShearPhi??lab.phi??lab.uuPhi,compressionIndexCc:lab.consolidationCc,recompressionIndexCr:lab.consolidationCs,initialVoidRatio:lab.voidRatio,constrainedModulus:lab.elasticModulus,oedometricModulus:lab.elasticModulus,poissonRatio:lab.poissonRatio}
 }
-function reflow(layers:IdealizedSoilLayer[]){let cursor=0;return layers.map((x,i)=>{const t=Number.isFinite(x.thickness)&&x.thickness!>0?x.thickness!:0;const next={...x,order:i+1,topDepth:cursor,bottomDepth:cursor+t,thickness:t};cursor+=t;return next})}
+function reflow(layers:IdealizedSoilLayer[]){let cursor=0;return layers.map((x,i)=>{const t=Number.isFinite(x.thickness)&&x.thickness!>0?x.thickness!:Math.max(0,x.bottomDepth-x.topDepth);const next={...x,order:i+1,topDepth:cursor,bottomDepth:cursor+t,thickness:t};cursor+=t;return next})}
 function sourceOf(spts:Array<{borehole:BoreholeRecord;spt:SptRecord}>,layer:IdealizedSoilLayer){return spts.find(x=>x.borehole.id===layer.sourceBoreholeId&&x.spt.id===layer.sourceSptRecordId)}
 function makeLayer(source:{borehole:BoreholeRecord;spt:SptRecord},labs:LaboratoryRecord[],order:number):IdealizedSoilLayer{
  const lab=linkedLab(labs,source.borehole.id,source.spt.id,source.spt.depth),patch=labPatch(lab)
