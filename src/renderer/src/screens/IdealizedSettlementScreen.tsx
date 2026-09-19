@@ -62,8 +62,8 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
   const [selected, setSelected] = useState(boreholes[0]?.id ?? '')
   const b = boreholes.find(x => x.id === selected) ?? boreholes[0]
   const f = p.foundationParameters
-  const qGross = finite(f.verticalLoad) && finite(f.footingWidth) && finite(f.footingLength)
-    ? forceToBase(f.verticalLoad, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
+  const qGross = finite(f.structuralWeight) && finite(f.footingWidth) && finite(f.footingLength)
+    ? forceToBase(f.structuralWeight, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
     : 0
 
   const result = useMemo(() => {
