@@ -7,8 +7,6 @@ import './borehole-log.css'
 
 type Props = { boreholes: BoreholeRecord[]; labs: LaboratoryRecord[]; onBoreholesChange: (rows: BoreholeRecord[]) => void }
 const fmt = (v?: number) => v === undefined || !Number.isFinite(v) ? '—' : v.toFixed(2)
-const colorMap: Record<LithologyLayer['colorClass'], string> = { fill: '#b99a72', clay: '#d5a06f', silt: '#c6b66a', sand: '#e0c66a', gravel: '#9da5a8', rock: '#737b82' }
-const patternId=(c:LithologyLayer['colorClass'])=>`url(#bh-${c})`
 
 export default function BoreholeLogScreen({ boreholes, labs, onBoreholesChange }: Props) {
   const [selectedId, setSelectedId] = useState(boreholes[0]?.id ?? '')
