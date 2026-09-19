@@ -26,9 +26,9 @@ export function tbdy2018Liquefaction(i:TBDYLiquefactionInput):TBDYLiquefactionRe
  if(f<=5){alpha=0;beta=1}
  else if(f<35){alpha=Math.exp(1.76-190/(f*f));beta=0.99+f/1000}
  else{alpha=5;beta=1.2}
- const N160f=N160+alpha*beta
+ const N160f=alpha+beta*N160
  const n=Math.max(N160f,0.1)
- const CRRM75=1/(34-n)+n/135+50/((10*n+45)**2)-1/200
+ const CRRM75=n<34?1/(34-n)+n/135+50/((10*n+45)**2)-1/200:0
  const CM=Math.pow(10,2.24)/Math.pow(Math.max(i.Mw,0.1),2.56)
  const Rtau=CRRM75*CM*sv
  let rd=1
@@ -40,6 +40,7 @@ export function tbdy2018Liquefaction(i:TBDYLiquefactionInput):TBDYLiquefactionRe
  const FS=tau>0?Rtau/tau:Infinity
  if(i.effectiveStress<=0)warnings.push('Efektif düşey gerilme sıfır/negatif.')
  if(i.rawSPT<0)warnings.push('Ham SPT negatif olamaz.')
+ if(N160f>=34)warnings.push('N1,60f ≥ 34 olduğu için TBDY 2018 Ek 16B kapsamında sıvılaşma tetiklenmesi değerlendirilmez.')
  if(i.finesContent<0||i.finesContent>100)warnings.push('İnce dane içeriği %0-%100 aralığına sınırlandı.')
  return{N160,N160f,CN,alpha,beta,CRRM75,CM,Rtau,rd,tauEarthquake:tau,FS,steps:[
   {symbol:'CN',formula:'min(1.70, 9.78/√σ′vo)',value:CN,source:'TBDY 2018 Denk. 16B.2'},
