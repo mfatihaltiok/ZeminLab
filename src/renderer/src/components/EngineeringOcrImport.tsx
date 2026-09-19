@@ -6,7 +6,7 @@ type OcrLine = { text: string; score?: number | null; box?: unknown }
 type DocumentTable = { index?:number; page?:number|null; box?:number[]|null; columns?:string[]; rows?:string[][] }
 type AnalysisResult = { ok:boolean; provider?:string; engines?:{ocr?:string;layout_table?:string}; lines?:OcrLine[]; document?:{text?:string;tables?:DocumentTable[];pages?:number}; warnings?:{paddle?:string|null;docling?:string|null}; policy?:{no_guessing?:boolean;requires_user_review?:boolean;reject_ambiguous_values?:boolean}; error?:string }
 type SptCandidate = { depth:number; n1?:number; n2?:number; n3?:number; score:number; raw:string }
-type LabCandidate = { field:string; value:number; score:number; raw:string; evidence:string }
+type LabCandidate = { field:string; value:number; score:number; raw:string; evidence:string; rowIndex?:number }
 
 const numberTokens=(text:string)=>[...text.replace(/,/g,'.').matchAll(/-?\d+(?:\.\d+)?/g)].map(m=>Number(m[0])).filter(Number.isFinite)
 const norm=(text:string)=>text.toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/φ/g,'phi').replace(/Φ/g,'phi').replace(/°/g,'').replace(/\s+/g,' ').trim()
@@ -115,20 +115,20 @@ function parseLaboratoryTables(tables: DocumentTable[]): LabCandidate[] {
         const cell = cells[columnIndex] ?? ''
         const value = numericCellValue(field, cell)
         if (value === undefined) continue
-        candidates.push({ field, value, score: 0.98, raw: cell, evidence: `Docling tablo · satır ${rowIndex + 1} · sütun ${columnIndex + 1}: ${cell}` })
+        candidates.push({ field, value, score: 0.98, raw: cell, rowIndex, evidence: `Docling tablo · satır ${rowIndex + 1} · sütun ${columnIndex + 1}: ${cell}` })
       }
       for (let columnIndex = 0; columnIndex < cells.length; columnIndex++) {
         const field = laboratoryFieldFromText(cells[columnIndex])
         if (!field) continue
         const sameCell = numericCellValue(field, cells[columnIndex])
         if (sameCell !== undefined) {
-          candidates.push({ field, value: sameCell, score: 0.97, raw: cells[columnIndex], evidence: `Docling tablo · satır ${rowIndex + 1}: ${cells[columnIndex]}` })
+          candidates.push({ field, value: sameCell, score: 0.97, raw: cells[columnIndex], rowIndex, evidence: `Docling tablo · satır ${rowIndex + 1}: ${cells[columnIndex]}` })
           continue
         }
         const numericRight = cells.slice(columnIndex + 1).map((cell, offset) => ({ cell, columnIndex: columnIndex + offset + 1, value: numericCellValue(field, cell) })).filter((item): item is { cell: string; columnIndex: number; value: number } => item.value !== undefined)
         if (numericRight.length === 1) {
           const item = numericRight[0]
-          candidates.push({ field, value: item.value, score: 0.95, raw: item.cell, evidence: `Docling tablo · satır ${rowIndex + 1} · ${cells[columnIndex]} → ${item.cell}` })
+          candidates.push({ field, value: item.value, score: 0.95, raw: item.cell, rowIndex, evidence: `Docling tablo · satır ${rowIndex + 1} · ${cells[columnIndex]} → ${item.cell}` })
         }
       }
     })
@@ -138,7 +138,12 @@ function parseLaboratoryTables(tables: DocumentTable[]): LabCandidate[] {
 
 function mergeLaboratoryCandidates(candidates: LabCandidate[]) {
   const grouped = new Map<string, LabCandidate[]>()
-  for (const candidate of candidates) grouped.set(candidate.field, [...(grouped.get(candidate.field) ?? []), candidate])
+  for (const candidate of candidates) {
+    const rowKey = candidate.rowIndex == null ? 'ocr' : String(candidate.rowIndex)
+    const key = candidate.field + '|' + rowKey
+    grouped.set(key, [...(grouped.get(key) ?? []), candidate])
+  }
+
   const result: LabCandidate[] = []
   for (const list of grouped.values()) {
     list.sort((a, b) => b.score - a.score)
@@ -150,7 +155,12 @@ function mergeLaboratoryCandidates(candidates: LabCandidate[]) {
     }
     result.push(list[0])
   }
-  return result
+
+  return result.sort((a, b) => {
+    const ar = a.rowIndex ?? Number.MAX_SAFE_INTEGER
+    const br = b.rowIndex ?? Number.MAX_SAFE_INTEGER
+    return ar - br || b.score - a.score
+  })
 }
 
 function parseLaboratory(lines: OcrLine[], tables: DocumentTable[] = []): LabCandidate[] {
@@ -193,7 +203,7 @@ export function EngineeringOcrImport({mode,laboratoryTargets=[],onSptImport,onLa
   const onFile=async(file?:File)=>{if(!file)return;if(!['image/png','image/jpeg','application/pdf'].includes(file.type)){setMessage('Yalnızca PNG, JPG veya PDF kabul edilir.');return}await analyze(await fileToDataUrl(file))}
   const importRows=()=>{if(!candidates.length)return;if(mode==='spt')onSptImport?.(candidates as SptCandidate[]);else if(targetId)onLaboratoryImport?.(targetId,candidates as LabCandidate[]);setMessage(candidates.length+' doğrulanmış aday kullanıcı onayıyla içeri aktarılacak şekilde hazırlandı.');setReview(false)}
   if(!host||!visible)return null
-  const panel=<section className="engineering-note engineering-ocr-panel" style={{marginBottom:12}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}><div><strong>{mode==='spt'?'SPT VERİLERİNİ BELGEDEN OKU':'LABORATUVAR VERİLERİNİ BELGEDEN OKU'}</strong><div style={{fontSize:12,opacity:.75}}>PNG/JPG seçebilir, PDF yükleyebilir veya Ctrl+V ile görsel yapıştırabilirsiniz. Yer değişimi için sayfa koordinatına değil belge yapısına bakılır.</div></div><div style={{display:'flex',gap:8,alignItems:'center'}}>{mode==='laboratory'&&<select value={targetId} onChange={e=>setTargetId(e.target.value)} disabled={!laboratoryTargets.length}><option value="">Hedef numune seçin</option>{laboratoryTargets.map(t=><option key={t.id} value={t.id}>{t.sampleId} · {t.depth.toFixed(2)} m</option>)}</select>}<button className="command-button" disabled={busy} onClick={()=>inputRef.current?.click()}>{busy?'Analiz ediliyor…':'Belge seç'}</button><input ref={inputRef} hidden type="file" accept="image/png,image/jpeg,application/pdf" onChange={e=>void onFile(e.target.files?.[0])}/></div></div>{message&&<div style={{marginTop:8}}>{message}</div>}{review&&<div style={{marginTop:12,overflowX:'auto'}}><table className="engineering-grid"><thead><tr>{mode==='spt'?<><th>Derinlik</th><th>n1</th><th>n2</th><th>n3</th><th>Güven</th></>:<><th>Alan</th><th>Değer</th><th>Güven</th><th>Kanıt</th></>}</tr></thead><tbody>{mode==='spt'?(candidates as SptCandidate[]).map((r,i)=><tr key={i}><td>{r.depth}</td><td>{r.n1??'—'}</td><td>{r.n2??'—'}</td><td>{r.n3??'—'}</td><td>{r.score?(r.score*100).toFixed(0)+'%':'belirsiz'}</td></tr>):(candidates as LabCandidate[]).map((r,i)=><tr key={i}><td>{r.field}</td><td>{r.value}</td><td>{r.score?(r.score*100).toFixed(0)+'%':'belirsiz'}</td><td>{r.evidence}</td></tr>)}</tbody></table><div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}><button className="command-button primary" disabled={!candidates.length||(mode==='laboratory'&&!targetId)} onClick={importRows}>Kontrol ettim, verileri içeri aktar</button></div></div>}</section>
+  const panel=<section className="engineering-note engineering-ocr-panel" style={{marginBottom:12}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}><div><strong>{mode==='spt'?'SPT VERİLERİNİ BELGEDEN OKU':'LABORATUVAR VERİLERİNİ BELGEDEN OKU'}</strong><div style={{fontSize:12,opacity:.75}}>PNG/JPG seçebilir, PDF yükleyebilir veya Ctrl+V ile görsel yapıştırabilirsiniz. Yer değişimi için sayfa koordinatına değil belge yapısına bakılır.</div></div><div style={{display:'flex',gap:8,alignItems:'center'}}>{mode==='laboratory'&&<select value={targetId} onChange={e=>setTargetId(e.target.value)} disabled={!laboratoryTargets.length}><option value="">Hedef numune seçin</option>{laboratoryTargets.map(t=><option key={t.id} value={t.id}>{t.sampleId} · {t.depth.toFixed(2)} m</option>)}</select>}<button className="command-button" disabled={busy} onClick={()=>inputRef.current?.click()}>{busy?'Analiz ediliyor…':'Belge seç'}</button><input ref={inputRef} hidden type="file" accept="image/png,image/jpeg,application/pdf" onChange={e=>void onFile(e.target.files?.[0])}/></div></div>{message&&<div style={{marginTop:8}}>{message}</div>}{review&&<div style={{marginTop:12,overflowX:'auto'}}><table className="engineering-grid"><thead><tr>{mode==='spt'?<><th>Derinlik</th><th>n1</th><th>n2</th><th>n3</th><th>Güven</th></>:<><th>Satır</th><th>Alan</th><th>Değer</th><th>Güven</th><th>Kanıt</th></>}</tr></thead><tbody>{mode==='spt'?(candidates as SptCandidate[]).map((r,i)=><tr key={i}><td>{r.depth}</td><td>{r.n1??'—'}</td><td>{r.n2??'—'}</td><td>{r.n3??'—'}</td><td>{r.score?(r.score*100).toFixed(0)+'%':'belirsiz'}</td></tr>):(candidates as LabCandidate[]).map((r,i)=><tr key={i}><td>{r.rowIndex==null?'OCR':r.rowIndex+1}</td><td>{r.field}</td><td>{r.value}</td><td>{r.score?(r.score*100).toFixed(0)+'%':'belirsiz'}</td><td>{r.evidence}</td></tr>)}</tbody></table><div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}><button className="command-button primary" disabled={!candidates.length||(mode==='laboratory'&&!targetId)} onClick={importRows}>Kontrol ettim, verileri içeri aktar</button></div></div>}</section>
   return createPortal(panel,host)
 }
 export type { SptCandidate, LabCandidate }
