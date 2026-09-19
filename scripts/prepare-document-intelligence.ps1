@@ -91,6 +91,13 @@ function Patch-PaddleXModelScopeImport {
   }
 
   $source = Get-Content -Raw -Path $officialModelsPath
+
+  $source = [regex]::Replace(
+    $source,
+    '(?m)^import modelscope[ \t]*$',
+    "# FALUZMN: ModelScope lazy-load edilir; temel OCR başlangıcında Torch yüklenmez."
+  )
+
   $classStartText = "class _ModelScopeModelHoster(_BaseModelHoster):"
   $nextClassText = "class _AIStudioModelHoster(_BaseModelHoster):"
   $classStart = $source.IndexOf($classStartText)
@@ -99,12 +106,6 @@ function Patch-PaddleXModelScopeImport {
   if ($classStart -lt 0 -or $classEnd -lt 0) {
     throw "PaddleX ModelScope hoster bölümü beklenen yapıda bulunamadı."
   }
-
-  $source = [regex]::Replace(
-    $source,
-    '(?m)^import modelscope[ \t]*$',
-    "# FALUZMN: ModelScope lazy-load edilir; temel OCR başlangıcında Torch yüklenmez."
-  )
 
   $classSegment = $source.Substring($classStart, $classEnd - $classStart)
   if ($classSegment -notmatch '(?m)^[ \t]+import modelscope[ \t]*$') {
@@ -125,12 +126,7 @@ function Patch-PaddleXModelScopeImport {
   $patchMarker = Join-Path $paddleRoot "faluzmn-paddlex-lazy-modelscope.ready"
   Set-Content -Path $patchMarker -Value "PaddleX ModelScope import lazy-loaded by FALUZMN runtime preparation." -Encoding UTF8
 }
-
-Patch-PaddleXModelScopeImport
-
 Write-Host "2/6 PaddleOCR runtime kontrol ediliyor..."
-Patch-PaddleXModelScopeImport
-
 $paddleProbe = Invoke-BundledPython -Arguments @(
   "-c",
   "import paddle, paddleocr; print(paddle.__version__); print(paddleocr.__version__)"
@@ -143,6 +139,14 @@ if ($paddleProbe.ExitCode -ne 0 -or $paddleText -notmatch "3\.2\.2" -or $paddleT
 } else {
   Write-Host "PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 zaten kurulu; yeniden indirilmiyor."
 }
+
+Patch-PaddleXModelScopeImport
+
+$paddleProbe = Invoke-BundledPython -Arguments @(
+  "-c",
+  "import paddle, paddleocr; print(paddle.__version__); print(paddleocr.__version__)"
+)
+Assert-NativeSuccess -Result $paddleProbe -Message "PaddleOCR/PaddleX runtime doğrulaması başarısız."
 
 Write-Host "3/6 Docling belge yapısı motoru kontrol ediliyor..."
 $doclingProbe = Invoke-BundledPython -Arguments @("-c","import docling; print(docling.__version__)")
