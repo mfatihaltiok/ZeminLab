@@ -62,22 +62,30 @@ app.whenReady().then(()=>{
     return{filePath,data:envelope.data,version:envelope.version}
   })
 
-  ipcMain.handle('field-cache:save',async(_event,payload:unknown)=>{
-    const cachePath=join(app.getPath('userData'),'FALUZMN-field-cache.json')
-    const envelope={format:'FALUZMN-FIELD-CACHE',version:FIELD_CACHE_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:payload}
+  const writeFieldCache=async(kind:'boreholes'|'laboratories',data:unknown)=>{
+    const cachePath=join(app.getPath('userData'),`FALUZMN-${kind}.cache.json`)
+    const envelope={format:'FALUZMN-FIELD-CACHE',version:FIELD_CACHE_SCHEMA_VERSION,savedAt:new Date().toISOString(),kind,data}
     await fs.mkdir(app.getPath('userData'),{recursive:true})
     await fs.writeFile(cachePath,JSON.stringify(envelope,null,2),'utf8')
     return {cachePath,savedAt:envelope.savedAt}
-  })
+  }
+
+  ipcMain.handle('field-cache:save-boreholes',async(_event,payload:unknown)=>writeFieldCache('boreholes',payload))
+  ipcMain.handle('field-cache:save-laboratories',async(_event,payload:unknown)=>writeFieldCache('laboratories',payload))
 
   ipcMain.handle('field-cache:load',async()=>{
-    const cachePath=join(app.getPath('userData'),'FALUZMN-field-cache.json')
-    try{
-      const raw=await fs.readFile(cachePath,'utf8')
-      const envelope=JSON.parse(raw) as {format?:string;version?:number;data?:unknown;savedAt?:string}
-      if(envelope.format!=='FALUZMN-FIELD-CACHE'||envelope.version!==FIELD_CACHE_SCHEMA_VERSION)return null
-      return {data:envelope.data,savedAt:envelope.savedAt}
-    }catch{return null}
+    const readCache=async(kind:'boreholes'|'laboratories')=>{
+      const cachePath=join(app.getPath('userData'),`FALUZMN-${kind}.cache.json`)
+      try{
+        const raw=await fs.readFile(cachePath,'utf8')
+        const envelope=JSON.parse(raw) as {format?:string;version?:number;kind?:string;data?:unknown;savedAt?:string}
+        if(envelope.format!=='FALUZMN-FIELD-CACHE'||envelope.version!==FIELD_CACHE_SCHEMA_VERSION||envelope.kind!==kind)return null
+        return {data:envelope.data,savedAt:envelope.savedAt}
+      }catch{return null}
+    }
+    const [boreholes,laboratories]=await Promise.all([readCache('boreholes'),readCache('laboratories')])
+    if(!boreholes&&!laboratories)return null
+    return {boreholes:boreholes?.data,laboratories:laboratories?.data,savedAt:boreholes?.savedAt??laboratories?.savedAt}
   })
 
   ipcMain.handle('report:print',async event=>{
