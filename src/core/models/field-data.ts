@@ -1,9 +1,8 @@
-export type FieldDataSource = 'manual' | 'imported' | 'ocr'
-export type ProvenanceKind = 'MEASURED' | 'IMPORTED' | 'OCR' | 'USER_ENTERED' | 'CORRELATED' | 'DEFAULT' | 'MISSING'
+export type FieldDataSource = 'manual' | 'imported'
+export type ProvenanceKind = 'MEASURED' | 'IMPORTED' | 'USER_ENTERED' | 'CORRELATED' | 'DEFAULT' | 'MISSING'
 export interface DataProvenance { kind: ProvenanceKind; source?: string; sourceId?: string; approved: boolean; note?: string; capturedAt?: string }
 export function manualProvenance(note?:string):DataProvenance{return {kind:'USER_ENTERED',approved:true,note,capturedAt:new Date().toISOString()}}
 export function importedProvenance(source:string,sourceId?:string,approved=false):DataProvenance{return {kind:'IMPORTED',source,sourceId,approved,capturedAt:new Date().toISOString()}}
-export function ocrProvenance(source:string,sourceId?:string):DataProvenance{return {kind:'OCR',source,sourceId,approved:false,capturedAt:new Date().toISOString()}}
 
 export type BoreholeId = string
 export type SptTestType = 'SPT' | 'UD'
