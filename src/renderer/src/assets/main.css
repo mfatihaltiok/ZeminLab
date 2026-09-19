@@ -15,3 +15,5 @@ body{font-size:14px}
 .geophysics-panel{font-size:14px}
 .vs30-result span,.vs30-result small{font-size:13px}
 .vs30-result strong{font-size:22px}
+
+.menu-item{position:relative;display:flex;height:100%;align-items:center}.menu-item>button{min-width:74px}.menu-popup{position:absolute;left:0;top:27px;z-index:50;min-width:210px;padding:4px;border:1px solid #8f9aa3;background:#f7f8f9;box-shadow:2px 3px 8px rgba(0,0,0,.18)}.menu-popup>button{display:block;width:100%;height:30px;padding:0 10px;border:0;background:transparent;text-align:left;font-size:12px;cursor:pointer}.menu-popup>button:hover{background:#dce8f1}.menu-info{display:flex;flex-direction:column;gap:4px;padding:9px 11px;font-size:11px;color:#4d5962}.menu-info span{font-size:10px;color:#77818a}.status-bar{flex:0 0 23px}
