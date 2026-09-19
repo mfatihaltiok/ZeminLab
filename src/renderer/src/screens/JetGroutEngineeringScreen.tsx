@@ -1,25 +1,28 @@
 import { useMemo, useState } from 'react'
 import { jetGroutEngineering, type JetGroutEngineeringResult } from '../../../core/engineering/jet-grout-advanced'
 import { Card, Field, Frame, Metric, Source } from '../workspace/WorkspaceShell'
+import { useProjectInfo } from '../../../core/state/project-store'
+import { forceToBase } from '../../../core/units/project-units'
 import { CalculationTrace } from '../components/CalculationTrace'
 
 export let latestJetGroutResult: JetGroutEngineeringResult | undefined
 
 export function JetGroutEngineeringScreen() {
+  const p=useProjectInfo(); const f=p.foundationParameters
+  const projectArea=Math.max(0,f.footingWidth*f.footingLength); const projectLoad=forceToBase(f.structuralWeight,p.unitSystem); const projectH=Math.hypot(forceToBase(f.vtX,p.unitSystem),forceToBase(f.vtY,p.unitSystem))
   const [d,setD]=useState('0.8'), [spacing,setSpacing]=useState('1.5'), [soil,setSoil]=useState('150'), [column,setColumn]=useState('2000')
   const [soilEs,setSoilEs]=useState('5000'), [columnEs,setColumnEs]=useState('100000'), [soilC,setSoilC]=useState('10'), [columnC,setColumnC]=useState('2000')
-  const [area,setArea]=useState('16'), [load,setLoad]=useState('800')
   const [thickness,setThickness]=useState('5'), [phi,setPhi]=useState('40'), [c,setC]=useState('10'), [angle,setAngle]=useState('30')
-  const [hload,setHload]=useState('80'), [layout,setLayout]=useState<'square'|'triangular'>('square')
+  const [layout,setLayout]=useState<'square'|'triangular'>('square')
   const r=useMemo(()=>jetGroutEngineering({
     columnDiameter:Number(d), spacing:Number(spacing), layout,
     qSoil:Number(soil), qColumn:Number(column),
     cSoil:Number(soilC), cColumn:Number(columnC),
     EsSoil:Number(soilEs), EsColumn:Number(columnEs),
-    load:Number(load), foundationArea:Number(area), foundationThickness:Number(thickness),
+    load:projectLoad>0?projectLoad:undefined, foundationArea:projectArea>0?projectArea:undefined, foundationThickness:Number(thickness),
     columnFrictionAngle:Number(phi), cohesion:Number(c), frictionAngle:Number(angle),
-    verticalLoad:Number(load), horizontalLoad:Number(hload)
-  }),[d,spacing,layout,soil,column,soilEs,columnEs,soilC,columnC,load,area,thickness,phi,c,angle,hload])
+    verticalLoad:projectLoad, horizontalLoad:projectH
+  }),[d,spacing,layout,soil,column,soilEs,columnEs,soilC,columnC,thickness,phi,c,angle,p.unitSystem,p.foundationParameters.structuralWeight,p.foundationParameters.vtX,p.foundationParameters.vtY])
   latestJetGroutResult=r
   return <Frame screen="jet-grout">
     <Source>Erol &amp; Çekinmez Bayram (2018), Jet Enjeksiyon Yöntemi, Yüksel Proje, Ankara: Jet Grout zemin-kolon kompozit malzeme yaklaşımı. Priebe 1995 yalnızca taş kolon/vibro-replacement referans ekranıdır ve Jet Grout hesabına uygulanmaz. TBDY 2018 Bölüm 16 ise ayrı yönetmelik kontrolleri olarak ele alınır.</Source>
@@ -29,9 +32,9 @@ export function JetGroutEngineeringScreen() {
       <Field label="Zemin qult (kPa)" value={soil} onChange={setSoil}/><Field label="Kolon qult (kPa)" value={column} onChange={setColumn}/>
       <Field label="Zemin c′ (kPa)" value={soilC} onChange={setSoilC}/><Field label="Kolon c′ (kPa)" value={columnC} onChange={setColumnC}/>
       <Field label="Zemin E (kPa)" value={soilEs} onChange={setSoilEs}/><Field label="Kolon E (kPa)" value={columnEs} onChange={setColumnEs}/>
-      <Field label="Temel alanı (m²)" value={area} onChange={setArea}/><Field label="Düşey yük (kN)" value={load} onChange={setLoad}/>
+      <Metric label="Temel alanı" value={projectArea.toFixed(2)} unit="m²"/><Metric label="G+Q" value={projectLoad.toFixed(2)} unit="kN"/>
       <Field label="İyileştirme kalınlığı H (m)" value={thickness} onChange={setThickness}/><Field label="Kolon φ (°) · Priebe referansı" value={phi} onChange={setPhi}/>
-      <Field label="Arayüz c′ (kPa)" value={c} onChange={setC}/><Field label="Arayüz φ′ (°)" value={angle} onChange={setAngle}/><Field label="Yatay yük H (kN)" value={hload} onChange={setHload}/>
+      <Field label="Arayüz c′ (kPa)" value={c} onChange={setC}/><Field label="Arayüz φ′ (°)" value={angle} onChange={setAngle}/><Metric label="√(Vtx²+Vty²)" value={projectH.toFixed(2)} unit="kN"/>
     </div></Card>
     <div className="metric-strip"><Metric label="Alan oranı ar" value={(r.areaReplacementRatio*100).toFixed(2)} unit="%"/><Metric label="Kompozit kapasite" value={r.compositeCapacity.toFixed(2)} unit="kPa" tone="primary"/><Metric label="Ecomp" value={r.compositeModulus?.toFixed(1) ?? '—'} unit="kPa"/><Metric label="Kolon yük payı" value={(r.columnLoadShare*100).toFixed(1)} unit="%"/><Metric label="β stress concentration" value={r.stressConcentrationFactor.toFixed(2)}/></div>
     <Card title="EROL &amp; ÇEKİNMEZ BAYRAM · KOMPOZİT BİRİM HÜCRE"><CalculationTrace title="Kompozit hesap zinciri" source={r.source} rows={[
