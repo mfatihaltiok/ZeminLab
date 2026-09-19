@@ -174,6 +174,7 @@ function parseLaboratory(lines: OcrLine[], tables: DocumentTable[] = []): LabCan
   }
   return mergeLaboratoryCandidates([...tableCandidates, ...ocrCandidates])
 }
+
 function fileToDataUrl(file:File){return new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(reader.error??new Error('Belge okunamadı.'));reader.readAsDataURL(file)})}
 
 export function EngineeringOcrImport({mode,laboratoryTargets=[],onSptImport,onLaboratoryImport}:{mode:Mode;laboratoryTargets?:Array<{id:string;sampleId:string;depth:number}>;onSptImport?:(rows:SptCandidate[])=>void;onLaboratoryImport?:(targetId:string,rows:LabCandidate[])=>void}){
