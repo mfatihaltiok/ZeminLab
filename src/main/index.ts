@@ -7,7 +7,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
 const projectSaveFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
-const projectOpenFilter=[{name:'FALUZMN Projesi',extensions:['falu','zlproj','zlab']}]
+const projectOpenFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
 const pdfFilter=[{name:'PDF Belgesi',extensions:['pdf']}]
 const PROJECT_SCHEMA_VERSION=1
 const execFileAsync=promisify(execFile)
@@ -93,7 +93,7 @@ app.whenReady().then(()=>{
     if(!filePath){
       const result=await dialog.showSaveDialog({title:'FALUZMN Projesini Kaydet',defaultPath:'Yeni Proje.falu',filters:projectSaveFilter})
       if(result.canceled||!result.filePath)return null
-      filePath=result.filePath.endsWith('.falu')?result.filePath:`${result.filePath}.zlproj`
+      filePath=result.filePath.endsWith('.falu')?result.filePath:`${result.filePath}.falu`
     }
     const envelope={format:'FALUZMN',version:PROJECT_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:payload}
     await fs.writeFile(filePath,JSON.stringify(envelope,null,2),'utf8')
@@ -101,12 +101,12 @@ app.whenReady().then(()=>{
   })
 
   ipcMain.handle('project:open',async()=>{
-    const result=await dialog.showOpenDialog({title:'ZeminLab Projesi Aç',properties:['openFile'],filters:projectOpenFilter})
+    const result=await dialog.showOpenDialog({title:'FALUZMN Projesi Aç',properties:['openFile'],filters:projectOpenFilter})
     if(result.canceled||!result.filePaths[0])return null
     const filePath=result.filePaths[0]
     const raw=await fs.readFile(filePath,'utf8')
     const envelope=JSON.parse(raw) as {format?:string;version?:number;data?:unknown}
-    if(envelope.format!=='ZeminLab'||typeof envelope.version!=='number'||envelope.data===undefined)throw new Error('Geçersiz veya desteklenmeyen FALUZMN proje dosyası.')
+    if(envelope.format!=='FALUZMN'||typeof envelope.version!=='number'||envelope.data===undefined)throw new Error('Geçersiz veya desteklenmeyen FALUZMN proje dosyası.')
     if(envelope.version>PROJECT_SCHEMA_VERSION)throw new Error(`Bu proje dosyası daha yeni bir FALUZMN sürümüne ait (v${envelope.version}).`)
     return{filePath,data:envelope.data,version:envelope.version}
   })
@@ -125,7 +125,7 @@ app.whenReady().then(()=>{
   ipcMain.handle('report:export-pdf',async event=>{
     const window=BrowserWindow.fromWebContents(event.sender)
     if(!window)return null
-    const result=await dialog.showSaveDialog(window,{title:'Mühendislik Raporunu PDF Olarak Kaydet',defaultPath:'ZeminLab-Mühendislik-Raporu.pdf',filters:pdfFilter})
+    const result=await dialog.showSaveDialog(window,{title:'Mühendislik Raporunu PDF Olarak Kaydet',defaultPath:'FALUZMN-Mühendislik-Raporu.pdf',filters:pdfFilter})
     if(result.canceled||!result.filePath)return null
     const pdf=await window.webContents.printToPDF({landscape:false,pageSize:'A4',printBackground:true,displayHeaderFooter:false,margins:{top:0,bottom:0,left:0,right:0}})
     const filePath=result.filePath.endsWith('.pdf')?result.filePath:`${result.filePath}.pdf`
