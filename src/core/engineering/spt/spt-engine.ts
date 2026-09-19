@@ -99,7 +99,7 @@ export function calculateSpt(input: SptEngineInput): SptEngineResult {
     { symbol: 'Cₛ', title: 'Numune alıcı düzeltmesi', formula: 'Cₛ = f(sampler)', value: cs, note: input.sampler === 'without-liner' ? 'İç tüpsüz numune alıcı; varsayılan Cₛ=1.10.' : 'Standart iç tüplü numune alıcı; Cₛ=1.00.' },
     { symbol: 'Cᵣ', title: 'Rod boyu düzeltmesi', formula: 'Cᵣ = f(L)', value: cr, note: input.rodLengthM ? `Rod boyu = ${input.rodLengthM} m` : 'Rod boyu girilmedi; 1.00 kullanıldı.' },
     { symbol: 'N₆₀', title: 'Standartlaştırılmış SPT', formula: 'N₆₀ = N · Cₑ · Cᵦ · Cₛ · Cᵣ', value: n60 },
-    { symbol: 'Cᴺ', title: 'Örtü basıncı düzeltmesi', formula: 'Cᴺ = min(1.70, √(100/σ′ᵥ₀))', value: cn, note: finitePositive(sigma) ? `σ′ᵥ₀ = ${sigma!.toFixed(3)} kPa` : 'Etkin düşey gerilme verilmediği için uygulanmadı.' },
+    { symbol: 'Cᴺ', title: 'Örtü basıncı düzeltmesi', formula: 'Cᴺ = min(1.70, 9.78 / √σ′ᵥ₀)', value: cn, note: finitePositive(sigma) ? `σ′ᵥ₀ = ${sigma!.toFixed(3)} kPa` : 'Etkin düşey gerilme verilmediği için uygulanmadı.' },
     { symbol: '(N₁)₆₀', title: 'Normalize SPT', formula: '(N₁)₆₀ = Cᴺ · N₆₀', value: n1_60 }
   ]
   if (dilatancyApplied) trace.push({ symbol: '(N₁)₆₀,d', title: 'Dilatansi düzeltmesi', formula: '15 + 0.5[(N₁)₆₀ − 15]', value: n1_60_dilatancy, note: 'Bu seçenek yalnızca proje metodolojisi açıkça gerektiriyorsa kullanılmalıdır.' })
