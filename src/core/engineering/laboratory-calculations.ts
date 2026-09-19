@@ -10,6 +10,8 @@ import type { LaboratoryRecord } from '../models/field-data'
  */
 export type LaboratoryDerivedValues = {
   plasticityIndex?: number
+  dryUnitWeight?: number
+  porosityFromVoidRatio?: number
 }
 
 export function calculatePlasticityIndex(liquidLimit?: number, plasticLimit?: number): number | undefined {
@@ -19,9 +21,16 @@ export function calculatePlasticityIndex(liquidLimit?: number, plasticLimit?: nu
 }
 
 export function deriveLaboratoryValues(record: LaboratoryRecord): LaboratoryDerivedValues {
-  return {
-    plasticityIndex: calculatePlasticityIndex(record.liquidLimit, record.plasticLimit)
-  }
+  const plasticityIndex = calculatePlasticityIndex(record.liquidLimit, record.plasticLimit)
+  const dryUnitWeight =
+    record.unitWeight != null && Number.isFinite(record.unitWeight) && record.waterContent != null && Number.isFinite(record.waterContent)
+      ? record.unitWeight / (1 + Math.max(0, record.waterContent) / 100)
+      : undefined
+  const porosityFromVoidRatio =
+    record.voidRatio != null && Number.isFinite(record.voidRatio) && record.voidRatio >= 0
+      ? record.voidRatio / (1 + record.voidRatio)
+      : undefined
+  return { plasticityIndex, dryUnitWeight, porosityFromVoidRatio }
 }
 
 /**
