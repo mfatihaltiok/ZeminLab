@@ -32,6 +32,7 @@ export function WorkspaceShell({screen,onScreenChange,onNewProject,onOpenProject
     <button onClick={()=>{setOpenMenu(null);onSaveProject()}}>Kaydet</button>
     <button onClick={()=>{setOpenMenu(null);onSaveAsProject()}}>Farklı Kaydet…</button>
   </div>}</div>
+  <div className="menu-item"><button onClick={()=>setOpenMenu(openMenu==='Düzen'?null:'Düzen')}>Düzen</button>{openMenu==='Düzen'&&<div className="menu-popup"><button onClick={()=>{setOpenMenu(null);go('project-info')}}>Proje Bilgilerini Düzenle</button><button onClick={()=>{setOpenMenu(null);go('field')}}>Saha Verilerini Düzenle</button></div>}</div>
   <div className="menu-item"><button onClick={()=>setOpenMenu(openMenu==='Görünüm'?null:'Görünüm')}>Görünüm</button>{openMenu==='Görünüm'&&<div className="menu-popup">
     <button onClick={()=>setLeftVisible(v=>!v)}>Model Explorer {leftVisible?'✓':''}</button>
     <button onClick={()=>setRightVisible(v=>!v)}>Çalışma Notları {rightVisible?'✓':''}</button>
