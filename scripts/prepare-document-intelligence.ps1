@@ -65,8 +65,8 @@ $env:PYTHONNOUSERSITE = "1"
 & $runtimePython -c "import paddle, paddleocr, docling; print('Paddle', paddle.__version__); print('PaddleOCR', paddleocr.__version__); print('Docling', docling.__version__)"
 if ($LASTEXITCODE -ne 0) { throw "Yerel belge motorları import edilemedi." }
 
-$marker = Join-Path $paddleRoot "zeminlab-document-intelligence.ready"
-Set-Content -Path $marker -Value "PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 / PP-OCRv5 / Docling 2.128.0 / CPU / offline" -Encoding UTF8
+$marker = Join-Path $paddleRoot "faluzmn-document-intelligence.ready"
+Set-Content -Path $marker -Value "FALUZMN PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 / PP-OCRv5 / Docling 2.128.0 / CPU / offline" -Encoding UTF8
 
 Remove-Item -Force $getPip,$zipPath -ErrorAction SilentlyContinue
-Write-Host "ZeminLab belge istihbarat runtime hazır."
+Write-Host "FALUZMN belge istihbarat runtime hazır."
