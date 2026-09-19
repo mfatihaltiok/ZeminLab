@@ -11,15 +11,16 @@ $pythonUrl = "https://www.python.org/ftp/python/$pythonVersion/$pythonZip"
 $tempRoot = Join-Path $env:TEMP "zeminlab-document-intelligence-build"
 
 New-Item -ItemType Directory -Force -Path $resourceRoot,$tempRoot | Out-Null
-if (Test-Path $runtimeRoot) { Remove-Item -Recurse -Force $runtimeRoot }
-if (Test-Path $paddleRoot) { Remove-Item -Recurse -Force $paddleRoot }
-if (Test-Path $doclingRoot) { Remove-Item -Recurse -Force $doclingRoot }
 New-Item -ItemType Directory -Force -Path $runtimeRoot,$paddleRoot,$doclingRoot | Out-Null
 
 $zipPath = Join-Path $tempRoot $pythonZip
-Write-Host "1/6 Bundled Python hazırlanıyor..."
-Invoke-WebRequest -Uri $pythonUrl -OutFile $zipPath
-Expand-Archive -Path $zipPath -DestinationPath $runtimeRoot -Force
+Write-Host "1/6 Bundled Python kontrol ediliyor..."
+if (-not (Test-Path $runtimePython)) {
+  Invoke-WebRequest -Uri $pythonUrl -OutFile $zipPath
+  Expand-Archive -Path $zipPath -DestinationPath $runtimeRoot -Force
+} else {
+  Write-Host "Bundled Python zaten mevcut; yeniden indirilmiyor."
+}
 
 $pth = Get-ChildItem $runtimeRoot -Filter "python*._pth" | Select-Object -First 1
 if (-not $pth) { throw "Embedded Python ._pth dosyası bulunamadı." }
@@ -30,19 +31,36 @@ if ($pthLines -notcontains "import site") { Add-Content -Path $pth.FullName -Val
 $runtimePython = Join-Path $runtimeRoot "python.exe"
 if (-not (Test-Path $runtimePython)) { throw "Bundled Python bulunamadı: $runtimePython" }
 
-$getPip = Join-Path $tempRoot "get-pip.py"
-Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
-& $runtimePython $getPip --disable-pip-version-check --no-warn-script-location
-if ($LASTEXITCODE -ne 0) { throw "Bundled Python pip kurulumu başarısız." }
+$pipCheck = & $runtimePython -m pip --version 2>$null
+if ($LASTEXITCODE -ne 0) {
+  $getPip = Join-Path $tempRoot "get-pip.py"
+  Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
+  & $runtimePython $getPip --disable-pip-version-check --no-warn-script-location
+  if ($LASTEXITCODE -ne 0) { throw "Bundled Python pip kurulumu başarısız." }
+} else {
+  Write-Host "pip zaten mevcut; yeniden kurulmayacak."
+}
 
-Write-Host "2/6 PaddleOCR PP-OCRv5 kuruluyor..."
-$paddlePackages = @("numpy==1.26.4","scipy==1.13.1","scikit-learn==1.7.1","paddleocr==3.3.2","paddlepaddle==3.2.2")
-& $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location $paddlePackages
-if ($LASTEXITCODE -ne 0) { throw "PaddleOCR runtime kurulumu başarısız." }
+Write-Host "2/6 PaddleOCR runtime kontrol ediliyor..."
+$paddleProbe = & $runtimePython -c "import paddle, paddleocr; print(paddle.__version__); print(paddleocr.__version__)" 2>$null
+$paddleText = $paddleProbe -join " "
+if ($LASTEXITCODE -ne 0 -or $paddleText -notmatch "3.2.2" -or $paddleText -notmatch "3.3.2") {
+  $paddlePackages = @("numpy==1.26.4","scipy==1.13.1","scikit-learn==1.7.1","paddleocr==3.3.2","paddlepaddle==3.2.2")
+  & $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location $paddlePackages
+  if ($LASTEXITCODE -ne 0) { throw "PaddleOCR runtime kurulumu başarısız." }
+} else {
+  Write-Host "PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 zaten kurulu; yeniden indirilmiyor."
+}
 
-Write-Host "3/6 Docling belge yapısı motoru kuruluyor..."
-& $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location "docling==2.128.0"
-if ($LASTEXITCODE -ne 0) { throw "Docling kurulumu başarısız." }
+Write-Host "3/6 Docling belge yapısı motoru kontrol ediliyor..."
+$doclingProbe = & $runtimePython -c "import docling; print(docling.__version__)" 2>$null
+$doclingText = $doclingProbe -join " "
+if ($LASTEXITCODE -ne 0 -or $doclingText -notmatch "2.128.0") {
+  & $runtimePython -m pip install --disable-pip-version-check --no-warn-script-location "docling==2.128.0"
+  if ($LASTEXITCODE -ne 0) { throw "Docling kurulumu başarısız." }
+} else {
+  Write-Host "Docling 2.128.0 zaten kurulu; yeniden indirilmiyor."
+}
 
 Write-Host "4/6 Yalnızca gerekli Docling layout + table modelleri indiriliyor..."
 $env:DOCLING_ARTIFACTS_PATH = $doclingRoot
