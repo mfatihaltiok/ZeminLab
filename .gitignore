@@ -6,3 +6,5 @@ out
 *.log*
 resources/python-runtime/
 resources/paddleocr-vl-v1/
+resources/paddleocr-v5/
+resources/docling/
