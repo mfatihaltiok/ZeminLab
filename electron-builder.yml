@@ -10,14 +10,6 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 extraResources:
-  - from: resources/python-runtime
-    to: python-runtime
-  - from: resources/paddleocr-v5
-    to: paddleocr-v5
-  - from: resources/docling
-    to: docling
-  - from: tools/document_intelligence.py
-    to: tools/document_intelligence.py
 win:
   executableName: FALUZMN
 nsis:
