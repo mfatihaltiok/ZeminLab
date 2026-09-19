@@ -51,7 +51,7 @@ app.whenReady().then(()=>{
     return await writeProjectFile(filePath,payload)
   })
 
-  ipcMain.handle('project:open',,async()=>{
+  ipcMain.handle('project:open',async()=>{
     const result=await dialog.showOpenDialog({title:'FALUZMN Projesi Aç',properties:['openFile'],filters:projectOpenFilter})
     if(result.canceled||!result.filePaths[0])return null
     const filePath=result.filePaths[0]
