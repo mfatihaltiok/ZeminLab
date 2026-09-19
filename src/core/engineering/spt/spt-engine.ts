@@ -87,7 +87,7 @@ export function calculateSpt(input: SptEngineInput): SptEngineResult {
   const n60 = input.nField * ce * cb * cs * cr
   const sigma = input.effectiveStress
   const applyOverburden = input.applyOverburden ?? true
-  const cn = applyOverburden && finitePositive(sigma) ? Math.min(1.7, Math.sqrt(100 / sigma!)) : 1
+  const cn = applyOverburden && finitePositive(sigma) ? Math.min(1.7, 9.78 / Math.sqrt(sigma!)) : 1
   const n1_60 = n60 * cn
   const fines = input.fineContent ?? 0
   const dilatancyApplied = Boolean(input.applyDilatancy && fines < 35 && finitePositive(sigma) && n1_60 > 15)
