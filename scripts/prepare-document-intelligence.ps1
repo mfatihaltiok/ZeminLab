@@ -127,17 +127,17 @@ function Patch-PaddleXModelScopeImport {
   Set-Content -Path $patchMarker -Value "PaddleX ModelScope import lazy-loaded by FALUZMN runtime preparation." -Encoding UTF8
 }
 Write-Host "2/6 PaddleOCR runtime kontrol ediliyor..."
-$paddleProbe = Invoke-BundledPython -Arguments @(
+$paddlePackageProbe = Invoke-BundledPython -Arguments @(
   "-c",
-  "import paddle, paddleocr; print(paddle.__version__); print(paddleocr.__version__)"
+  "from importlib.metadata import version; print('paddlepaddle', version('paddlepaddle')); print('paddleocr', version('paddleocr'))"
 )
-$paddleText = $paddleProbe.Output
-if ($paddleProbe.ExitCode -ne 0 -or $paddleText -notmatch "3\.2\.2" -or $paddleText -notmatch "3\.3\.2") {
+$paddlePackageText = $paddlePackageProbe.Output
+if ($paddlePackageProbe.ExitCode -ne 0 -or $paddlePackageText -notmatch "paddlepaddle 3\.2\.2" -or $paddlePackageText -notmatch "paddleocr 3\.3\.2") {
   $paddlePackages = @("numpy==1.26.4","scipy==1.13.1","scikit-learn==1.7.1","paddleocr==3.3.2","paddlepaddle==3.2.2")
   $install = Invoke-BundledPython -Arguments (@("-m","pip","install","--disable-pip-version-check","--no-warn-script-location") + $paddlePackages)
   Assert-NativeSuccess -Result $install -Message "PaddleOCR runtime kurulumu başarısız."
 } else {
-  Write-Host "PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 zaten kurulu; yeniden indirilmiyor."
+  Write-Host "PaddleOCR 3.3.2 / PaddlePaddle 3.2.2 paketleri zaten kurulu; yeniden indirilmiyor."
 }
 
 Patch-PaddleXModelScopeImport
