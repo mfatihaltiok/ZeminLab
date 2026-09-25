@@ -44,6 +44,9 @@ export interface IdealizedSoilLayer {
   constrainedModulus?: number
   oedometricModulus?: number
   poissonRatio?: number
+  /** Janbu tangent-modulus parameters; no automatic correlation is permitted. */
+  janbuModulusNumber?: number
+  janbuStressExponent?: number
   parameterSources: Record<string, IdealizedParameterSource>
   userOverride: boolean
   sourceBoreholeId?: string
