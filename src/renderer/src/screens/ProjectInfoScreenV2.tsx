@@ -97,7 +97,7 @@ export function ProjectInfoScreenV2(){
 
       <Card title="TEMEL TABANI · KAYMA PARAMETRELERİ">
         <div className="form-grid">
-          <Field label="tanδ ≤ 0.60" value={f.baseFrictionTanDelta??0.6} onChange={v=>setFoundation({baseFrictionTanDelta:num(v)})}/>
+          <Field label="tanδ ≤ 0.60" value={f.baseFrictionTanDelta??''} onChange={v=>setFoundation({baseFrictionTanDelta:num(v)})}/>
           <Field label={"Karakteristik pasif direnç Rpk ("+units.force+")"} value={f.passiveResistanceCharacteristic??0} onChange={v=>setFoundation({passiveResistanceCharacteristic:num(v)})}/>
           <label>Pasif direnç kredisi<select value={f.usePassiveResistance?'yes':'no'} onChange={e=>setFoundation({usePassiveResistance:e.target.value==='yes'})}><option value="no">Kullanma</option><option value="yes">Kullan</option></select></label>
           <Field label={"Drenajsız Cu ("+units.stress+")"} value={soil.undrainedCohesion??''} onChange={v=>setSoil({undrainedCohesion:v===''?undefined:num(v)})}/>
@@ -105,7 +105,7 @@ export function ProjectInfoScreenV2(){
           <Metric label="γRh" value="1.10"/>
           <Metric label="γRp" value="1.40"/>
         </div>
-        <div className="classification-note">Temel YASS altında/aynı kotta ise TBDY 16.8.4.6 gereği deprem sürtünme direnci Cu ile hesaplanır.</div>
+        <div className="classification-note">tanδ boş bırakılırsa kayma hesabı üretilmez. Temel YASS altında/aynı kotta ise TBDY 16.8.4.6 gereği deprem sürtünme direnci Cu ile hesaplanır.</div>
       </Card>
 
       <Card title="ZEMİN PARAMETRELERİ">

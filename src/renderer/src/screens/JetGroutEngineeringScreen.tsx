@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { jetGroutEngineering, type JetGroutEngineeringResult } from '../../../core/engineering/jet-grout-advanced'
 import { Card, Field, Frame, Metric, Source } from '../workspace/WorkspaceShell'
 import { updateProjectInfo, useProjectInfo } from '../../../core/state/project-store'
-import { forceToBase, forceFromBase, stressFromBase, stressToBase, modulusFromBase, modulusToBase, PROJECT_UNIT_LABELS } from '../../../core/units/project-units'
+import { forceToBase, stressFromBase, stressToBase, modulusFromBase, modulusToBase, PROJECT_UNIT_LABELS } from '../../../core/units/project-units'
 import { CalculationTrace } from '../components/CalculationTrace'
 
 export let latestJetGroutResult:JetGroutEngineeringResult|undefined
@@ -15,11 +15,11 @@ export function JetGroutEngineeringScreen(){
   const projectLoad=forceToBase(f.structuralWeight,p.unitSystem)
   const projectH=Math.hypot(forceToBase(f.vtX,p.unitSystem),forceToBase(f.vtY,p.unitSystem))
   const set=(key:keyof typeof j,value:number|undefined|string)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
-  const displayStress=(v?:number)=>v==null?'':stressFromBase(v,p.unitSystem).toString(),displayModulus=(v?:number)=>v==null?'':modulusFromBase(v,p.unitSystem).toString(),d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=j.qSoil?.toString()??'',column=j.qColumn?.toString()??''
+  const displayStress=(v?:number)=>v==null?'':stressFromBase(v,p.unitSystem).toString(),displayModulus=(v?:number)=>v==null?'':modulusFromBase(v,p.unitSystem).toString(),d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=displayStress(j.qSoil),column=displayStress(j.qColumn)
   const soilEs=displayModulus(j.EsSoil),columnEs=displayModulus(j.EsColumn),soilC=displayStress(j.cSoil),columnC=displayStress(j.cColumn)
   const thickness=j.foundationThickness?.toString()??'',soilNu=j.soilPoissonRatio?.toString()??'',phi=j.columnFrictionAngle?.toString()??'',c=j.interfaceCohesion?.toString()??'',angle=j.interfaceFrictionAngle?.toString()??''
   const layout=j.layout??'square'
-  const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)
+  const ready=[d,spacing,soil,column].every(x=>x!==''&&Number.isFinite(Number(x))&&Number(x)>0)&&Number.isFinite(Number(soilNu))&&Number(soilNu)>-1&&Number(soilNu)<.5
   const r=useMemo(()=>{
     if(!ready)return undefined
     return jetGroutEngineering({
@@ -29,7 +29,7 @@ export function JetGroutEngineeringScreen(){
       load:projectLoad>0?projectLoad:undefined,foundationArea:projectArea>0?projectArea:undefined,
       foundationThickness:Number(thickness)>0?Number(thickness):undefined,
       columnFrictionAngle:Number(phi)>0?Number(phi):undefined,soilPoissonRatio:Number(soilNu),cohesion:Number(c)>0?Number(c):undefined,
-      frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH
+      frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH,shearNormalStress:undefined
     })
   },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,soilNu,phi,c,angle,projectLoad,projectArea,projectH])
   latestJetGroutResult=r
@@ -40,15 +40,15 @@ export function JetGroutEngineeringScreen(){
       <Field label="Kolon çapı d (m)" value={d} onChange={v=>set('columnDiameter',num(v))}/>
       <Field label="Aks aralığı s (m)" value={spacing} onChange={v=>set('spacing',num(v))}/>
       <label>Yerleşim<select value={layout} onChange={e=>set('layout',e.target.value as 'square'|'triangular')}><option value="square">Kare</option><option value="triangular">Üçgen</option></select></label>
-      <Field label={`Zemin qult (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})` value={soil} onChange={v=>set('qSoil',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
-      <Field label={`Kolon qult (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})` value={column} onChange={v=>set('qColumn',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
-      <Field label={`Zemin c′ (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})` value={soilC} onChange={v=>set('cSoil',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
-      <Field label={`Kolon c′ (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})` value={columnC} onChange={v=>set('cColumn',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
-      <Field label={`Zemin E (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].modulus})` value={soilEs} onChange={v=>set('EsSoil',v===''?undefined:modulusToBase(Number(v),p.unitSystem))}/>
-      <Field label={`Kolon E (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].modulus})` value={columnEs} onChange={v=>set('EsColumn',v===''?undefined:modulusToBase(Number(v),p.unitSystem))}/>
+      <Field label={`Zemin qult (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})`} value={soil} onChange={v=>set('qSoil',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
+      <Field label={`Kolon qult (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})`} value={column} onChange={v=>set('qColumn',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
+      <Field label={`Zemin c′ (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})`} value={soilC} onChange={v=>set('cSoil',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
+      <Field label={`Kolon c′ (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})`} value={columnC} onChange={v=>set('cColumn',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
+      <Field label={`Zemin E (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].modulus})`} value={soilEs} onChange={v=>set('EsSoil',v===''?undefined:modulusToBase(Number(v),p.unitSystem))}/>
+      <Field label={`Kolon E (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].modulus})`} value={columnEs} onChange={v=>set('EsColumn',v===''?undefined:modulusToBase(Number(v),p.unitSystem))}/>
       <Field label="İyileştirme kalınlığı H (m)" value={thickness} onChange={v=>set('foundationThickness',num(v))}/>
       <Field label="Zemin ν" value={soilNu} onChange={v=>set('soilPoissonRatio',num(v))}/><Field label="Kolon φ (°)" value={phi} onChange={v=>set('columnFrictionAngle',num(v))}/>
-      <Field label={`Arayüz c′ (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})` value={c} onChange={v=>set('interfaceCohesion',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
+      <Field label={`Arayüz c′ (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})`} value={c} onChange={v=>set('interfaceCohesion',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
       <Field label="Arayüz φ′ (°)" value={angle} onChange={v=>set('interfaceFrictionAngle',num(v))}/>
       <Metric label="Temel alanı" value={projectArea.toFixed(2)} unit="m²"/>
       <Metric label="G+Q" value={projectLoad.toFixed(2)} unit="kN"/>
