@@ -41,7 +41,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   else if(method==='schmertmann')influenceDepth=input.influenceDepth??(ratio>=10?4*B:2*B)
   else {influenceDepth=input.influenceDepth??0;if(influenceDepth<=0)warnings.push('Seçilen yöntem için etki derinliği açıkça girilmelidir.')}
   if(input.foundationType==='surekli'&&ratio<10)warnings.push('Sürekli temel seçildi ancak L/B < 10; gerçek temel geometrisiyle değerlendirme yapılmalıdır.')
-  const zoneBottom=Df+influenceDepth;const zoneStress=method==='burland-burbidge'||method!=='schmertmann'?effectiveStressAtDepth(layers,zoneBottom,gwt):effectiveStressAtDepth(layers,zoneBottom,gwt);if(influenceDepth>0&&!zoneStress.complete)warnings.push('Tanımlı etki derinliği boyunca zemin profili/gerilme verisi eksik.')
+  const zoneBottom=Df+influenceDepth;const zoneStress=effectiveStressAtDepth(layers,zoneBottom,gwt);if(influenceDepth>0&&!zoneStress.complete)warnings.push('Tanımlı etki derinliği boyunca zemin profili/gerilme verisi eksik.')
   let totalImmediate=0,totalConsolidation=0;const results:SettlementLayerResult[]=[];const burlandPieces:Array<{layer:IdealizedSoilLayer;thickness:number;midDepth:number}>=[]
   for(const layer of layers){
     if(layer.bottomDepth<=Df||influenceDepth<=0)continue

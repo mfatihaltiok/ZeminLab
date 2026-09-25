@@ -11,7 +11,7 @@ export interface LiquefactionSptRecord{
 }
 export interface LiquefactionProfileInput{
   Mw:number;Sds:number;gwt:number;layers:LiquefactionSoilLayer[];spt:LiquefactionSptRecord[];gammaW?:number;applyDilatancy?:boolean
-  dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup;continuousOrThickLens?:boolean;foundationDepth?:number
+  dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup;continuousOrThickLens?:boolean;foundationDepth?:number;siteSpecificResponseAnalysisCompleted?:boolean
 }
 export interface LiquefactionProfileRow{
   depth:number;soil?:string;fineContent?:number;plasticityIndex?:number;clayContent?:number;waterContent?:number
@@ -65,9 +65,10 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
   if(!finite(gammaW)||gammaW<=0)throw new Error('Su birim hacim ağırlığı pozitif olmalıdır.')
   const CM=magnitudeCorrection(input.Mw),warnings:string[]=[]
   const scopeComplete=input.dts!==undefined&&input.soilGroup!==undefined&&input.continuousOrThickLens!==undefined
-  const mandatoryByProject=scopeComplete&&mandatoryDts(input.dts)&&mandatorySoilGroup(input.soilGroup)&&input.continuousOrThickLens===true
+  const zfBlocked=input.soilGroup==='ZF'&&input.siteSpecificResponseAnalysisCompleted!==true
+  const mandatoryByProject=scopeComplete&&!zfBlocked&&mandatoryDts(input.dts)&&mandatorySoilGroup(input.soilGroup)&&input.continuousOrThickLens===true
   if(!scopeComplete)warnings.push('DTS, TBDY zemin grubu ve/veya 16.6.1 sürekli tabaka/kalın mercek doğrulaması eksik; sıvılaşma zorunluluğu kesinleştirilemedi.')
-  if(input.soilGroup==='ZF')warnings.push('ZF için 16.5.1.3 sahaya özel zemin davranış analizi gerekir; bu ekran o analizi yerine geçmez.')
+  if(input.soilGroup==='ZF')warnings.push(input.siteSpecificResponseAnalysisCompleted===true?'ZF saha özel zemin davranış analizi tamamlandı; sıvılaşma zinciri bu kayda göre çalıştırıldı.':'ZF için 16.5.1.3 sahaya özel zemin davranış analizi tamamlanmadan sıvılaşma sonucu üretilmez.')
   const rows=input.spt.filter(x=>finite(x.depth)&&x.depth>=0).sort((a,b)=>a.depth-b.depth).map((record):LiquefactionProfileRow=>{
     const layer=input.layers.find(l=>record.depth>=l.top&&record.depth<l.bottom)
     const stress=stressAtDepth(record.depth,input.layers,input.gwt,gammaW)
@@ -92,6 +93,10 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       {symbol:'(N1)60f',title:'İnce dane düzeltilmiş SPT',formula:'(N1)60f=α+β(N1)60',value:n1_60f}
     ]
     const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha:fc.alpha,beta:fc.beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionRequired}
+    if(zfBlocked){
+      trace.push({symbol:'ZF',title:'Saha özel zemin davranış analizi',formula:'16.5.1.3',value:0,note:'ZF seçildi ancak saha özel zemin davranış analizi tamamlanmadı.'})
+      return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
+    }
     if(stress.covered<Math.max(0,record.depth)-1e-9){
       trace.push({symbol:'Kapsama',title:'Katman kapsamı',formula:'ΣΔz=z',value:stress.covered,unit:'m',note:'SPT derinliğine kadar sürekli γ profili yok.'})
       return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}

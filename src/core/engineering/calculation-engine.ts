@@ -93,7 +93,8 @@ export function foundationChecks(i:FoundationCheckInput){
   const effectiveLength=Math.max(0,i.L-2*Math.abs(ey)),effectiveWidth=Math.max(0,i.B-2*Math.abs(ex))
   const contactArea=i.area??effectiveWidth*effectiveLength
   const rh=i.gammaRh??1.10,rp=i.gammaRp??1.40
-  const rawTan=i.deltaTan??.60,deltaTan=Math.min(.60,Math.max(0,rawTan))
+  if(i.deltaTan==null||!Number.isFinite(i.deltaTan)||i.deltaTan<0)throw new Error('Temel tabanı tanδ parametresi açıkça girilmelidir.')
+  const rawTan=i.deltaTan,deltaTan=Math.min(.60,Math.max(0,rawTan))
   const warnings:string[]=[]
   let rth=0
   const submerged=i.groundwaterDepth!=null&&i.foundationDepth!=null&&i.groundwaterDepth<=i.foundationDepth
