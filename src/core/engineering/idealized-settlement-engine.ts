@@ -59,7 +59,7 @@ function burlandSettlement(layer:IdealizedSoilLayer,qNet:number,B:number,L:numbe
     if(qNet>pc)Ic=IcNC
   }
   const settlementMm=.14*Fs*fL*Ic*Math.pow(B/Br,.7)*(qTerm/sigmaR)*Br*1000
-  return{value:Math.max(0,settlementMm),note:\`N60=\${n60.toFixed(1)}, Ic=\${Ic.toFixed(4)}, Fs=\${Fs.toFixed(3)}, fL=\${fL.toFixed(3)}, \${oc?'OC':'NC'} Burland-Burbidge\`}
+  return{value:Math.max(0,settlementMm),note:'N60='+n60.toFixed(1)+', Ic='+Ic.toFixed(4)+', Fs='+Fs.toFixed(3)+', fL='+fL.toFixed(3)+', '+(oc?'OC':'NC')+' Burland-Burbidge'}
 }
 function schmertmannIz(z:number,B:number,L:number,qNet:number,sigmaPeak:number){
   const ratio=L/Math.max(B,1e-9)
