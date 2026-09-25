@@ -11,7 +11,7 @@ export interface LiquefactionSptRecord{
 }
 export interface LiquefactionProfileInput{
   Mw:number;Sds:number;gwt:number;layers:LiquefactionSoilLayer[];spt:LiquefactionSptRecord[];gammaW?:number;applyDilatancy?:boolean
-  dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup;continuousOrThickLens?:boolean
+  dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup;continuousOrThickLens?:boolean;foundationDepth?:number
 }
 export interface LiquefactionProfileRow{
   depth:number;soil?:string;fineContent?:number;plasticityIndex?:number;clayContent?:number;waterContent?:number
@@ -79,7 +79,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       applyOverburden:true,applyDilatancy:false
     })
     const fines=clamp(fineContent??0,0,100),fc=fineContentCorrection(fines),n1_60f=fc.alpha+fc.beta*npt.n1_60
-    const saturated=record.depth>input.gwt+1e-9,within20=record.depth<=20+1e-9,potentiallyLiquefiable=saturated&&within20&&soilIsPotential(soil??'',pi)
+    const saturated=record.depth>input.gwt+1e-9,within20=record.depth<=20+1e-9,belowFoundation=record.depth>=(input.foundationDepth??0)+1e-9,potentiallyLiquefiable=saturated&&within20&&belowFoundation&&soilIsPotential(soil??'',pi)
     const exceptionA=input.dts==='4'&&clayContent!=null&&pi!=null&&clayContent>20&&pi>10,exceptionB=input.dts==='4'&&fineContent!=null&&fineContent>35&&npt.n1_60>20,exemption=exceptionA||exceptionB
     const mandatoryAnalysis=potentiallyLiquefiable&&mandatoryByProject&&!exemption
     const researchDataComplete=fineContent!=null&&pi!=null&&waterContent!=null
@@ -96,7 +96,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
     }
     if(!saturated||!within20||!potentiallyLiquefiable||exemption){
-      const note=!saturated?'YASS üzerinde':!within20?'20 m dışında':!potentiallyLiquefiable?'16.6.4 potansiyel zemin tanımına girmiyor':'DTS=4 istisnası'
+      const note=!saturated?'YASS üzerinde':!within20?'20 m dışında':!belowFoundation?'Temel tabanı üzerinde':!potentiallyLiquefiable?'16.6.4 potansiyel zemin tanımına girmiyor':'DTS=4 istisnası'
       trace.push({symbol:'Kapsam',title:'TBDY kapsam kontrolü',formula:'16.6.1–16.6.6',value:record.depth,note})
       return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
