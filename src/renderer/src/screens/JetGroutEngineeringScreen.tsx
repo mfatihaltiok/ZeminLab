@@ -17,7 +17,7 @@ export function JetGroutEngineeringScreen(){
   const set=(key:keyof typeof j,value:number|undefined|string)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
   const d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=j.qSoil?.toString()??'',column=j.qColumn?.toString()??''
   const soilEs=j.EsSoil?.toString()??'',columnEs=j.EsColumn?.toString()??'',soilC=j.cSoil?.toString()??'',columnC=j.cColumn?.toString()??''
-  const thickness=j.foundationThickness?.toString()??'',phi=j.columnFrictionAngle?.toString()??'',c=j.interfaceCohesion?.toString()??'',angle=j.interfaceFrictionAngle?.toString()??''
+  const thickness=j.foundationThickness?.toString()??'',soilNu=j.soilPoissonRatio?.toString()??'',phi=j.columnFrictionAngle?.toString()??'',c=j.interfaceCohesion?.toString()??'',angle=j.interfaceFrictionAngle?.toString()??''
   const layout=j.layout??'square'
   const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)
   const r=useMemo(()=>{
@@ -28,10 +28,10 @@ export function JetGroutEngineeringScreen(){
       EsSoil:Number(soilEs)>0?Number(soilEs):undefined,EsColumn:Number(columnEs)>0?Number(columnEs):undefined,
       load:projectLoad>0?projectLoad:undefined,foundationArea:projectArea>0?projectArea:undefined,
       foundationThickness:Number(thickness)>0?Number(thickness):undefined,
-      columnFrictionAngle:Number(phi)>0?Number(phi):undefined,cohesion:Number(c)>0?Number(c):undefined,
+      columnFrictionAngle:Number(phi)>0?Number(phi):undefined,soilPoissonRatio:Number(soilNu),cohesion:Number(c)>0?Number(c):undefined,
       frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH
     })
-  },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,phi,c,angle,projectLoad,projectArea,projectH])
+  },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,soilNu,phi,c,angle,projectLoad,projectArea,projectH])
   latestJetGroutResult=r
 
   return <Frame screen="jet-grout">
@@ -47,7 +47,7 @@ export function JetGroutEngineeringScreen(){
       <Field label="Zemin E (kPa)" value={soilEs} onChange={v=>set('EsSoil',num(v))}/>
       <Field label="Kolon E (kPa)" value={columnEs} onChange={v=>set('EsColumn',num(v))}/>
       <Field label="İyileştirme kalınlığı H (m)" value={thickness} onChange={v=>set('foundationThickness',num(v))}/>
-      <Field label="Kolon φ (°)" value={phi} onChange={v=>set('columnFrictionAngle',num(v))}/>
+      <Field label="Zemin ν" value={soilNu} onChange={v=>set('soilPoissonRatio',num(v))}/><Field label="Kolon φ (°)" value={phi} onChange={v=>set('columnFrictionAngle',num(v))}/>
       <Field label="Arayüz c′ (kPa)" value={c} onChange={v=>set('interfaceCohesion',num(v))}/>
       <Field label="Arayüz φ′ (°)" value={angle} onChange={v=>set('interfaceFrictionAngle',num(v))}/>
       <Metric label="Temel alanı" value={projectArea.toFixed(2)} unit="m²"/>
