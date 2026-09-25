@@ -49,7 +49,8 @@ export interface SubgradeReactionResult {
 }
 
 export function subgradeReaction(i: SubgradeReactionInput): SubgradeReactionResult {
-  const r=authoritativeSubgradeReaction({...i,method:i.method??'elastic'})
+  if(i.method==null) throw new Error('Yatak katsayısı yöntemi açıkça seçilmelidir.')
+  const r=authoritativeSubgradeReaction(i)
   return {ks:r.ks,method:r.method==='q/s'?'q/s':'elastic',source:r.source,formula:r.formula,unit:r.unit,assumptions:r.assumptions}
 }
 
@@ -76,43 +77,30 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
   let consolidation = 0
   const details: LayerSettlementResult['layers'] = []
   for (const l of layers) {
-    const H = Math.max(0, l.thickness)
-    const ds = Math.max(0, l.deltaSigma)
-    let s = 0
-    let type: 'elastic' | 'oedometer' = 'elastic'
-    if (H <= 0 || ds <= 0) {
-      details.push({ settlement: 0, type })
-      continue
-    }
-    if (l.mv != null && l.mv >= 0) {
-      s = H * l.mv * ds
-      consolidation += s
-      type = 'oedometer'
-    } else if (l.Cc != null && l.e0 != null && l.sigma0 > 0 && l.Cc >= 0 && l.e0 > -1) {
-      const sigma1 = l.sigma0 + ds
-      const spc = l.sigmaPc ?? l.sigma0
-      const Cr = Math.max(0, l.Cr ?? l.Cc)
-      if (spc > l.sigma0 && sigma1 > l.sigma0) {
-        const sigmaA = Math.min(sigma1, spc)
-        const sigmaB = Math.max(sigma1, spc)
-        let strain = 0
-        if (sigmaA > l.sigma0) strain += Cr * Math.log10(sigmaA / l.sigma0)
-        if (sigmaB > sigmaA) strain += l.Cc * Math.log10(sigmaB / sigmaA)
-        s = H / (1 + l.e0) * Math.max(0, strain)
-      } else {
-        s = H * l.Cc / (1 + l.e0) * Math.max(0, Math.log10(sigma1 / l.sigma0))
-      }
-      consolidation += s
-      type = 'oedometer'
-    } else if (l.Es != null && l.Es > 0) {
-      s = H * ds / l.Es
-      immediate += s
-    }
-    details.push({ settlement: Math.max(0, s), type })
+    const H = Math.max(0, l.thickness), ds = Math.max(0, l.deltaSigma)
+    let s=0, type:'elastic'|'oedometer'='elastic'
+    if(H<=0||ds<=0){details.push({settlement:0,type});continue}
+    if(l.model==='mv'){
+      if(l.mv==null||!Number.isFinite(l.mv)||l.mv<0)throw new Error('mv modeli seçildiyse mv girilmelidir.')
+      s=H*l.mv*ds;consolidation+=s;type='oedometer'
+    }else if(l.model==='oedometer'){
+      if(l.Cc==null||l.e0==null||l.sigma0<=0||l.Cc<0||l.e0<=-1||!Number.isFinite(l.Cc)||!Number.isFinite(l.e0))throw new Error('Ödometre modeli için Cc, e0 ve σ′0 gerekir.')
+      const sigma1=l.sigma0+ds
+      if(l.sigmaPc!=null){
+        if(l.Cr==null||!Number.isFinite(l.Cr)||l.Cr<0||l.sigmaPc<=l.sigma0)throw new Error('OC ödometre modeli için Cr ve σ′c birlikte gerekir.')
+        const pc=l.sigmaPc,Cr=l.Cr
+        const strain=sigma1<=pc?Cr*Math.log10(sigma1/l.sigma0):Cr*Math.log10(pc/l.sigma0)+l.Cc*Math.log10(sigma1/pc)
+        s=H*Math.max(0,strain)/(1+l.e0)
+      }else s=H*l.Cc*Math.max(0,Math.log10(sigma1/l.sigma0))/(1+l.e0)
+      consolidation+=s;type='oedometer'
+    }else if(l.model==='elastic'){
+      if(l.Es==null||!Number.isFinite(l.Es)||l.Es<=0)throw new Error('Elastik model için Es gerekir.')
+      s=H*ds/l.Es;immediate+=s
+    }else throw new Error('Tabaka oturma modelini açıkça seçiniz: mv, oedometer veya elastic.')
+    details.push({settlement:Math.max(0,s),type})
   }
-  return { immediate, consolidation, total: immediate + consolidation, layers: details }
+  return { immediate, consolidation, total: immediate+consolidation, layers: details }
 }
-
 export interface SchmertmannLayer { thickness: number; Es: number; Iz: number }
 export function schmertmannSettlement(q: number, layers: SchmertmannLayer[], C1?: number, C2?: number) {
   if (C1 == null || !Number.isFinite(C1) || C1 < 0) throw new Error('Schmertmann C1 açıkça verilmelidir.')
