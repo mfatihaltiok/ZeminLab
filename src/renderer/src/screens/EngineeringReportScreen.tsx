@@ -80,7 +80,7 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
       })
       return{borehole:b,result:rows.length?liquefactionProfile({
         Mw:p.seismic.magnitude!,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(x=>({top:x.from,bottom:x.to,gamma:x.unitWeight??0,gammaSat:x.saturatedUnitWeight??x.unitWeight??0,soil:x.code,finesContent:x.finesContent,plasticityIndex:x.plasticityIndex})),
-        spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup
+        spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens
       }):undefined}
     })
   },[boreholes,labs,p.seismic.magnitude,p.seismic.dts,sds])
