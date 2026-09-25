@@ -132,9 +132,9 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(checks.length){
     const min=Math.min(...checks.map(x=>x.qk))
     checks.forEach(x=>x.controlling=Math.abs(x.qk-min)<1e-9)
-    warnings.push('Tabakalı zemin kontrolü: etkin derinlikteki tabakalar ayrı hesaplandı; en düşük karakteristik qk ek kontrol olarak kullanıldı. Bu, 16.8.3.3 için muhafazakâr bir ekran kontrolüdür ve özel tabakalı-zemin mekanizmasının yerini tutmaz.')
+    warnings.push('Tabakalı zemin kontrolü: etkin derinlikteki tabakalar ayrı ek kontrol olarak raporlandı. Bu ekran kontrolü ana homojen zemin qk değerini değiştirmez; nihai tabakalı zemin hesabının yerini tutmaz.')
   }
-  const controlling=checks.length?Math.min(qk,...checks.map(x=>x.qk)):qk,designQt=controlling/Math.max(resistanceFactor,1e-9),adequate=qo<=designQt&&Be>0&&Le>0
+  const controlling=qk,designQt=controlling/Math.max(resistanceFactor,1e-9),adequate=qo<=designQt&&Be>0&&Le>0&&checks.length===0
   if(method==='TBDY-2018'&&Math.abs((i.resistanceFactor??1.4)-1.4)>1e-9)warnings.push('TBDY 2018 Tablo 16.2 yüzeysel temel için γRv=1.40 kullanılmalıdır.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: γ′ ve ağırlıklı γ kullanıldı.')
   if(groundSlope>0)warnings.push('Arazi eğimi katsayıları Vesic tipi genel kabul görmüş bağıntılarla uygulanmıştır; β<φ′ koşulu kontrol edildi.')
