@@ -46,8 +46,9 @@ function buildSources(lithology: LithologyLayer[], spt: Array<SptRecord & { bore
   if (labs.some(x => x.plasticLimit != null)) sources.plasticLimit = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.plasticityIndex != null)) sources.plasticityIndex = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.finesContent != null)) sources.finesContent = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.c != null || x.directShearC != null || x.uuC != null)) sources.cohesion = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.phi != null || x.directShearPhi != null || x.uuPhi != null)) sources.frictionAngle = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
+  if (labs.some(x => x.c != null || x.directShearC != null)) sources.cohesion = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
+  if (labs.some(x => x.uuC != null)) sources.undrainedCohesion = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
+  if (labs.some(x => x.phi != null || x.directShearPhi != null)) sources.frictionAngle = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.consolidationCc != null)) sources.compressionIndexCc = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.consolidationCs != null)) sources.recompressionIndexCr = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.voidRatio != null)) sources.initialVoidRatio = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }

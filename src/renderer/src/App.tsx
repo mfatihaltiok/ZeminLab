@@ -22,7 +22,7 @@ import { createEmptyBorehole } from '../../core/models/field-data-factory'
 
 function FieldCommandBar({boreholes,selectedBoreholeId,onSelectedBoreholeChange,onBoreholesChange,onLabsChange,unitSystem}:{boreholes:BoreholeRecord[];selectedBoreholeId:string;onSelectedBoreholeChange:(id:string)=>void;onBoreholesChange:(r:BoreholeRecord[])=>void;onLabsChange:(r:LaboratoryRecord[])=>void;unitSystem:'ton-m'|'kN-m'}){
  const create=()=>{const b=createEmptyBorehole(boreholes.length+1,unitSystem);onBoreholesChange([...boreholes,b]);onSelectedBoreholeChange(b.id)};
- const remove=()=>{const t=boreholes.find(b=>b.id===selectedBoreholeId);if(!t)return;if(!window.confirm(t.name+' sondajını ve bu sondaja bağlı laboratuvar kayıtlarını silmek istiyor musunuz?'))return;const next=boreholes.filter(b=>b.id!==t.id);onBoreholesChange(next);onLabsChange(labs.filter(l=>l.boreholeId!==t.id));onSelectedBoreholeChange(next[0]?.id??'')};
+ const remove=()=>{const t=boreholes.find(b=>b.id===selectedBoreholeId);if(!t)return;if(!window.confirm(t.name+' sondajını ve bu sondaja bağlı laboratuvar kayıtlarını silmek istiyor musunuz?'))return;const next=boreholes.filter(b=>b.id!==t.id);onBoreholesChange(next);onLabsChange(labs=>labs.filter(l=>l.boreholeId!==t.id));onSelectedBoreholeChange(next[0]?.id??'')};
  return <div className="field-command-bar"><div className="command-group"><span className="command-caption">SONDAJ YÖNETİMİ</span><button className="command-button primary" onClick={create}>＋ Yeni Sondaj</button><button className="command-button danger" onClick={remove} disabled={!selectedBoreholeId}>Sil</button></div></div>}
 
 function App(){
