@@ -19,7 +19,7 @@
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
     "postinstall": "electron-builder install-app-deps",
-    "test:engineering": "node --experimental-strip-types scripts/engineering-regression.ts"
+    "test:engineering": "npx --yes tsx scripts/engineering-regression.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
