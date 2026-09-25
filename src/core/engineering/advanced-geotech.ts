@@ -180,13 +180,13 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
     ? ar * i.cColumn + (1 - ar) * i.cSoil
     : undefined
   const n = i.EsSoil != null && i.EsColumn != null && i.EsSoil > 0 && i.EsColumn > 0
-    ? Math.max(1, i.EsColumn / i.EsSoil)
+    ? i.EsColumn / i.EsSoil
     : undefined
-  const columnLoadShare = n != null ? Math.min(0.98, (n * ar) / (1 + (n - 1) * ar)) : ar
+  const columnLoadShare = n != null ? (n * ar) / (1 + (n - 1) * ar) : ar
   const soilLoadShare = 1 - columnLoadShare
   const treatedSettlementFactor = n != null ? 1 / (1 + (n - 1) * ar) : undefined
-  const capacityFS = i.load != null && i.foundationArea != null && i.foundationArea > 0
-    ? compositeCapacity * i.foundationArea / Math.max(i.load, 1e-9)
+  const capacityFS = i.load != null && i.load > 0 && i.foundationArea != null && i.foundationArea > 0
+    ? compositeCapacity * i.foundationArea / i.load
     : undefined
 
   return {
