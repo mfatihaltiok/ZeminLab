@@ -142,4 +142,23 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(result.layers[0].deltaSigma>0)
 }
 
+
+{
+  const profile={
+    id:'secondary',version:1,status:'SABİTLENDİ' as const,targetLayerCount:1,generatedAt:new Date(0).toISOString(),
+    sourceBoreholeIds:[],sourceLaboratoryIds:[],
+    layers:[{
+      id:'L1',order:1,topDepth:0,bottomDepth:10,soilName:'Kum',soilCode:'SA',boreholeIds:[],sptRecordIds:[],laboratoryRecordIds:[],
+      gamma:18,gammaSat:19,constrainedModulus:10000,secondaryCompressionIndex:0.02,initialVoidRatio:1,
+      parameterSources:{},userOverride:false
+    }],
+    methodology:'regression'
+  }
+  const result=calculateIdealizedSettlement({profile,method:'2to1-layer',B:2,L:2,Df:0,qGross:100,groundwaterDepth:50,timeYears:10})
+  approx(result.totalSecondary,50)
+  approx(result.layers[0].secondarySettlement,50)
+  assert.equal(result.ready,true)
+}
+
+
 console.log('Engineering regression tests: PASS')
