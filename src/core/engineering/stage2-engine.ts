@@ -16,7 +16,8 @@ export interface Stage2BearingInput{
 }
 
 export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
-  const V=Math.max(0,i.loadV??0),H=Math.abs(i.loadH??0),design=i.design??'classical-allowable',warnings:string[]=[]
+  const V=Math.max(0,i.loadV??0),H=Math.abs(i.loadH??0),design=i.design,warnings:string[]=[]
+  if(!design) throw new Error('Stage2 uyumluluk API için design açıkça belirtilmelidir.')
   if(design==='tbdy-2018'){
     const r=calculateSurfaceFoundation({
       B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma,gamma2:i.gammaSat??i.gamma,c:i.c,phi:i.phi,
@@ -46,7 +47,8 @@ export interface Stage2SettlementInput{
 }
 
 export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
-  const B=Math.max(i.B,0),L=Math.max(i.L??i.B,0),q=Math.max(i.q,0),method=i.method??'elastic'
+  const B=Math.max(i.B,0),L=Math.max(i.L??0,0),q=Math.max(i.q,0),method=i.method
+  if(!method) throw new Error('Stage2 oturma uyumluluk API için method açıkça belirtilmelidir.')
   const warnings:string[]=[]
   if(B<=0||L<=0)warnings.push('B ve L pozitif olmalıdır.')
   if(!i.layers.length)warnings.push('Katman tanımlanmadı.')
@@ -59,10 +61,11 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
     if(H>0&&ds>0){
       if(method==='elastic'||method==='2:1'){
         const E=layer.Es
-        if(E!=null&&Number.isFinite(E)&&E>0){const nu=Math.max(0,Math.min(.49,layer.nu??0));s=ds*H*(1-nu*nu)/E;type=method==='elastic'?'elastic':'2:1 + elastic'}else warnings.push('Katman '+(index+1)+': Es eksik.')
+        if(E!=null&&Number.isFinite(E)&&E>0){if(layer.nu==null||!Number.isFinite(layer.nu)||layer.nu<0||layer.nu>=.5)warnings.push('Katman '+(index+1)+': elastik yöntem için ν eksik.')
+        else {const nu=layer.nu;s=ds*H*(1-nu*nu)/E;type=method==='elastic'?'elastic':'2:1 + elastic'}}else warnings.push('Katman '+(index+1)+': Es eksik.')
       }else if(method==='janbu'){
-        const M=layer.M??layer.Es
-        if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push('Katman '+(index+1)+': M eksik.')
+        const M=layer.M
+        if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push('Katman '+(index+1)+': M eksik; Es otomatik M yerine kullanılmaz.')
       }else if(method==='schmertmann'){
         const E=layer.Es
         const Iz=layer.Iz
@@ -72,8 +75,7 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
         const sigma0=Math.max(layer.sigmaV0,1e-6),sigma1=sigma0+ds
         if(layer.mv!=null&&layer.mv>=0){s=H*layer.mv*ds;type='oedometer'}
         else if(layer.Cc!=null&&layer.e0!=null&&layer.e0>-1){
-          const pc=Math.max(layer.sigmaPc??sigma0,sigma0),Cr=Math.max(0,layer.Cr??layer.Cc)
-          s=sigma1<=pc?H*Cr/(1+layer.e0)*Math.log10(sigma1/sigma0):H*Cr/(1+layer.e0)*Math.log10(pc/sigma0)+H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/pc),type='oedometer'
+          if(layer.sigmaPc!=null&&layer.Cr!=null&&layer.sigmaPc>sigma0&&layer.Cr>=0){const pc=layer.sigmaPc,Cr=layer.Cr;s=sigma1<=pc?H*Cr/(1+layer.e0)*Math.log10(sigma1/sigma0):H*Cr/(1+layer.e0)*Math.log10(pc/sigma0)+H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/pc),type='oedometer'}else if(layer.sigmaPc==null&&layer.Cr==null){s=H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/sigma0),type='oedometer'}else warnings.push('Katman '+(index+1)+': OC konsolidasyon için σ′c ve Cr birlikte verilmelidir.')
         }else warnings.push('Katman '+(index+1)+': mv veya Cc/e0 eksik.')
       }
     }
