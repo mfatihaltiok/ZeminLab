@@ -5,7 +5,7 @@ import { tbdyBearingCapacity, foundationChecks } from '../../../core/calculation
 import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '../../../core/engineering/idealized-settlement-engine'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { deriveSptValues } from '../../../core/engineering/field-calculations'
-import { latestJetGroutResult } from './JetGroutEngineeringScreen'
+import { jetGroutEngineering } from '../../../core/engineering/jet-grout-advanced'
 import type { BoreholeRecord, LaboratoryRecord } from '../../../core/models/field-data'
 import type { IdealizedSoilProfile } from '../../../core/models/idealized-soil-profile'
 import { Frame } from '../workspace/WorkspaceShell'
@@ -48,6 +48,17 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
       return{method,result}
     })
   },[profile,B,L,Df,N,boreholes])
+  const jetGrout=useMemo(()=>{
+    const j=p.jetGrout
+    if(!(j.columnDiameter&&j.columnDiameter>0&&j.spacing&&j.spacing>0&&j.qSoil&&j.qSoil>0&&j.qColumn&&j.qColumn>0))return undefined
+    return jetGroutEngineering({
+      columnDiameter:j.columnDiameter,spacing:j.spacing,layout:j.layout??'square',
+      qSoil:j.qSoil,qColumn:j.qColumn,cSoil:j.cSoil,cColumn:j.cColumn,EsSoil:j.EsSoil,EsColumn:j.EsColumn,
+      load:N>0?N:undefined,foundationArea:B>0&&L>0?B*L:undefined,foundationThickness:j.foundationThickness,
+      columnFrictionAngle:j.columnFrictionAngle,cohesion:j.interfaceCohesion,frictionAngle:j.interfaceFrictionAngle,
+      verticalLoad:N,horizontalLoad:H
+    })
+  },[p.jetGrout,N,B,L,H])
   const foundation=useMemo(()=>B>0&&L>0?foundationChecks({
     B,L,N,Vx,Vy,Mx,My,deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion,
     area:undefined,groundwaterDepth:soil.groundwaterDepth,foundationDepth:Df,
@@ -132,10 +143,10 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
       </Section>)}
 
       <Section title="Jet Grout">
-        {latestJetGroutResult?<>
-          <div className="report-metrics"><div><span>Alan oranı</span><b>{fmt(latestJetGroutResult.areaReplacementRatio*100,2)} %</b></div><div><span>Ecomp</span><b>{fmt(latestJetGroutResult.compositeModulus,1)} kPa</b></div><div><span>Kolon yük payı</span><b>{fmt(latestJetGroutResult.columnLoadShare*100,1)} %</b></div><div><span>FS</span><b>{fmt(latestJetGroutResult.capacityFS,2)}</b></div></div>
-          {info('Kaynak notu',latestJetGroutResult.sourceNote)}
-        </>:info('Sonuç','Jet Grout ayrıntılı hesabı çalıştırılmadan rapora sonuç yazılmaz.')}
+        {jetGrout?<>
+          <div className="report-metrics"><div><span>Alan oranı</span><b>{fmt(jetGrout.areaReplacementRatio*100,2)} %</b></div><div><span>Ecomp</span><b>{fmt(jetGrout.compositeModulus,1)} kPa</b></div><div><span>Kolon yük payı</span><b>{fmt(jetGrout.columnLoadShare*100,1)} %</b></div><div><span>FS</span><b>{fmt(jetGrout.capacityFS,2)}</b></div></div>
+          {info('Kaynak notu',jetGrout.sourceNote)}
+        </>:info('Sonuç','Jet Grout girişleri tamamlanmadan sonuç üretilmez.')}
       </Section>
 
       <Section title="Yönetmelik ve yöntem notları">
