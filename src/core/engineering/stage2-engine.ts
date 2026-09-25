@@ -27,11 +27,12 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
       layers:i.layers?.map((x,idx)=>({topDepth:i.Df+i.layers!.slice(0,idx).reduce((a,y)=>a+y.thickness,0),bottomDepth:i.Df+i.layers!.slice(0,idx+1).reduce((a,y)=>a+y.thickness,0),gamma:x.gamma,gammaSat:x.gammaSat??x.gamma,cohesion:x.c,phi:x.phi}))
     })
     return{
-      value:{Nq:r.Nq,Nc:r.Nc,Ngamma:r.Ngamma,sc:r.sc,sq:r.sq,sgamma:r.sg,dc:r.dc,dq:r.dq,dgamma:r.dg,ic:r.ic,iq:r.iq,igamma:r.ig,characteristic:r.qk,designResistance:r.qt,allowableGross:r.qk/Math.max(i.FS??3,1e-9),qApplied:r.qo,BEffective:r.Be,LEffective:r.Le,ex:r.ex,ey:r.ey,qSurcharge:r.surcharge,resistanceFactor:1.4},
+      value:{Nq:r.Nq,Nc:r.Nc,Ngamma:r.Ngamma,sc:r.sc,sq:r.sq,sgamma:r.sg,dc:r.dc,dq:r.dq,dgamma:r.dg,ic:r.ic,iq:r.iq,igamma:r.ig,characteristic:r.qk,designResistance:r.qt,allowableGross:r.qt,qApplied:r.qo,BEffective:r.Be,LEffective:r.Le,ex:r.ex,ey:r.ey,qSurcharge:r.surcharge,resistanceFactor:1.4},
       method:'TBDY 2018',source:r.source,warnings:r.warnings,steps:r.steps
     }
   }
-  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,c:i.c,phi:i.phi,FS:Math.max(i.FS??3,.1),method:i.method})
+  if(i.FS==null||!Number.isFinite(i.FS)||i.FS<=0) throw new Error('Klasik taşıma gücü uyumluluk API için FS açıkça verilmelidir.')
+  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,c:i.c,phi:i.phi,FS:i.FS,method:i.method})
   if((i.momentX??0)!==0||(i.momentY??0)!==0)warnings.push('Klasik taşıma gücü API merkezi düşey yük varsayar; momentli temas için TBDY motoru kullanılmalıdır.')
   return{
     value:{Nq:r.value.Nq,Nc:r.value.Nc,Ngamma:r.value.Ngamma,sc:r.value.sc,sq:r.value.sq,sgamma:r.value.sg,dc:r.value.dc,dq:r.value.dq,dgamma:r.value.dg,ic:r.value.ic,iq:r.value.iq,igamma:r.value.ig,characteristic:r.value.ultimate,designResistance:undefined,allowableGross:r.value.allowableGross,qApplied:V/Math.max(i.B*i.L,1e-9),BEffective:i.B,LEffective:i.L,ex:0,ey:0,qSurcharge:i.gamma*i.Df,resistanceFactor:undefined},
