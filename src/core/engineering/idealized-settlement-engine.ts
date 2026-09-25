@@ -10,12 +10,12 @@ type SettlementLayerResult={
   status:'HESAPLANDI'|'VERİ EKSİK';note?:string
 }
 export interface IdealizedSettlementInput{
-  profile:IdealizedSoilProfile;method:IdealizedSettlementMethod;B:number;L:number;Df:number;qGross:number;groundwaterDepth?:number
+  profile:IdealizedSoilProfile;method:IdealizedSettlementMethod;B:number;L:number;Df:number;qGross:number;groundwaterDepth?:number;verticalLoad?:number;momentX?:number;momentY?:number
   foundationType?:FoundationType;timeYears?:number;burlandNTrend?:BurlandNTrend;burlandSoftLayerBottomDepth?:number;burlandState?:'NC'|'OC';burlandPreconsolidationPressure?:number
 }
 export interface IdealizedSettlementResult{
   method:IdealizedSettlementMethod;layers:SettlementLayerResult[];totalImmediate:number;totalConsolidation:number;totalSettlement:number
-  influenceDepth:number;netFoundationPressure:number;foundationEffectiveStress:number;ready:boolean;warnings:string[];source:string
+  influenceDepth:number;netFoundationPressure:number;foundationEffectiveStress:number;effectiveB:number;effectiveL:number;foundationArea:number;ready:boolean;warnings:string[];source:string
 }
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 function isCohesive(layer:IdealizedSoilLayer){
@@ -86,17 +86,23 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   const layers=[...profile.layers].sort((a,b)=>a.topDepth-b.topDepth)
   if(profile.status!=='SABİTLENDİ')warnings.push('İdealize Zemin Profili SABİTLENDİ durumunda değil.')
   if(profile.parameterUnitSystem!=='kN-m')warnings.push('Profil mühendislik birimleri kN-m taban sisteminde değil; sonuç üretilmedi.')
-  if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve pozitif yük girdileri geçerli olmalıdır.'],source:'FALUZMN ortak oturma motoru'}
+  if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,effectiveB:0,effectiveL:0,foundationArea:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve pozitif yük girdileri geçerli olmalıdır.'],source:'FALUZMN ortak oturma motoru'}
+  const verticalLoad=finite(input.verticalLoad)?input.verticalLoad!:qGross*B*L
+  if(verticalLoad<=0||!finite(verticalLoad))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,effectiveB:0,effectiveL:0,foundationArea:0,ready:false,warnings:[...warnings,'Oturma için pozitif düşey temel yükü gerekir.'],source:'FALUZMN ortak oturma motoru'}
+  const ex=(input.momentY??0)/verticalLoad,ey=(input.momentX??0)/verticalLoad,effectiveB=B-2*Math.abs(ex),effectiveL=L-2*Math.abs(ey),foundationArea=Math.max(0,effectiveB)*Math.max(0,effectiveL)
+  if(effectiveB<=0||effectiveL<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,effectiveB,effectiveL,foundationArea,ready:false,warnings:[...warnings,'Eksantrisite temel boyutunu tüketiyor; oturma için etkin temas alanı geçersiz.'],source:'FALUZMN ortak oturma motoru'}
+  const appliedQ=verticalLoad/foundationArea
   const gwt=finite(input.groundwaterDepth)?input.groundwaterDepth!:NaN
   if(!finite(gwt))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'YASS girilmeden efektif gerilme/oturma hesabı yapılamaz.'],source:'FALUZMN ortak oturma motoru'}
   const baseStress=effectiveStressAtDepth(layers,Df,gwt)
   if(!finite(baseStress.effective))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Df seviyesine kadar γ/γsat profili eksik veya geçersiz.'],source:'FALUZMN ortak oturma motoru'}
-  const qNet=Math.max(0,qGross-baseStress.effective)
-  const ratio=L/Math.max(B,1e-9)
-  const influenceDepth=method==='burland-burbidge'?burlandInfluenceDepth(B,input.burlandNTrend??'unknown',input.burlandSoftLayerBottomDepth,input.Df):method==='schmertmann'?(input.foundationType==='surekli'?4*B:(ratio>=10?4*B:2*B)):method==='janbu'?Math.max(2*B,1):2*B
+  const qNet=Math.max(0,appliedQ-baseStress.effective)
+  const ratio=effectiveL/Math.max(effectiveB,1e-9)
+  const influenceDepth=method==='burland-burbidge'?burlandInfluenceDepth(effectiveB,input.burlandNTrend??'unknown',input.burlandSoftLayerBottomDepth,input.Df):method==='schmertmann'?(input.foundationType==='surekli'?4*effectiveB:(ratio>=10?4*effectiveB:2*effectiveB)):method==='janbu'?Math.max(2*effectiveB,1):2*effectiveB
   if(qNet<=0)warnings.push('Temel seviyesinde net ilave basınç sıfır/negatif; seçilen yöntem yük artışı açısından hesaplanamaz.')
   let totalImmediate=0,totalConsolidation=0
   const results:SettlementLayerResult[]=[]
+  if(Math.abs(ex)>B/6||Math.abs(ey)>L/6)warnings.push('Eksantrisite temel çekirdeği dışına çıkıyor; etkin boyut yaklaşımı sınırındadır.')
   const relevant=layers.map((layer,index)=>{const top=Math.max(layer.topDepth,Df),bottom=layer.bottomDepth,h=overlap(top,bottom,Df,Df+influenceDepth);return{layer,index,top,bottom,h}}).filter(x=>x.h>0)
   let methodReady=true
   let globalBurlandSettlement=0
@@ -113,7 +119,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   for(const {layer,index,top,bottom,h} of relevant){
     const zTop=top-Df,zBottom=bottom-Df,zMid=(zTop+zBottom)/2,midDepth=Df+zMid,midStress=effectiveStressAtDepth(layers,midDepth,gwt)
     if(!finite(midStress.effective)){methodReady=false;results.push({layerId:layer.id,order:layer.order,soilName:layer.soilName,soilCode:layer.soilCode,topDepth:top,bottomDepth:bottom,thickness:h,midDepth,sigmaV0:0,porePressure:0,sigmaV0Effective:0,deltaSigma:0,sigmaVFinal:0,sigmaVFinalEffective:0,immediateSettlement:0,consolidationSettlement:0,totalSettlement:0,method:'VERİ EKSİK',status:'VERİ EKSİK',note:'Efektif gerilme profili eksik.'});continue}
-    const deltaSigma=Math.max(0,stressIncrement(qNet,B,L,zMid)),finalEffective=midStress.effective+deltaSigma,cohesive=isCohesive(layer)
+    const deltaSigma=Math.max(0,stressIncrement(qNet,effectiveB,effectiveL,zMid)),finalEffective=midStress.effective+deltaSigma,cohesive=isCohesive(layer)
     let immediate=0,consolidation=0,status:'HESAPLANDI'|'VERİ EKSİK'='HESAPLANDI',methodName='',note=''
     if(method==='burland-burbidge'){
       methodName='Burland & Burbidge (1985)'
@@ -139,9 +145,9 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       else if(!finite(layer.elasticModulus)||layer.elasticModulus!<=0){status='VERİ EKSİK';note:'Schmertmann için Es gerekir.'}
       else if(!finite(input.timeYears)||input.timeYears!<.1){status='VERİ EKSİK';note:'C2 için timeYears ≥ 0.1 yıl girilmelidir.'}
       else{
-        const peakDepth=input.foundationType==='surekli'?B:ratio>=10?B:.5*B,sigmaPeak=effectiveStressAtDepth(layers,Df+peakDepth,gwt).effective
+        const peakDepth=input.foundationType==='surekli'?effectiveB:ratio>=10?effectiveB:.5*effectiveB,sigmaPeak=effectiveStressAtDepth(layers,Df+peakDepth,gwt).effective
         if(!finite(sigmaPeak)){status='VERİ EKSİK';note='Schmertmann için tepe etki derinliğine kadar efektif gerilme profili tamamlanmalıdır.'} else {
-        const Iz=schmertmannIz(zMid,B,L,qNet,sigmaPeak,input.foundationType==='surekli'),C1=Math.max(.5,1-.5*baseStress.effective/Math.max(qNet,1e-9)),C2=1+.2*Math.log10(10*input.timeYears!)
+        const Iz=schmertmannIz(zMid,effectiveB,effectiveL,qNet,sigmaPeak,input.foundationType==='surekli'),C1=Math.max(.5,1-.5*baseStress.effective/Math.max(qNet,1e-9)),C2=1+.2*Math.log10(10*input.timeYears!)
         immediate=C1*C2*qNet*Iz*h/layer.elasticModulus!*1000
         }
       }
@@ -158,5 +164,5 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(method==='2to1-layer')warnings.push('2:1 + M yöntemi tek boyutlu sıkışma gerinimini M ile entegre eder; E_s kullanılmaz.')
   if(method==='janbu')warnings.push('Janbu sonucu yalnız açık m ve a girdileriyle üretilir; otomatik m/a korelasyonu yapılmaz.')
   if(method==='schmertmann')warnings.push('Schmertmann granüler zemin içindir; C1 ve C2 açıkça hesaplanır.')
-  return{method,layers:results,totalImmediate,totalConsolidation,totalSettlement:totalImmediate+totalConsolidation,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,ready:methodReady&&results.length>0,warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978) ve Janbu (1967) tangent modulus; yöntem kapsamları ayrı tutulur.'}
+  return{method,layers:results,totalImmediate,totalConsolidation,totalSettlement:totalImmediate+totalConsolidation,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,effectiveB,effectiveL,foundationArea,ready:methodReady&&results.length>0,warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978) ve Janbu (1967) tangent modulus; yöntem kapsamları ayrı tutulur.'}
 }
