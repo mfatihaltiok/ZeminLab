@@ -4,6 +4,7 @@ import { calculateSurfaceFoundation } from '../src/core/engineering/surface-foun
 import { liquefactionProfile } from '../src/core/engineering/liquefaction/liquefaction-profile.ts'
 import { foundationChecks } from '../src/core/engineering/calculation-engine.ts'
 import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-settlement-engine.ts'
+import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
 
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(Math.abs(actual-expected)<=tolerance,`expected ${expected}, got ${actual}`)
@@ -64,6 +65,14 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(result.rows[0].FS !== undefined)
   assert.equal(result.rows[0].postLiquefactionRequired,true)
   assert.equal(result.rows[0].conclusion,'SIVILAŞMA RİSKİ VAR')
+}
+
+{
+  const invalidCrr=tbdy2018Liquefaction({
+    depth:5,totalStress:100,effectiveStress:80,rawSPT:40,CE:1,CB:1,CR:1,CS:1,finesContent:0,Mw:7.5,SDS:1
+  })
+  assert.ok(Number.isNaN(invalidCrr.CRRM75))
+  assert.ok(Number.isNaN(invalidCrr.FS))
 }
 
 {
