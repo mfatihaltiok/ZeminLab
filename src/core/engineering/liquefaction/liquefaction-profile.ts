@@ -102,11 +102,11 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     }
     if(!mandatoryAnalysis){
       trace.push({symbol:'DTS/Zemin',title:'16.6.1 zorunluluğu',formula:'DTS=1/1a/2/2a ve ZD/ZE/ZF',value:0,note:'Proje koşulları zorunlu sıvılaşma ekranını tetiklemedi.'})
-      return{...base,status:'ANALİZ GEREKMİYOR',liquefactionCheck:'not-evaluable',trace}
+      return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     if(!researchDataComplete){
       trace.push({symbol:'Veri',title:'Zemin araştırması veri seti',formula:'SPT + dane dağılımı + w + Atterberg',value:0,note:'16.6.3 asgari veri seti tamamlanmadan nihai SPT sıvılaşma sonucu üretilmez.'})
-      return{...base,status:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
+      return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
     }
     if(npt.n1_60>=30){
       trace.push({symbol:'(N1)60',title:'Tetiklenme eşiği',formula:'(N1)60<30',value:npt.n1_60,note:'16.6.5 gereği tetiklenme değerlendirmesi yapılmaz.'})
