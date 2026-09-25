@@ -60,7 +60,7 @@ function vesicBaseFactors(thetaDeg:number,phi:number,Nq:number){
   if(theta===0)return{bc:1,bq:1,bg:1}
   if(theta>=90)throw new Error('Temel tabanı eğimi 90° veya daha büyük olamaz.')
   if(phi<=0)return{bc:Math.max(0,1-theta/147),bq:1,bg:1}
-  const bq=Math.max(0,(1-Math.tan(rad(theta)))**2),bg=bq
+  const bq=Math.max(0,(1-theta*Math.tan(rad(phi))/57)**2),bg=bq
   const bc=Math.max(0,bq-(1-bq)/Math.max(Nq-1,1e-9))
   return{bc,bq,bg}
 }
