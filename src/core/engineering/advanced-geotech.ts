@@ -176,12 +176,12 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
   const compositeModulus = i.EsSoil != null && i.EsColumn != null && i.EsSoil > 0 && i.EsColumn > 0
     ? ar * i.EsColumn + (1 - ar) * i.EsSoil
     : undefined
-  const compositeCohesion = i.cSoil != null && i.cColumn != null
-    ? ar * i.cColumn + (1 - ar) * i.cSoil
-    : undefined
-  const n = i.EsSoil != null && i.EsColumn != null && i.EsSoil > 0 && i.EsColumn > 0
-    ? i.EsColumn / i.EsSoil
-    : undefined
+  if (i.cSoil != null && (!Number.isFinite(i.cSoil) || i.cSoil < 0)) throw new Error('cSoil geçerli ve negatif olmayan bir değer olmalıdır.')
+  if (i.cColumn != null && (!Number.isFinite(i.cColumn) || i.cColumn < 0)) throw new Error('cColumn geçerli ve negatif olmayan bir değer olmalıdır.')
+  const compositeCohesion = i.cSoil != null && i.cColumn != null ? ar * i.cColumn + (1 - ar) * i.cSoil : undefined
+  if (i.EsSoil != null && (!Number.isFinite(i.EsSoil) || i.EsSoil <= 0)) throw new Error('EsSoil geçerli ve pozitif olmalıdır.')
+  if (i.EsColumn != null && (!Number.isFinite(i.EsColumn) || i.EsColumn <= 0)) throw new Error('EsColumn geçerli ve pozitif olmalıdır.')
+  const n = i.EsSoil != null && i.EsColumn != null ? i.EsColumn / i.EsSoil : undefined
   const columnLoadShare = n != null ? (n * ar) / (1 + (n - 1) * ar) : ar
   const soilLoadShare = 1 - columnLoadShare
   const treatedSettlementFactor = n != null ? 1 / (1 + (n - 1) * ar) : undefined
