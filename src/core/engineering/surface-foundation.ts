@@ -64,10 +64,17 @@ function baseFactors(thetaDeg:number,phi:number,Nq:number){
  const theta=Math.abs(thetaDeg);if(theta===0)return{bc:1,bq:1,bg:1};if(theta>=90)throw new Error('Temel tabanı eğimi 90° veya daha büyük olamaz.')
  if(phi<=0)return{bc:Math.max(0,1-theta/147),bq:1,bg:1};const bq=Math.max(0,(1-theta*Math.tan(rad(phi))/57)**2),bg=bq,bc=Math.max(0,bq-(1-bq)/Math.max(Nq-1,1e-9));return{bc,bq,bg}
 }
-function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number,baseQ:number,mf:ReturnType<typeof methodFactors>,method:SurfaceFoundationMethod){
- if(!layers?.length)return[]
- const active=layers.filter(l=>l.bottomDepth>Df&&l.topDepth<Df+influence&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
- return active.map(l=>{const phi=clamp(l.phi,0,50),ff=factors(phi,method),gamma=l.gammaSat!=null?Math.max(l.gammaSat-gammaW,0):Math.max(l.gamma,0);const qk=Math.max(0,l.cohesion)*ff.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+baseQ*ff.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+.5*gamma*Math.max(.01,Math.min(1e3,influence))*ff.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg;return{top:l.topDepth,bottom:l.bottomDepth,c:l.cohesion,phi,gamma,qk,controlling:false}})
+function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,Bp:number,Lp:number,baseQ:number,method:SurfaceFoundationMethod){
+  if(!layers?.length)return[]
+  const active=layers.filter(l=>l.bottomDepth>Df&&l.topDepth<Df+2*Bp&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
+  return active.map(l=>{
+    const phi=clamp(l.phi,0,50),ff=factors(phi,method)
+    const gNat=Math.max(l.gamma,0),gSat=l.gammaSat!=null?Math.max(l.gammaSat-gammaW,0):Math.max(l.gamma,0)
+    const qk= l.cohesion!*ff.Nc
+      + baseQ*ff.Nq
+      + .5*gSat*Bp*ff.Ngamma
+    return{top:l.topDepth,bottom:l.bottomDepth,c:l.cohesion,phi,gamma:l.gamma,gammaEffective:gSat,qk,controlling:false}
+  })
 }
 export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoundationResult{
  if(i.B<=0||i.L<=0||i.Df<0)throw new Error('Temel B ve L pozitif, Df negatif olmayan değer olmalıdır.')
@@ -85,7 +92,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
  const resistanceFactor=method==='TBDY-2018'?TBDY_GAMMA_RV:1
  if(method==='TBDY-2018'&&i.resistanceFactor!=null&&Math.abs(i.resistanceFactor-TBDY_GAMMA_RV)>1e-9)warnings.push('TBDY için γRv kullanıcı girdisi yok sayıldı; sabit γRv=1.40 kullanıldı.')
  const qt=qk/resistanceFactor,qo=effectiveArea>0?N/effectiveArea:0,utilization=qt>0?qo/qt:Infinity
- const checks=layerChecks(i.layers,i.Df,2*Bp,qBase,mf,method)
+ const checks=layerChecks(i.layers,i.Df,Bp,Lp,qBase,method)
  if(checks.length){const min=Math.min(...checks.map(x=>x.qk));checks.forEach(x=>x.controlling=Math.abs(x.qk-min)<1e-9);warnings.push('Tabakalı zemin sonucu ekran taramasıdır; homojen TBDY taşıma gücü hesabının yerine nihai tabakalı zemin çözümü olarak kullanılmaz.')}
  const layeredScreeningOnly=checks.length>0
  const zfBlocked=i.soilGroup==='ZF'&&!i.siteSpecificResponseAnalysisCompleted
