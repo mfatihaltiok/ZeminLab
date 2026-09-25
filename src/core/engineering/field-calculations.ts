@@ -1,5 +1,5 @@
 import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../models/field-data'
-import { calculateSpt, isCohesionlessSoilCode, type SptEngineResult } from './spt/spt-engine'
+import { calculateSpt, soilBehaviorFromCode, type SptEngineResult } from './spt/spt-engine'
 export type PlasticityClass='CIL'|'CIM'|'CIH'|'SiL'|'SiM'|'SiH'
 export interface SoilClassificationResult{code:PlasticityClass;description:string;plasticityGroup:'Düşük'|'Orta'|'Yüksek';isClay:boolean;aLinePi:number}
 export function classifyFineSoil(liquidLimit?:number,plasticityIndex?:number):SoilClassificationResult|null{
@@ -48,7 +48,7 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
   const nField=fieldN(record)
   if(nField===undefined)return{nField,ce:undefined,cb:undefined,cs:undefined,cr:undefined,cn:undefined,n60:undefined,n1_60:undefined,n1_60_dilatancy:undefined,dilatancyApplied:false,trace:[],overburdenCorrection:undefined,overburdenCorrectionApplied:false,warnings:['n2 ve n3 olmadan N30 oluşmaz.'],ready:false,n60Ready:false,n1_60Ready:false}
   const stress=stressAtDepth(borehole,record.depth,laboratories),cfg=record.correction??{},lab=linkedLabForSpt(laboratories,borehole.id,record.id,record.depth),layer=layerAtDepth(borehole,record.depth),soilCode=record.soilCode??layer?.code
-  const behavior=isCohesionlessSoilCode(soilCode)?'cohesionless':soilCode?'cohesive':'unknown'
+  const behavior=soilBehaviorFromCode(soilCode)
   const fineContent=cfg.fineContent??lab?.finesContent??lab?.sieve200Passing??layer?.finesContent
   const result=calculateSpt({nField,energyRatio:cfg.energyRatio,boreholeDiameterMm:borehole.drillingDiameter,sampler:cfg.sampler,samplerCorrection:cfg.samplerCorrection,rodLengthM:cfg.rodLengthM,effectiveStress:stress.effectiveStress,fineContent,soilBehavior:behavior,applyOverburden:cfg.applyOverburdenCorrection??true,applyDilatancy:cfg.applyDilatancyCorrection??false,hammerType:cfg.hammerType})
   return{...result,verticalStress:stress.verticalStress,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:result.n1_60Ready,n60DilatancyCorrected:result.n1_60_dilatancy,cohesionless:behavior==='cohesionless'}
