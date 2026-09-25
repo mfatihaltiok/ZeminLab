@@ -24,17 +24,24 @@ function isCohesive(layer:IdealizedSoilLayer){
 }
 function isGranular(layer:IdealizedSoilLayer){return !isCohesive(layer)&&(/SA|GR|SAND|KUM|ÇAKIL|CAKIL/i.test(layer.soilCode+' '+layer.soilName))}
 function effectiveStressAtDepth(layers:IdealizedSoilLayer[],depth:number,gwt:number){
-  let total=0
-  for(const layer of [...layers].sort((a,b)=>a.topDepth-b.topDepth)){
-    const top=Math.max(0,layer.topDepth),bottom=Math.min(depth,layer.bottomDepth)
+  let total=0,cursor=0
+  for(const layer of [...layers].sort((x,y)=>x.topDepth-y.topDepth)){
+    if(layer.bottomDepth<=layer.topDepth)continue
+    if(layer.topDepth>cursor+1e-9&&layer.topDepth<depth-1e-9)return{total:NaN,porePressure:NaN,effective:NaN}
+    const top=Math.max(layer.topDepth,cursor),bottom=Math.min(depth,layer.bottomDepth)
     if(bottom<=top)continue
-    const wt=finite(layer.gamma)?layer.gamma:undefined,ws=finite(layer.gammaSat??layer.gamma)?(layer.gammaSat??layer.gamma):undefined
-    if(wt==null||ws==null)return{total:NaN,porePressure:NaN,effective:NaN}
-    const above=gwt>=0?Math.max(0,Math.min(bottom,gwt)-top):bottom-top,below=(bottom-top)-above
-    total+=above*wt+below*ws
+    const gamma=finite(layer.gamma)&&layer.gamma!>0?layer.gamma:undefined
+    const gammaSat=finite(layer.gammaSat)&&layer.gammaSat!>0?layer.gammaSat:gamma
+    if(gamma==null||gammaSat==null)return{total:NaN,porePressure:NaN,effective:NaN}
+    const above=gwt>=0?Math.max(0,Math.min(bottom,gwt)-top):bottom-top
+    const below=(bottom-top)-above
+    total+=above*gamma+below*gammaSat
+    cursor=bottom
+    if(cursor>=depth-1e-9)break
   }
-  const u=gwt>=0&&depth>gwt?9.80665*(depth-gwt):0
-  return{total,porePressure:u,effective:Math.max(0,total-u)}
+  if(cursor<depth-1e-9)return{total:NaN,porePressure:NaN,effective:NaN}
+  const porePressure=gwt>=0&&depth>gwt?9.80665*(depth-gwt):0
+  return{total,porePressure,effective:Math.max(0,total-porePressure)}
 }
 function stressIncrement(qNet:number,B:number,L:number,z:number){return qNet*B*L/Math.max((B+z)*(L+z),1e-9)}
 function overlap(a:number,b:number,c:number,d:number){return Math.max(0,Math.min(b,d)-Math.max(a,c))}
@@ -55,11 +62,13 @@ function burlandSettlementTotal(qNet:number,B:number,L:number,avgN:number,zI: nu
   return Math.max(0,qb*Cs*Ic*1000)
 }
 function consolidationSettlement(layer:IdealizedSoilLayer,thickness:number,sigma0:number,sigma1:number){
-  if(!finite(layer.compressionIndexCc)||!finite(layer.initialVoidRatio)||sigma0<=0||sigma1<=sigma0)return{value:0,ok:false}
-  const Cc=layer.compressionIndexCc!,Cr=finite(layer.recompressionIndexCr)&&layer.recompressionIndexCr!>=0?layer.recompressionIndexCr!:Cc,e0=layer.initialVoidRatio!,pc=finite(layer.preconsolidationPressure)&&layer.preconsolidationPressure!>sigma0?layer.preconsolidationPressure!:sigma0
-  let strain=0
-  if(sigma1<=pc)strain=Cr*Math.log10(sigma1/sigma0)
-  else{strain=Cr*Math.log10(Math.max(pc/sigma0,1))+Cc*Math.log10(Math.max(sigma1/pc,1))}
+  if(!finite(layer.compressionIndexCc)||!finite(layer.initialVoidRatio)||layer.initialVoidRatio!<=-1||sigma0<=0||sigma1<=sigma0)return{value:0,ok:false}
+  if(layer.consolidationState!=='NC'&&layer.consolidationState!=='OC')return{value:0,ok:false}
+  const Cc=layer.compressionIndexCc!,e0=layer.initialVoidRatio!,state=layer.consolidationState
+  if(state==='NC')return{value:Math.max(0,thickness*Cc*Math.log10(sigma1/sigma0)/(1+e0)*1000),ok:true}
+  if(!finite(layer.recompressionIndexCr)||layer.recompressionIndexCr!<0||!finite(layer.preconsolidationPressure)||layer.preconsolidationPressure!<=sigma0)return{value:0,ok:false}
+  const Cr=layer.recompressionIndexCr!,pc=layer.preconsolidationPressure!
+  const strain=sigma1<=pc?Cr*Math.log10(sigma1/sigma0):Cr*Math.log10(pc/sigma0)+Cc*Math.log10(sigma1/pc)
   return{value:Math.max(0,thickness*strain/(1+e0)*1000),ok:true}
 }
 function schmertmannIz(z:number,B:number,L:number,qNet:number,sigmaPeak:number,forceStrip:boolean){
@@ -110,7 +119,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       else{status='VERİ EKSİK';note='Etki zonu koşulları ve N60 değerlendirmesi tamamlanmadı.'}
     }else if(method==='elasticity'){
       methodName='Elastik tabaka gerinimi'
-      if(finite(layer.elasticModulus)&&layer.elasticModulus!>0){const nu=finite(layer.poissonRatio)?Math.max(0,Math.min(.49,layer.poissonRatio!)):.0;immediate=deltaSigma*h*(1-nu*nu)/layer.elasticModulus!*1000}
+      if(finite(layer.elasticModulus)&&layer.elasticModulus!>0&&finite(layer.poissonRatio)&&layer.poissonRatio!>=0&&layer.poissonRatio!<.5){const nu=layer.poissonRatio!;immediate=deltaSigma*h*(1-nu*nu)/layer.elasticModulus!*1000}else{status='VERİ EKSİK';note='Young modülü Es ve Poisson ν birlikte gerekir.'}
       else{status='VERİ EKSİK';note:'Young modülü Es gerekir.'}
       if(cohesive){const c=consolidationSettlement(layer,h,midStress.effective,finalEffective);if(c.ok)consolidation=c.value;else status='VERİ EKSİK'}
     }else if(method==='2to1-layer'){
@@ -129,8 +138,10 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       else if(!finite(input.timeYears)||input.timeYears!<.1){status='VERİ EKSİK';note:'C2 için timeYears ≥ 0.1 yıl girilmelidir.'}
       else{
         const peakDepth=input.foundationType==='surekli'?B:ratio>=10?B:.5*B,sigmaPeak=effectiveStressAtDepth(layers,Df+peakDepth,gwt).effective
+        if(!finite(sigmaPeak)){status='VERİ EKSİK';note='Schmertmann için tepe etki derinliğine kadar efektif gerilme profili tamamlanmalıdır.'} else {
         const Iz=schmertmannIz(zMid,B,L,qNet,sigmaPeak,input.foundationType==='surekli'),C1=Math.max(.5,1-.5*baseStress.effective/Math.max(qNet,1e-9)),C2=1+.2*Math.log10(10*input.timeYears!)
         immediate=C1*C2*qNet*Iz*h/layer.elasticModulus!*1000
+        }
       }
     }
     totalImmediate+=immediate;totalConsolidation+=consolidation
