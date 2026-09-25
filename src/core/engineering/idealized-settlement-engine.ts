@@ -131,7 +131,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       if(finite(M)&&M>0)immediate=deltaSigma*thickness/M*1000;else{status='VERİ EKSİK';note='Janbu için M/constrained modulus gerekir.'}
     }else{
       methodName='Schmertmann et al. (1978)'
-      const M=finite(layer.elasticModulus as number|undefined)?layer.elasticModulus:layer.oedometricModulus
+      const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
       const sigmaPeak=effectiveStressAtDepth(layers,Df+Math.min(influenceDepth/2,B),gwt).effective
       const Iz=schmertmannIz(zMid,B,L,qNet,sigmaPeak)
       const C1=qNet>0?Math.max(.5,1-.5*baseStress.effective/qNet):1
