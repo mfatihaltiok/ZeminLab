@@ -29,7 +29,11 @@ function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:Laborat
     if(top>cursor+1e-6)return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ profili süreksiz; σ′v0 hesaplanmadı.'}
     const gamma=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:labGammaInLayer(laboratories,borehole.id,top,bottom)
     if(gamma==null||gamma<=0)return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ profili eksik; σ′v0 hesaplanmadı.'}
-    sigmaV+=(bottom-top)*gamma
+    const belowGroundwater=borehole.groundwaterDepth!=null&&bottom>borehole.groundwaterDepth
+    const gammaSat=Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0?layer.saturatedUnitWeight!:undefined
+    if(belowGroundwater&&gammaSat==null)return{verticalStress:undefined,effectiveStress:undefined,source:'YASS altındaki katmanda γsat eksik; σ′v0 hesaplanmadı.'}
+    const dry=Math.max(0,Math.min(bottom,borehole.groundwaterDepth??bottom)-top),sat=(bottom-top)-dry
+    sigmaV+=dry*gamma+sat*(gammaSat??gamma)
     cursor=bottom
     if(cursor>=z-1e-6)break
   }
