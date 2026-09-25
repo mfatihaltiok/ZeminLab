@@ -37,6 +37,7 @@ export interface SoilParameters{
   surfaceSlope:number
   foundationBaseSlope:number
   finesContent:number
+  liquefactionContinuousOrThickLens:boolean
   classification:SoilClassification
 }
 export interface FoundationParameters{
@@ -69,7 +70,7 @@ export const defaultProjectInfo:ProjectInfo={
   engineer:'',clientName:'',firmName:'',buildingType:'',basementCount:0,normalFloorCount:0,unitSystem:'ton-m',
   geophysical:{soilGroupSource:'VS30',siteSpecificResponseAnalysisCompleted:false},
   seismic:{},
-  soilParameters:{unitWeight:0,saturatedUnitWeight:0,cohesion:0,frictionAngle:0,undrainedCohesion:undefined,groundwaterDepth:undefined,surfaceSlope:0,foundationBaseSlope:0,finesContent:0,classification:{system:'TS EN ISO 14688-2'}},
+  soilParameters:{unitWeight:0,saturatedUnitWeight:0,cohesion:0,frictionAngle:0,undrainedCohesion:undefined,groundwaterDepth:undefined,surfaceSlope:0,foundationBaseSlope:0,finesContent:0,liquefactionContinuousOrThickLens:false,classification:{system:'TS EN ISO 14688-2'}},
   foundationParameters:{
     foundationType:'tekil',footingWidth:0,footingLength:0,footingDepth:0,safetyFactor:3,verticalLoad:0,horizontalLoad:0,momentX:0,momentY:0,
     resistanceFactorRv:1.4,vtX:0,vtY:0,structuralWeight:0,baseFrictionTanDelta:0.6,passiveResistanceCharacteristic:0,usePassiveResistance:false
