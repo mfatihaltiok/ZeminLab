@@ -24,9 +24,10 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
     if(!valid)return {result:null,error:'Temel, zemin veya yük girdileri tamamlanmalı.'}
     try{
       return {result:tbdyBearingCapacity({
-        B,L,Df,gamma1,gamma2,c,phi,verticalLoad:N,horizontalLoad:H,momentX:Mx,momentY:My,
+        B,L,Df,gamma1,gamma2,c,phi,verticalLoad:N,horizontalLoad:H,horizontalLoadB:Math.abs(Vx),horizontalLoadL:Math.abs(Vy),momentX:Mx,momentY:My,
         groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:1.4,
-        foundationType:f.foundationType,groundwaterDepth:soil.groundwaterDepth,layers:layered,undrainedCu:soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem),soilGroup:p.geophysical.soilGroup,siteSpecificResponseAnalysisCompleted:p.geophysical.siteSpecificResponseAnalysisCompleted
+        foundationType:f.foundationType,groundwaterDepth:soil.groundwaterDepth,layers:layered,undrainedCu:soil.undrainedCohesion,
+        soilGroup:p.geophysical.soilGroup,siteSpecificResponseAnalysisCompleted:p.geophysical.siteSpecificResponseAnalysisCompleted==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem),soilGroup:p.geophysical.soilGroup,siteSpecificResponseAnalysisCompleted:p.geophysical.siteSpecificResponseAnalysisCompleted
       }),error:null}
     }catch(e){return{result:null,error:e instanceof Error?e.message:String(e)}}
   },[valid,B,L,Df,gamma1,gamma2,c,phi,N,H,Mx,My,soil.surfaceSlope,soil.foundationBaseSlope,f.foundationType,soil.groundwaterDepth,soil.undrainedCohesion,layered])
