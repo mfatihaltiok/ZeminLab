@@ -14,7 +14,7 @@ export function soilBehaviorFromCode(code?:string):SoilBehavior{
   const raw=code.trim().replace(/\s+/g,'')
   const upper=raw.toUpperCase().replace(/İ/g,'I')
   if(/(CL|CI|CH|ML|MH|SI)$/.test(upper)||/^(CI|CL|CH|ML|MH|SI)/.test(upper)||/PT$/.test(upper))return'cohesive'
-  if(/(SA|GR)$/.test(upper)||/^(SA|GR)/.test(upper)||upper.includes('SAND')||upper.includes('KUM')||upper.includes('CAKIL'))return'cohesionless'
+  if(/^(SM|SA|GR|SP|SW|GW|GP|GM)/.test(upper)||/(SA|GR)$/.test(upper)||upper.includes('SAND')||upper.includes('KUM')||upper.includes('CAKIL'))return'cohesionless'
   return'unknown'
 }
 export function isCohesionlessSoilCode(code?:string){return soilBehaviorFromCode(code)==='cohesionless'}
