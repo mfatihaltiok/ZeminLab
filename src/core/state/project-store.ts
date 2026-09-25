@@ -11,11 +11,12 @@ export type ProjectEnvelope = { format:'FALUZMN'; version:number; savedAt:string
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 const nonNegative=(x:unknown)=>finite(x)&&x>=0
 function convertLabRecord(l:LaboratoryRecord,system:ProjectInfo['unitSystem']):LaboratoryRecord{
-  const factor=(fn:(v:number,s:ProjectInfo['unitSystem'])=>number|undefined,k:keyof LaboratoryRecord)=>{const v=l[k];return finite(v)?fn(v,system as never):v as never}
+  const convert=(value:unknown,fn:(v:number,s:ProjectInfo['unitSystem'])=>number)=>finite(value as number)?fn(value as number,system):undefined
   return {...l,
-    unitWeight:factor(unitWeightToBase,'unitWeight'),pointLoadIs50:factor(stressToBase,'pointLoadIs50'),uniaxialRockStrength:factor(stressToBase,'uniaxialRockStrength'),
-    uuC:factor(stressToBase,'uuC'),directShearC:factor(stressToBase,'directShearC'),c:factor(stressToBase,'c'),elasticModulus:factor(modulusToBase,'elasticModulus'),
-    oedometricModulus:factor(modulusToBase,'oedometricModulus'),engineeringUnitSystem:'kN-m'
+    unitWeight:convert(l.unitWeight,unitWeightToBase),pointLoadIs50:convert(l.pointLoadIs50,stressToBase),uniaxialRockStrength:convert(l.uniaxialRockStrength,stressToBase),
+    uuC:convert(l.uuC,stressToBase),directShearC:convert(l.directShearC,stressToBase),c:convert(l.c,stressToBase),
+    elasticModulus:convert(l.elasticModulus,modulusToBase),oedometricModulus:convert(l.oedometricModulus,modulusToBase),
+    engineeringUnitSystem:'kN-m'
   }
 }
 function convertLayer(l:any,system:ProjectInfo['unitSystem']){
@@ -33,9 +34,10 @@ function normalizeBorehole(b:BoreholeRecord):BoreholeRecord{
 function normalizeLab(l:LaboratoryRecord):LaboratoryRecord{return {...l,depth:Math.max(0,l.depth),source:l.source==='imported'?'imported':'manual',confirmed:Boolean(l.confirmed)}}
 function normalizeProfile(p:IdealizedSoilProfile|undefined,system:ProjectInfo['unitSystem']):IdealizedSoilProfile|undefined{
   if(!p||!Array.isArray(p.layers))return undefined
-  return {...p,version:2,parameterUnitSystem:'kN-m',status:p.status==='SABİTLENDİ'?'SABİTLENDİ':'TASLAK',
-    layers:p.layers.map((l:any)=>convertLayer(l,system)),notes:[p.notes??'', 'MIGRASYON: Es/M değerleri ve c′/φ′ anlamları eski şemada kesin ayrıştırılamadığı için M alanları temizlendi; LAB kaynağı yeniden doğrulanmalıdır.'].filter(Boolean).join(' ')
-  }
+  const legacy=p.version<2||p.parameterUnitSystem!=='kN-m'
+  const layers=legacy?p.layers.map((l:any)=>convertLayer(l,system)):p.layers
+  const migrationNote=legacy?'MIGRASYON: Es/M alanları ile c′/φ′ kaynağı eski şemada kesin ayrıştırılamadığı için M alanları temizlendi; LAB kaynağı yeniden doğrulanmalıdır.':''
+  return {...p,version:2,parameterUnitSystem:'kN-m',status:p.status==='SABİTLENDİ'?'SABİTLENDİ':'TASLAK',layers,notes:[p.notes??'',migrationNote].filter(Boolean).join(' ')}
 }
 export function migrateProjectData(value:unknown,version:number):ProjectDocument{
   if(!value||typeof value!=='object')throw new Error('Geçersiz FALUZMN proje verisi.')
