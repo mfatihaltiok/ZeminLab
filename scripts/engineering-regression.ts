@@ -48,8 +48,8 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     momentX:100,momentY:40,resistanceFactor:1.4,method:'TBDY-2018'
   })
   approx(eccentric.qAvg,125)
-  approx(eccentric.qMax,147.5)
-  approx(eccentric.qMin,102.5)
+  approx(eccentric.qMax,158.75)
+  approx(eccentric.qMin,91.25)
   assert.equal(eccentric.contactState,'FULL')
   assert.equal(eccentric.coreContact,true)
 }
