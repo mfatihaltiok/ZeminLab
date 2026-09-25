@@ -1,7 +1,7 @@
 import type { FoundationType } from '../models/project'
 import { TBDY_GAMMA_RV } from '../models/project'
 
-export type SurfaceFoundationMethod='TBDY-2018'|'Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
+export type SurfaceFoundationMethod='TBDY-2018'
 
 export interface SurfaceFoundationLayer{
   topDepth:number
@@ -86,25 +86,13 @@ const gammaW=9.80665
 const rad=(deg:number)=>deg*Math.PI/180
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 
-function factors(phiDeg:number,method:SurfaceFoundationMethod){
+function factors(phiDeg:number){
   if(!finite(phiDeg)||phiDeg<0||phiDeg>=90)throw new Error('φ′ 0° ile 90° arasında olmalıdır.')
   const phi=phiDeg
   const t=Math.tan(rad(phi))
   const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
   const Nc=phi===0?5.14:(Nq-1)/t
-  let Ngamma=0
-  if(phi>0){
-    if(method==='Terzaghi'){
-      const Kp=Math.pow(Math.tan(Math.PI/4+rad(phi)/2),2)
-      Ngamma=2*(Kp+1)*t
-    }else if(method==='Meyerhof'){
-      Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
-    }else if(method==='Hansen'){
-      Ngamma=1.5*(Nq-1)*t
-    }else{
-      Ngamma=2*(Nq-1)*t
-    }
-  }
+  const Ngamma=phi===0?0:2*(Nq-1)*t
   return{phi,t,Nq,Nc,Ngamma}
 }
 
@@ -194,17 +182,15 @@ function shapeFactors(B:number,L:number,foundationType:FoundationType,phi:number
   }
 }
 
-function depthFactors(Df:number,B:number,phi:number,method:SurfaceFoundationMethod){
+function depthFactors(Df:number,B:number,phi:number){
   const k=Math.atan(Df/Math.max(B,1e-12))
-  if(method==='Meyerhof')return{dc:1+0.2*Math.sqrt(Math.tan(Math.PI/4+rad(phi)/2)**2)*Df/Math.max(B,1e-12),dq:1+0.1*Math.sqrt(Math.tan(Math.PI/4+rad(phi)/2)**2)*Df/Math.max(B,1e-12),dg:1}
-  if(method==='Terzaghi')return{dc:1,dq:1,dg:1}
   return{dc:1+0.4*k,dq:1+2*k*Math.tan(rad(phi))*(1-Math.sin(rad(phi)))**2,dg:1}
 }
 
 function localLayerCheck(layer:SurfaceFoundationLayer,B:number,Df:number,baseQ:number,method:SurfaceFoundationMethod){
   const phi=layer.phi
-  const f=factors(phi,method)
-  const d=depthFactors(Df,B,phi,method)
+  const f=factors(phi)
+  const d=depthFactors(Df,B,phi)
   const qk=Math.max(0,layer.cohesion)*f.Nc*d.dc+Math.max(0,baseQ)*f.Nq*d.dq+0.5*Math.max(0,layer.gammaSat!=null?layer.gammaSat-gammaW:layer.gamma)*B*f.Ngamma
   return{top:layer.topDepth,bottom:layer.bottomDepth,c:layer.cohesion,phi,gamma:layer.gamma,gammaEffective:layer.gammaSat!=null?Math.max(0,layer.gammaSat-gammaW):layer.gamma,qk,controlling:false}
 }
@@ -221,6 +207,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(i.baseSlope!=null&&!finite(i.baseSlope))throw new Error('Temel tabanı eğimi θ geçersiz.')
 
   const method=i.method??'TBDY-2018'
+  if(method!=='TBDY-2018')throw new Error('Klasik Terzaghi/Meyerhof/Hansen/Vesic hesabı ayrı kanonik taşıma gücü motorunda yürütülür.')
   const foundationType=i.foundationType??'tekil'
   const N=i.verticalLoad
   const hB=Math.abs(i.horizontalLoadB??0)
@@ -268,7 +255,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
 
   const checks=(i.layers??[])
     .filter(l=>finite(l.topDepth)&&finite(l.bottomDepth)&&l.bottomDepth>l.topDepth&&l.bottomDepth>i.Df&&l.topDepth<i.Df+2*Bp&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
-    .map(l=>localLayerCheck(l,Bp,i.Df,qBase,method))
+    .map(l=>localLayerCheck(l,Bp,i.Df,qBase))
   const layeredScreeningOnly=checks.length>0
   if(layeredScreeningOnly)warnings.push('16.8.3.3 kapsamındaki değişken/tabakalı zemin bulundu. Katman sonuçları yalnız ayrı ekran taramasıdır; kanonik homojen qk değerinin yerine geçirilmez ve nihai tasarım için tabakalı-zemin mekanizması ayrıca doğrulanmalıdır.')
 
