@@ -108,12 +108,12 @@ function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influen
 }
 
 export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoundationResult{
+  const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad,H=Math.abs(i.horizontalLoad??0)
   if(i.B<=0||i.L<=0||i.Df<0)throw new Error('Temel B ve L pozitif, Df negatif olmayan değer olmalıdır.')
   if(i.gamma1<=0)throw new Error('γ doğal birim hacim ağırlığı pozitif olmalıdır.')
   if(method==='TBDY-2018'&&i.resistanceFactor!=null&&(!finite(i.resistanceFactor)||i.resistanceFactor<1))throw new Error('γRv geçerli ve 1.0 veya büyük olmalıdır.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=0))throw new Error('YASS tanımlandıysa γsat pozitif olmalıdır.')
   if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük negatif olamaz.')
-  const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad,H=Math.abs(i.horizontalLoad??0)
   const groundSlope=Math.abs(i.groundSlope??0),baseSlope=Math.abs(i.baseSlope??0)
   if(groundSlope>=90||baseSlope>=90||groundSlope+baseSlope>=90)throw new Error('Arazi ve temel tabanı eğimleri geçersiz.')
   const warnings:string[]=[]
@@ -135,9 +135,10 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
     checks.forEach(x=>x.controlling=Math.abs(x.qk-min)<1e-9)
     warnings.push('Tabakalı zemin kontrolü: etkin derinlikteki tabakalar ayrı ek kontrol olarak raporlandı. Bu ekran kontrolü ana homojen zemin qk değerini değiştirmez; nihai tabakalı zemin hesabının yerini tutmaz.')
   }
-  const controlling=qk,designQt=controlling/Math.max(resistanceFactor,1e-9),adequate=qo<=designQt&&Be>0&&Le>0&&checks.length===0
+  const controlling=qk,designQt=controlling/Math.max(resistanceFactor,1e-9),adequate=qo<=designQt&&Be>0&&Le>0&&checks.length===0&&finite(i.groundwaterDepth)
   if(method==='TBDY-2018'&&Math.abs((i.resistanceFactor??ENGINEERING_CONSTANTS.TBDY_GAMMA_RV)-ENGINEERING_CONSTANTS.TBDY_GAMMA_RV)>1e-9)warnings.push('TBDY 2018 Tablo 16.2 yüzeysel temel için γRv=1.40 kullanılmalıdır.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: γ′ ve ağırlıklı γ kullanıldı.')
+  if(!finite(i.groundwaterDepth))warnings.push('YASS girilmedi; su etkisi olmadan ön değerlendirme yapıldı. Nihai tasarım için YASS teyit edilmelidir.')
   if(groundSlope>0)warnings.push('Arazi eğimi katsayıları Vesic tipi genel kabul görmüş bağıntılarla uygulanmıştır; β<φ′ koşulu kontrol edildi.')
   if(baseSlope>0)warnings.push('Temel tabanı eğimi katsayıları Vesic tipi genel kabul görmüş bağıntılarla uygulanmıştır.')
   if(foundationType==='radye')warnings.push('Radye temel için taşıma gücünün yanında toplam/farklı oturma ayrıca kontrol edilmelidir.')
@@ -160,7 +161,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
     Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,...mf,surcharge:water.surcharge,gammaBelow:water.gammaBelow,ex,ey,Be,Le,effectiveArea,qk:controlling,qt:designQt,qo,utilization:qo/Math.max(designQt,1e-9),adequate,effectiveDepth:2*Bp,
     representativeC:i.c,representativePhi:f.phi,representativeGamma:water.gammaBelow,ultimateClassical:qk,allowableClassical:i.safetyFactor!=null&&i.safetyFactor>0?qk/i.safetyFactor:undefined,
     undrainedQk:i.undrainedCu!=null?i.undrainedCu*5.14*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge:undefined,
-    layeredScreeningOnly:checks.length>0,finalDesignEligible:checks.length===0,layerChecks:checks,warnings,method,foundationType
+    layeredScreeningOnly:checks.length>0||!finite(i.groundwaterDepth),finalDesignEligible:checks.length===0&&finite(i.groundwaterDepth),layerChecks:checks,warnings,method,foundationType
   }
   return{...resultBase,source:'TBDY 2018 16.8.3.1–16.8.3.4; Denk. 16.8. Arazi ve temel tabanı eğimi katsayıları için genel kabul görmüş Vesic tipi bağıntılar kullanılır; tabakalı zemin kontrolü ayrıca raporlanır.',steps,value:{Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:mf.sc,sq:mf.sq,sg:mf.sg,dc:mf.dc,dq:mf.dq,dg:mf.dg,ic:mf.ic,iq:mf.iq,ig:mf.ig,gc:mf.gc,gq:mf.gq,gg:mf.gg,bc:mf.bc,bq:mf.bq,bg:mf.bg,surcharge:water.surcharge,gammaBelow:water.gammaBelow,ex,ey,Be,Le,effectiveArea,qk:controlling,qt:designQt,qo,utilization:qo/Math.max(designQt,1e-9),adequate,effectiveDepth:2*Bp}}
 }
