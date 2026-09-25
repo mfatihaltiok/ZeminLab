@@ -19,14 +19,14 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
   const Vx=forceToBase(Number(f.vtX),p.unitSystem),Vy=forceToBase(Number(f.vtY),p.unitSystem),H=Math.hypot(Vx,Vy)
   const Mx=momentToBase(Number(f.momentX),p.unitSystem),My=momentToBase(Number(f.momentY),p.unitSystem)
   const valid=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<50&&Number.isFinite(N)&&N>=0&&Number.isFinite(FS)&&FS>0
-  const layered=useMemo(()=>profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:unitWeightToBase(x.gamma??soil.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(x.gammaSat??x.gamma??soil.saturatedUnitWeight,p.unitSystem),cohesion:stressToBase(x.cohesion??soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle})).filter(x=>x.bottomDepth>x.topDepth),[profile,soil,p.unitSystem])
+  const layered=useMemo(()=>profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:x.gamma??unitWeightToBase(soil.unitWeight,p.unitSystem),gammaSat:x.gammaSat??unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem),cohesion:x.cohesion??stressToBase(soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle})).filter(x=>x.bottomDepth>x.topDepth),[profile,soil,p.unitSystem])
   const calculation=useMemo(()=>{
     if(!valid)return {result:null,error:'Temel, zemin veya yük girdileri tamamlanmalı.'}
     try{
       return {result:tbdyBearingCapacity({
         B,L,Df,gamma1,gamma2,c,phi,verticalLoad:N,horizontalLoad:H,momentX:Mx,momentY:My,
         groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:1.4,
-        foundationType:f.foundationType,groundwaterDepth:soil.groundwaterDepth,layers:layered,undrainedCu:soil.undrainedCohesion
+        foundationType:f.foundationType,groundwaterDepth:soil.groundwaterDepth,layers:layered,undrainedCu:soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem),soilGroup:p.geophysical.soilGroup,siteSpecificResponseAnalysisCompleted:p.geophysical.siteSpecificResponseAnalysisCompleted
       }),error:null}
     }catch(e){return{result:null,error:e instanceof Error?e.message:String(e)}}
   },[valid,B,L,Df,gamma1,gamma2,c,phi,N,H,Mx,My,soil.surfaceSlope,soil.foundationBaseSlope,f.foundationType,soil.groundwaterDepth,soil.undrainedCohesion,layered])
