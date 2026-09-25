@@ -11,7 +11,7 @@ type SettlementLayerResult={
 }
 export interface IdealizedSettlementInput{
   profile:IdealizedSoilProfile;method:IdealizedSettlementMethod;B:number;L:number;Df:number;qGross:number;groundwaterDepth?:number
-  foundationType?:FoundationType;timeYears?:number;burlandNTrend?:BurlandNTrend;burlandState?:'NC'|'OC';burlandPreconsolidationPressure?:number
+  foundationType?:FoundationType;timeYears?:number;burlandNTrend?:BurlandNTrend;burlandSoftLayerBottomDepth?:number;burlandState?:'NC'|'OC';burlandPreconsolidationPressure?:number
 }
 export interface IdealizedSettlementResult{
   method:IdealizedSettlementMethod;layers:SettlementLayerResult[];totalImmediate:number;totalConsolidation:number;totalSettlement:number
@@ -55,7 +55,7 @@ function adjustedBurlandN(layer:IdealizedSoilLayer,midDepth:number,gwt:number){
   else if(gwt>=0&&midDepth>=gwt&&fineSand&&n>15)n=15+.5*(n-15)
   return n
 }
-function burlandInfluenceDepth(B:number,trend:BurlandNTrend){const zi=1.4*Math.pow(B/.3,.75)*.3;return trend==='decreasing'?Math.min(2*B,zi):zi}
+function burlandInfluenceDepth(B:number,trend:BurlandNTrend,softLayerBottomDepth?:number,Df=0){const zi=1.4*Math.pow(B/.3,.75)*.3;if(trend==='decreasing'){if(!finite(softLayerBottomDepth)||softLayerBottomDepth!<=Df)return 2*B;return Math.min(2*B,softLayerBottomDepth!-Df)}return zi}
 function burlandSettlementTotal(qNet:number,B:number,L:number,avgN:number,zI: number,state:'NC'|'OC',pc?:number){
   const Br=.3,ratio=L/Math.max(B,1e-9),Cs=Math.pow((1.25*ratio)/(ratio+.25),2),Ic=state==='NC'?1.71/Math.pow(avgN,1.4):.57/Math.pow(avgN,1.4)
   const qb=state==='NC'?.14*(qNet/100)*Br*Math.pow(B/Br,.7):qNet<=((pc??-1))?.047*(qNet/100)*Br*Math.pow(B/Br,.7):.14*Math.max(0,qNet-.67*(pc??0))/100*Br*Math.pow(B/Br,.7)
@@ -91,7 +91,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(!finite(baseStress.effective))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Df seviyesine kadar γ/γsat profili eksik veya geçersiz.'],source:'FALUZMN ortak oturma motoru'}
   const qNet=Math.max(0,qGross-baseStress.effective)
   const ratio=L/Math.max(B,1e-9)
-  const influenceDepth=method==='burland-burbidge'?burlandInfluenceDepth(B,input.burlandNTrend??'unknown'):method==='schmertmann'?(input.foundationType==='surekli'?4*B:(ratio>=10?4*B:2*B)):method==='janbu'?Math.max(2*B,1):2*B
+  const influenceDepth=method==='burland-burbidge'?burlandInfluenceDepth(B,input.burlandNTrend??'unknown',input.burlandSoftLayerBottomDepth,input.Df):method==='schmertmann'?(input.foundationType==='surekli'?4*B:(ratio>=10?4*B:2*B)):method==='janbu'?Math.max(2*B,1):2*B
   if(qNet<=0)warnings.push('Temel seviyesinde net ilave basınç sıfır/negatif; seçilen yöntem yük artışı açısından hesaplanamaz.')
   let totalImmediate=0,totalConsolidation=0
   const results:SettlementLayerResult[]=[]
@@ -104,8 +104,8 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     if(input.burlandState==='OC'&&(!finite(input.burlandPreconsolidationPressure)||input.burlandPreconsolidationPressure!<=0)){warnings.push('Burland OC hesabı için σ′c girilmelidir.');methodReady=false}
     const zone=layers.map(layer=>{const h=overlap(layer.topDepth,layer.bottomDepth,Df,Df+influenceDepth);return{layer,h}}).filter(x=>x.h>0)
     if(!zone.length||zone.some(x=>!isGranular(x.layer))){warnings.push('Burland-Burbidge yalnız granüler zemin zonu için uygulanır; etki zonunda kohezyonlu/organik tabaka bulunduğundan hesap durduruldu.');methodReady=false}
-    const nValues=zone.map(x=>{const mid=(Math.max(x.layer.topDepth,Df)+Math.min(x.layer.bottomDepth,Df+influenceDepth))/2;return{n:adjustedBurlandN(x.layer,mid,gwt),h:x.h}});if(nValues.some(x=>x.n==null||x.n<=0)){warnings.push('Burland-Burbidge için etki zonunda tüm granüler tabakaların N60 değeri gerekir.');methodReady=false}
-    const totalH=nValues.reduce((s,x)=>s+x.h,0),avgN=totalH>0?nValues.reduce((s,x)=>s+(x.n??0)*x.h,0)/totalH:0
+    const nValues=zone.map(x=>{const mid=(Math.max(x.layer.topDepth,Df)+Math.min(x.layer.bottomDepth,Df+influenceDepth))/2;return adjustedBurlandN(x.layer,mid,gwt)});if(nValues.some(n=>n==null||n<=0)){warnings.push('Burland-Burbidge için etki zonundaki SPT temsilcilerinin N60 değerleri gerekir.');methodReady=false}
+    const avgN=nValues.length>0?nValues.reduce((s,n)=>s+(n??0),0)/nValues.length:0
     if(methodReady&&qNet>0)globalBurlandSettlement=burlandSettlementTotal(qNet,B,L,avgN,input.burlandState!,influenceDepth)
   }
   for(const {layer,index,top,bottom,h} of relevant){
@@ -147,6 +147,8 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     totalImmediate+=immediate;totalConsolidation+=consolidation
     results.push({layerId:layer.id,order:layer.order,soilName:layer.soilName,soilCode:layer.soilCode,topDepth:top,bottomDepth:bottom,thickness:h,midDepth,sigmaV0:midStress.total,porePressure:midStress.porePressure,sigmaV0Effective:midStress.effective,deltaSigma,sigmaVFinal:midStress.total+deltaSigma,sigmaVFinalEffective:finalEffective,representativeN60:layer.representativeN60,Es:layer.elasticModulus,poissonRatio:layer.poissonRatio,immediateSettlement:immediate,consolidationSettlement:consolidation,totalSettlement:immediate+consolidation,method:methodName,status,note})
   }
+  const profileBottom=layers.reduce((m,x)=>Math.max(m,x.bottomDepth),0)
+  if(profileBottom<Df+influenceDepth-1e-9){warnings.push('Profil, seçilen yöntemin etki derinliğinin altına kadar kesintisiz tanımlanmalıdır.');methodReady=false}
   if(results.length===0)methodReady=false
   if(results.some(x=>x.status==='VERİ EKSİK'))methodReady=false
   if(method==='burland-burbidge')warnings.push('Burland-Burbidge granüler zemin için ampirik oturma yöntemidir; N60 etki zonu ortalaması ve NC/OC durumu açık girdidir.')
