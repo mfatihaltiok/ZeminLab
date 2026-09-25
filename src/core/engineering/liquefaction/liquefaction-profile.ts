@@ -11,7 +11,7 @@ export interface LiquefactionSptRecord{
 }
 export interface LiquefactionProfileInput{
   Mw:number;Sds:number;gwt:number;layers:LiquefactionSoilLayer[];spt:LiquefactionSptRecord[];gammaW?:number;applyDilatancy?:boolean
-  dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup
+  dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup;continuousOrThickLens?:boolean
 }
 export interface LiquefactionProfileRow{
   depth:number;soil?:string;fineContent?:number;plasticityIndex?:number;clayContent?:number;waterContent?:number
@@ -64,8 +64,8 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
   const gammaW=input.gammaW??9.81
   if(!finite(gammaW)||gammaW<=0)throw new Error('Su birim hacim ağırlığı pozitif olmalıdır.')
   const CM=magnitudeCorrection(input.Mw),warnings:string[]=[]
-  const mandatoryByProject=mandatoryDts(input.dts)&&mandatorySoilGroup(input.soilGroup)
-  if(!input.dts||!input.soilGroup)warnings.push('DTS veya TBDY zemin grubu eksik; 16.6.1 zorunluluğu kesinleştirilemedi.')
+  const mandatoryByProject=mandatoryDts(input.dts)&&mandatorySoilGroup(input.soilGroup)&&input.continuousOrThickLens===true
+  if(!input.dts||!input.soilGroup||input.continuousOrThickLens!==true)warnings.push('DTS, TBDY zemin grubu veya 16.6.1 sürekli tabaka/kalın mercek doğrulaması eksik; sıvılaşma zorunluluğu kesinleştirilemedi.')
   if(input.soilGroup==='ZF')warnings.push('ZF için 16.5.1.3 sahaya özel zemin davranış analizi gerekir; bu ekran o analizi yerine geçmez.')
   const rows=input.spt.filter(x=>finite(x.depth)&&x.depth>=0).sort((a,b)=>a.depth-b.depth).map((record):LiquefactionProfileRow=>{
     const layer=input.layers.find(l=>record.depth>=l.top&&record.depth<l.bottom)
@@ -101,7 +101,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     if(!mandatoryAnalysis){
-      trace.push({symbol:'DTS/Zemin',title:'16.6.1 zorunluluğu',formula:'DTS=1/1a/2/2a ve ZD/ZE/ZF',value:0,note:'Proje koşulları zorunlu sıvılaşma ekranını tetiklemedi.'})
+      trace.push({symbol:'DTS/Zemin',title:'16.6.1 zorunluluğu',formula:'DTS=1/1a/2/2a + ZD/ZE/ZF + sürekli tabaka/kalın mercek',value:0,note:'Proje koşulları zorunlu sıvılaşma ekranını tetiklemedi.'})
       return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     if(!researchDataComplete){
