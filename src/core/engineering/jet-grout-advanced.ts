@@ -7,7 +7,8 @@ export interface PriebeScreeningResult { n0: number; n1: number; activeEarthPres
 export function priebeScreening(i: PriebeScreeningInput): PriebeScreeningResult {
   const ar = Math.min(0.95, Math.max(1e-6, i.areaReplacementRatio))
   const phi = Math.max(0, Math.min(60, i.columnFrictionAngle)) * Math.PI / 180
-  const mu = i.soilPoissonRatio == null ? 1 / 3 : Math.max(0, Math.min(0.49, i.soilPoissonRatio))
+  if (i.soilPoissonRatio == null || !Number.isFinite(i.soilPoissonRatio) || i.soilPoissonRatio < 0 || i.soilPoissonRatio >= 0.5) throw new Error('Priebe ön kontrolü için zemin ν açıkça girilmelidir.')
+  const mu = i.soilPoissonRatio
   const ka = Math.pow(Math.tan(Math.PI / 4 - phi / 2), 2)
   const f = ((1 - mu) * (1 - ar)) / Math.max(1 - 2 * mu + ar, 1e-9)
   const n0 = 1 + ar * ((1 + f / Math.max(ka, 1e-9)) / Math.max(f, 1e-9) - 1)
@@ -20,7 +21,8 @@ export interface VirtualRaftInput { load: number; area: number; treatedThickness
 export interface VirtualRaftResult { q: number; untreatedSettlement: number; treatedSettlement: number; reductionRatio: number; reductionPercent: number; formula: string }
 export function virtualRaftSettlement(i: VirtualRaftInput): VirtualRaftResult {
   const A = Math.max(i.area, 1e-9), H = Math.max(i.treatedThickness, 0), Es = Math.max(i.untreatedModulus, 1e-9), Ec = Math.max(i.treatedModulus, 1e-9)
-  const nu = Math.max(0, Math.min(0.49, i.poissonRatio ?? 0.30)), q = Math.max(0, i.load) / A, factor = 1 - nu * nu
+  if (i.poissonRatio == null || !Number.isFinite(i.poissonRatio) || i.poissonRatio < 0 || i.poissonRatio >= 0.5) throw new Error('Sanal radye karşılaştırması için ν açıkça girilmelidir.')
+  const nu = i.poissonRatio, q = Math.max(0, i.load) / A, factor = 1 - nu * nu
   const untreatedSettlement = q * H * factor / Es, treatedSettlement = q * H * factor / Ec
   const reductionRatio = untreatedSettlement > 0 ? treatedSettlement / untreatedSettlement : 0
   return { q, untreatedSettlement, treatedSettlement, reductionRatio, reductionPercent: Math.max(0, 1 - reductionRatio) * 100, formula: 's = q·H·(1−ν²)/E; treated/untreated equivalent-layer comparison' }
@@ -83,8 +85,10 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
     const sigmaTop = Math.max(0, layer.effectiveStressAtTop ?? 0)
     const sigmaBottom = Math.max(sigmaTop, layer.effectiveStressAtBottom ?? sigmaTop + Math.max(layer.gamma, 0) * H)
     const sigmaAvg = (sigmaTop + sigmaBottom) / 2
-    const alpha = Math.max(0, Math.min(1, layer.interfaceAlpha ?? 1))
-    const delta = Math.max(0, Math.min(89, layer.interfaceDelta ?? layer.frictionAngle)) * Math.PI / 180
+    if (layer.interfaceAlpha == null || !Number.isFinite(layer.interfaceAlpha) || layer.interfaceAlpha < 0 || layer.interfaceAlpha > 1) throw new Error('Jet Grout şaft hesabında arayüz α açıkça verilmelidir.')
+    if (layer.interfaceDelta == null || !Number.isFinite(layer.interfaceDelta) || layer.interfaceDelta < 0 || layer.interfaceDelta >= 90) throw new Error('Jet Grout şaft hesabında arayüz δ açıkça verilmelidir.')
+    const alpha = layer.interfaceAlpha
+    const delta = layer.interfaceDelta * Math.PI / 180
     const tau = Math.max(0, alpha * layer.cohesion + sigmaAvg * Math.tan(delta))
     const shaft = tau * perimeter * H
     shaftCharacteristic += shaft
@@ -107,7 +111,9 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
   const blockBase = Math.max(0, tipSoil * blockArea)
   const blockShaft = i.layers.reduce((sum, layer) => {
     const H = Math.max(0, layer.thickness), sigmaTop = Math.max(0, layer.effectiveStressAtTop ?? 0), sigmaBottom = Math.max(sigmaTop, layer.effectiveStressAtBottom ?? sigmaTop + Math.max(layer.gamma, 0) * H)
-    const sigmaAvg = (sigmaTop + sigmaBottom) / 2, alpha = Math.max(0, Math.min(1, layer.interfaceAlpha ?? 1)), delta = Math.max(0, Math.min(89, layer.interfaceDelta ?? layer.frictionAngle)) * Math.PI / 180
+    if (layer.interfaceAlpha == null || !Number.isFinite(layer.interfaceAlpha) || layer.interfaceAlpha < 0 || layer.interfaceAlpha > 1) throw new Error('Jet Grout blok şaft hesabında arayüz α açıkça verilmelidir.')
+    if (layer.interfaceDelta == null || !Number.isFinite(layer.interfaceDelta) || layer.interfaceDelta < 0 || layer.interfaceDelta >= 90) throw new Error('Jet Grout blok şaft hesabında arayüz δ açıkça verilmelidir.')
+    const sigmaAvg = (sigmaTop + sigmaBottom) / 2, alpha = layer.interfaceAlpha, delta = layer.interfaceDelta * Math.PI / 180
     return sum + Math.max(0, alpha * layer.cohesion + sigmaAvg * Math.tan(delta)) * blockPerimeter * H
   }, 0)
   const blockCharacteristic = blockBase + blockShaft
