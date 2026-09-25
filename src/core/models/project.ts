@@ -113,9 +113,9 @@ export function normalizeProjectInfo(value:Partial<ProjectInfo>):ProjectInfo{
   const unitSystem:UnitSystem=value.unitSystem==='kN-m'?'kN-m':'ton-m'
   const foundationType:FoundationType=foundation.foundationType==='surekli'||foundation.foundationType==='radye'||foundation.foundationType==='tekil'?foundation.foundationType:'tekil'
   const structuralWeight=Number.isFinite(foundation.structuralWeight)&&foundation.structuralWeight>=0?foundation.structuralWeight:(Number.isFinite(foundation.verticalLoad)?foundation.verticalLoad:0)
-  const sds=seismic.sds??calculateSdsSeismic(seismic.ss,seismic.fs)
-  const sd1=seismic.sd1??calculateSd1Seismic(seismic.s1,seismic.f1)
-  const dts=seismic.dts??determineDts(sds,seismic.bks)
+  const sds=calculateSdsSeismic(seismic.ss,seismic.fs)??seismic.sds
+  const sd1=calculateSd1Seismic(seismic.s1,seismic.f1)??seismic.sd1
+  const dts=determineDts(sds,seismic.bks)
   return {
     ...defaultProjectInfo,...value,unitSystem,
     geophysical:{...defaultProjectInfo.geophysical,...(value.geophysical??{})},
