@@ -18,4 +18,27 @@ export function classifyVs30(vs30?:number):GeophysicalParameters['soilGroup']{if
 export function calculateSdsSeismic(ss?:number,fs?:number):number|undefined{if(!Number.isFinite(ss)||!Number.isFinite(fs)||ss!<0||fs!<=0)return undefined;return ss!*fs!}
 export function calculateSd1Seismic(s1?:number,f1?:number):number|undefined{if(!Number.isFinite(s1)||!Number.isFinite(f1)||s1!<0||f1!<=0)return undefined;return s1!*f1!}
 export function determineDts(sds:number|undefined,bks:BuildingUseClass|undefined):EarthquakeDesignClass|undefined{if(!Number.isFinite(sds)||sds!<0||bks===undefined)return undefined;if(sds<.33)return bks===1?'4a':'4';if(sds<.50)return bks===1?'3a':'3';if(sds<.75)return bks===1?'2a':'2';return bks===1?'1a':'1'}
-export function normalizeProjectInfo(value:Partial<ProjectInfo>):ProjectInfo{const soil={...defaultProjectInfo.soilParameters,...(value.soilParameters??{})};const foundation={...defaultProjectInfo.foundationParameters,...(value.foundationParameters??{})};const seismic={...defaultProjectInfo.seismic,...(value.seismic??{})};const unitSystem:UnitSystem=value.unitSystem==='kN-m'?'kN-m':'ton-m';const foundationType:FoundationType=foundation.foundationType==='surekli'||foundation.foundationType==='radye'||foundation.foundationType==='tekil'?foundation.foundationType:'tekil';const structuralWeight=Number.isFinite(foundation.structuralWeight)&&foundation.structuralWeight>=0?foundation.structuralWeight:(Number.isFinite(foundation.verticalLoad)?foundation.verticalLoad:0);const vtX=Number.isFinite(foundation.vtX)?foundation.vtX:0;const vtY=Number.isFinite(foundation.vtY)?foundation.vtY:0;const sds=calculateSdsSeismic(seismic.ss,seismic.fs)??seismic.sds;const sd1=calculateSd1Seismic(seismic.s1,seismic.f1)??seismic.sd1;const dts=sds===undefined?seismic.dts:determineDts(sds,seismic.bks);return{...defaultProjectInfo,...value,unitSystem,geophysical:{...defaultProjectInfo.geophysical,...(value.geophysical??{})},seismic:{...seismic,sds,sd1,dts},soilParameters:{...soil,classification:{...defaultProjectInfo.soilParameters.classification,...(soil.classification??{})}},foundationParameters:{...foundation,foundationType,structuralWeight,verticalLoad:structuralWeight,vtX,vtY,horizontalLoad:Math.hypot(vtX,vtY),resistanceFactorRv:ENGINEERING_CONSTANTS.TBDY_GAMMA_RV},jetGrout:{...defaultProjectInfo.jetGrout,...(value.jetGrout??{}),unitSystem:(value.jetGrout?.unitSystem==='ton-m'||value.jetGrout?.unitSystem==='kN-m'?value.jetGrout.unitSystem:'kN-m')},visualDocuments:value.visualDocuments??{}}}
+export function normalizeProjectInfo(value:Partial<ProjectInfo>):ProjectInfo{
+  const soil={...defaultProjectInfo.soilParameters,...(value.soilParameters??{})}
+  const foundation={...defaultProjectInfo.foundationParameters,...(value.foundationParameters??{})}
+  const seismic={...defaultProjectInfo.seismic,...(value.seismic??{})}
+  const unitSystem:UnitSystem=value.unitSystem==='kN-m'?'kN-m':'ton-m'
+  const foundationType:FoundationType=foundation.foundationType==='surekli'||foundation.foundationType==='radye'||foundation.foundationType==='tekil'?foundation.foundationType:'tekil'
+  const structuralWeight=Number.isFinite(foundation.structuralWeight)&&foundation.structuralWeight>=0?foundation.structuralWeight:(Number.isFinite(foundation.verticalLoad)?foundation.verticalLoad:0)
+  const vtX=Number.isFinite(foundation.vtX)?foundation.vtX:0
+  const vtY=Number.isFinite(foundation.vtY)?foundation.vtY:0
+  const sdsValue=calculateSdsSeismic(seismic.ss,seismic.fs)
+  const sd1Value=calculateSd1Seismic(seismic.s1,seismic.f1)
+  const resolvedSds=sdsValue??seismic.sds
+  const resolvedSd1=sd1Value??seismic.sd1
+  const resolvedDts=resolvedSds===undefined?seismic.dts:determineDts(resolvedSds,seismic.bks)
+  return{
+    ...defaultProjectInfo,...value,unitSystem,
+    geophysical:{...defaultProjectInfo.geophysical,...(value.geophysical??{})},
+    seismic:{...seismic,sds:resolvedSds,sd1:resolvedSd1,dts:resolvedDts},
+    soilParameters:{...soil,classification:{...defaultProjectInfo.soilParameters.classification,...(soil.classification??{})}},
+    foundationParameters:{...foundation,foundationType,structuralWeight,verticalLoad:structuralWeight,vtX,vtY,horizontalLoad:Math.hypot(vtX,vtY),resistanceFactorRv:ENGINEERING_CONSTANTS.TBDY_GAMMA_RV},
+    jetGrout:{...defaultProjectInfo.jetGrout,...(value.jetGrout??{}),unitSystem:(value.jetGrout?.unitSystem==='ton-m'||value.jetGrout?.unitSystem==='kN-m'?value.jetGrout.unitSystem:'kN-m')},
+    visualDocuments:value.visualDocuments??{}
+  }
+}
