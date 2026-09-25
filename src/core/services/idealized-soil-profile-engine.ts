@@ -28,8 +28,8 @@ const mode = (values: string[]): string | undefined => {
 
 const overlap = (from: number, to: number, top: number, bottom: number) => from < bottom && to > top
 
-function intervalLithology(boreholes: BoreholeRecord[], top: number, bottom: number): LithologyLayer[] {
-  return boreholes.flatMap(b => b.lithology.filter(x => overlap(x.from, x.to, top, bottom)))
+function intervalLithology(boreholes: BoreholeRecord[], top: number, bottom: number): Array<LithologyLayer & { boreholeId:string; unitSystem:'ton-m'|'kN-m' }> {
+  return boreholes.flatMap(b => b.lithology.filter(x => overlap(x.from, x.to, top, bottom)).map(x => ({...x,boreholeId:b.id,unitSystem:b.unitSystem})))
 }
 
 function intervalSpt(boreholes: BoreholeRecord[], top: number, bottom: number): Array<SptRecord & { boreholeId: string }> {
@@ -96,8 +96,8 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
   const descriptions = lithology.map(x => x.description).filter(Boolean).concat(labs.map(x => x.soilDescription).filter(Boolean) as string[])
   const codes = lithology.map(x => x.code).filter(Boolean).concat(labs.map(x => x.soilCode).filter(Boolean) as string[])
   const nValues = spt.map(x => x.n2 != null && x.n3 != null ? x.n2 + x.n3 : undefined).filter((x): x is number => x != null)
-  const gamma = median(boreholes.flatMap(b => b.lithology.filter(x => overlap(x.from,x.to,top,bottom)).map(x => x.unitWeight!=null?unitWeightToBase(x.unitWeight,b.unitSystem):undefined).filter((x): x is number => x != null)).concat(labs.map(x => laboratoryValueToBase('unitWeight',x.unitWeight,x.unitSystem)).filter((x): x is number => x != null)))
-  const gammaSat = median(boreholes.flatMap(b => b.lithology.filter(x => overlap(x.from,x.to,top,bottom)).map(x => x.saturatedUnitWeight!=null?unitWeightToBase(x.saturatedUnitWeight,b.unitSystem):undefined).filter((x): x is number => x != null)))
+  const gamma = median(lithology.map(x => x.unitWeight!=null?unitWeightToBase(x.unitWeight,x.unitSystem):undefined).filter((x): x is number => x != null)).concat(labs.map(x => laboratoryValueToBase('unitWeight',x.unitWeight,x.unitSystem)).filter((x): x is number => x != null)))
+  const gammaSat = median(lithology.map(x => x.saturatedUnitWeight!=null?unitWeightToBase(x.saturatedUnitWeight,x.unitSystem):undefined).filter((x): x is number => x != null)))
   const firstDefined = (values: Array<number | undefined>) => values.find(x => x != null)
   const labMedian = (values: Array<number | undefined>) => median(values.filter((x): x is number => x != null))
   const cLab = labMedian(labs.map(x => laboratoryValueToBase('cohesion',x.directShearC ?? x.c,x.unitSystem)))

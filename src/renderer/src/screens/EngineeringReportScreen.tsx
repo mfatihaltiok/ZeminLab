@@ -37,7 +37,7 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
     if(!(B>0&&L>0&&Df>=0&&N>=0&&soil.unitWeight>0))return undefined
     try{return tbdyBearingCapacity({
       B,L,Df,gamma1:unitWeightToBase(soil.unitWeight,p.unitSystem),gamma2:unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem),
-      c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,verticalLoad:N,horizontalLoad:H,momentX:Mx,momentY:My,
+      c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,verticalLoad:N,horizontalLoad:H,soilPoissonRatio:p.jetGrout.soilPoissonRatio,shearNormalStress:p.jetGrout.interfaceNormalStress,momentX:Mx,momentY:My,
       groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:ENGINEERING_CONSTANTS.TBDY_GAMMA_RV,foundationType:f.foundationType,
       groundwaterDepth:soil.groundwaterDepth,undrainedCu:soil.undrainedCohesion,
       layers:profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:x.gamma??unitWeightToBase(soil.unitWeight,p.unitSystem),gammaSat:x.gammaSat??x.gamma??unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem),cohesion:x.cohesion??stressToBase(soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle}))
@@ -49,7 +49,7 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
     if(!profile||profile.status!=='SABİTLENDİ'||!(B>0&&L>0&&Df>=0&&N>0))return []
     return settlementMethods.map(method=>{
       const result=calculateIdealizedSettlement({profile,method,B,L,Df,foundationType:f.foundationType,qGross:N/(B*L),groundwaterDepth:soil.groundwaterDepth??(boreholes.length===1?boreholes[0].groundwaterDepth:undefined)})
-      return{method,result}
+      return{method,result:result as typeof result}
     })
   },[profile,B,L,Df,N,f.foundationType,soil.groundwaterDepth,boreholes])
   const jetGrout=useMemo(()=>{

@@ -1,10 +1,11 @@
-/** Compatibility facade. Engineering formulas live in src/core/engineering. */
+/** Compatibility facade. Canonical engineering implementations live under src/core/engineering. */
 export { bearingCapacity, tbdyBearingCapacity } from '../engineering/calculation-engine'
-export type { BearingMethod, BearingInput, TbdyBearingInput, CalculationStep, CalculationResult } from '../engineering/calculation-engine'
+export type { BearingMethod, BearingInput, TbdyBearingInput, CalculationStep, CalculationResult, SettlementInput } from '../engineering/calculation-engine'
 export { foundationChecks } from '../engineering/foundation-sliding'
 export type { FoundationCheckInput } from '../engineering/foundation-sliding'
 export { calculateSpt, fineContentCorrection } from '../engineering/spt/spt-engine'
 export type { SptEngineInput, SptEngineResult, SptTraceStep } from '../engineering/spt/spt-engine'
+export { liquefaction } from '../engineering/calculation-engine'
 export { jetGroutAdvanced as jetGrout } from '../engineering/advanced-geotech'
 export type { JetGroutAdvancedInput as JetGroutInput, JetGroutAdvancedResult as JetGroutResult } from '../engineering/advanced-geotech'
 export { SOURCE_NOTES } from '../engineering/source-notes'

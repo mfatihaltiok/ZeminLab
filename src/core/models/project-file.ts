@@ -41,7 +41,7 @@ function validateBoreholes(boreholes: BoreholeRecord[], unitSystem: UnitSystem):
       if (s.correction) {
         const cc = s.correction
         for (const [k,v] of Object.entries(cc)) if (typeof v === 'number') number(v,'SPT '+k)
-        if (cc.energyRatio !== undefined && cc.energyRatio > 100) throw new Error('SPT enerji oranı %100''den büyük olamaz.')
+        if (cc.energyRatio !== undefined && cc.energyRatio > 100) throw new Error('SPT enerji oranı %100`den büyük olamaz.')
         if (cc.applyOverburdenCorrection !== undefined && typeof cc.applyOverburdenCorrection !== 'boolean') throw new Error('SPT CN ayarı bozuk.')
         if (cc.applyDilatancyCorrection !== undefined && typeof cc.applyDilatancyCorrection !== 'boolean') throw new Error('SPT dilatansi ayarı bozuk.')
       }
