@@ -87,9 +87,11 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
   const d = i.diameter, Ab = Math.PI * d * d / 4, perimeter = Math.PI * d
   let shaftCharacteristic = 0
   const layerTrace = i.layers.map((layer, index) => {
-    const H = Math.max(0, layer.thickness)
-    const sigmaTop = Math.max(0, layer.effectiveStressAtTop ?? 0)
-    const sigmaBottom = Math.max(sigmaTop, layer.effectiveStressAtBottom ?? sigmaTop + Math.max(layer.gamma, 0) * H)
+    if(!Number.isFinite(layer.thickness)||layer.thickness<0||!Number.isFinite(layer.gamma)||layer.gamma<=0||!Number.isFinite(layer.cohesion)||layer.cohesion<0||!Number.isFinite(layer.frictionAngle)||layer.frictionAngle<0||layer.frictionAngle>=89) throw new Error('Jet Grout tabakalarında H, γ, c ve φ açıkça geçerli girilmelidir.')
+    if(layer.effectiveStressAtTop==null||!Number.isFinite(layer.effectiveStressAtTop)||layer.effectiveStressAtTop<0||layer.effectiveStressAtBottom==null||!Number.isFinite(layer.effectiveStressAtBottom)||layer.effectiveStressAtBottom<layer.effectiveStressAtTop) throw new Error('Jet Grout tabakalarında σ′ üst ve alt değerleri açıkça verilmelidir.')
+    const H = layer.thickness
+    const sigmaTop = layer.effectiveStressAtTop
+    const sigmaBottom = layer.effectiveStressAtBottom
     const sigmaAvg = (sigmaTop + sigmaBottom) / 2
     if (layer.interfaceAlpha == null || !Number.isFinite(layer.interfaceAlpha) || layer.interfaceAlpha < 0 || layer.interfaceAlpha > 1) throw new Error('Jet Grout şaft hesabında arayüz α açıkça verilmelidir.')
     if (layer.interfaceDelta == null || !Number.isFinite(layer.interfaceDelta) || layer.interfaceDelta < 0 || layer.interfaceDelta >= 90) throw new Error('Jet Grout şaft hesabında arayüz δ açıkça verilmelidir.')
@@ -105,9 +107,11 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
   if(!Number.isFinite(base.effectiveStressAtBottom)||base.effectiveStressAtBottom!<0||!Number.isFinite(base.frictionAngle)||base.frictionAngle<0||base.frictionAngle>=89) throw new Error('Uç tabaka için σ′ ve φ geçerli olmalıdır.')
   const sigmaBase = base.effectiveStressAtBottom!, phiBase = base.frictionAngle * Math.PI / 180
   const Nq = Math.exp(Math.PI * Math.tan(phiBase)) * Math.pow(Math.tan(Math.PI / 4 + phiBase / 2), 2)
-  const tipSoil = base ? Math.max(0, base.cohesion) * ((Nq - 1) / Math.max(Math.tan(phiBase), 1e-9)) + sigmaBase * Nq : 0
+  const Nc = phiBase===0 ? 5.14 : (Nq - 1) / Math.tan(phiBase)
+  const tipSoil = base.cohesion * Nc + sigmaBase * Nq
   const tipCharacteristic = Math.max(0, tipSoil * Ab)
-  const materialLimit = i.columnStrength != null ? Math.max(0, i.columnStrength) * Ab : Number.POSITIVE_INFINITY
+  if(i.columnStrength!=null&&(!Number.isFinite(i.columnStrength)||i.columnStrength<0))throw new Error('Jet Grout kolon dayanımı geçerli ve negatif olmayan bir değer olmalıdır.')
+  const materialLimit = i.columnStrength != null ? i.columnStrength * Ab : Number.POSITIVE_INFINITY
   const columnCharacteristic = Math.min(materialLimit, shaftCharacteristic + tipCharacteristic)
   if(!Number.isFinite(i.numberOfColumns)||i.numberOfColumns!<1||!Number.isFinite(i.groupRows)||i.groupRows!<1||!Number.isFinite(i.groupColumns)||i.groupColumns!<1||!Number.isFinite(i.groupSpacing)||i.groupSpacing!<d) throw new Error('Grup hesabı için kolon sayısı, satır/sütun sayısı ve aks aralığı açıkça girilmelidir.')
   const n=Math.round(i.numberOfColumns!),rows=Math.round(i.groupRows!),cols=Math.round(i.groupColumns!),spacing=i.groupSpacing!
