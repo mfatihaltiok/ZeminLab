@@ -16,21 +16,27 @@ export interface Stage2BearingInput{
 }
 
 export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
-  const V=Math.max(0,i.loadV??0),H=Math.abs(i.loadH??0),design=i.design??'classical-allowable',warnings:string[]=[]
+  if(!Number.isFinite(i.B)||i.B<=0||!Number.isFinite(i.L)||i.L<=0||!Number.isFinite(i.Df)||i.Df<0||!Number.isFinite(i.gamma)||i.gamma<=0||!Number.isFinite(i.c)||i.c<0||!Number.isFinite(i.phi)||i.phi<0||i.phi>=90) throw new Error('Stage2 taşıma gücü temel/zemin girdileri geçersiz.')
+  if(i.loadV!=null&&(!Number.isFinite(i.loadV)||i.loadV<0))throw new Error('loadV geçerli ve negatif olmayan bir değer olmalıdır.')
+  if(i.loadH!=null&&!Number.isFinite(i.loadH))throw new Error('loadH geçerli olmalıdır.')
+  const V=i.loadV??0,H=Math.abs(i.loadH??0),design=i.design,warnings:string[]=[]
+  if(!design) throw new Error('Stage2 uyumluluk API için design açıkça belirtilmelidir.')
   if(design==='tbdy-2018'){
+    if(i.waterTableDepth!=null&&i.gammaSat==null) throw new Error('YASS tanımlıysa γsat açıkça girilmelidir; γnat otomatik γsat kabul edilmez.')
     const r=calculateSurfaceFoundation({
-      B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma,gamma2:i.gammaSat??i.gamma,c:i.c,phi:i.phi,
+      B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma,gamma2:i.gammaSat,c:i.c,phi:i.phi,
       verticalLoad:V,horizontalLoad:H,momentX:i.momentX??0,momentY:i.momentY??0,
       groundSlope:i.soilSlope??0,baseSlope:i.baseSlope??0,resistanceFactor:1.4,method:'TBDY-2018',
       groundwaterDepth:i.waterTableDepth,undrainedCu:i.undrainedCu,
       layers:i.layers?.map((x,idx)=>({topDepth:i.Df+i.layers!.slice(0,idx).reduce((a,y)=>a+y.thickness,0),bottomDepth:i.Df+i.layers!.slice(0,idx+1).reduce((a,y)=>a+y.thickness,0),gamma:x.gamma,gammaSat:x.gammaSat??x.gamma,cohesion:x.c,phi:x.phi}))
     })
     return{
-      value:{Nq:r.Nq,Nc:r.Nc,Ngamma:r.Ngamma,sc:r.sc,sq:r.sq,sgamma:r.sg,dc:r.dc,dq:r.dq,dgamma:r.dg,ic:r.ic,iq:r.iq,igamma:r.ig,characteristic:r.qk,designResistance:r.qt,allowableGross:r.qk/Math.max(i.FS??3,1e-9),qApplied:r.qo,BEffective:r.Be,LEffective:r.Le,ex:r.ex,ey:r.ey,qSurcharge:r.surcharge,resistanceFactor:1.4},
+      value:{Nq:r.Nq,Nc:r.Nc,Ngamma:r.Ngamma,sc:r.sc,sq:r.sq,sgamma:r.sg,dc:r.dc,dq:r.dq,dgamma:r.dg,ic:r.ic,iq:r.iq,igamma:r.ig,characteristic:r.qk,designResistance:r.qt,allowableGross:r.qt,qApplied:r.qo,BEffective:r.Be,LEffective:r.Le,ex:r.ex,ey:r.ey,qSurcharge:r.surcharge,resistanceFactor:1.4},
       method:'TBDY 2018',source:r.source,warnings:r.warnings,steps:r.steps
     }
   }
-  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,c:i.c,phi:i.phi,FS:Math.max(i.FS??3,.1),method:i.method})
+  if(i.FS==null||!Number.isFinite(i.FS)||i.FS<=0) throw new Error('Klasik taşıma gücü uyumluluk API için FS açıkça verilmelidir.')
+  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,c:i.c,phi:i.phi,FS:i.FS,method:i.method})
   if((i.momentX??0)!==0||(i.momentY??0)!==0)warnings.push('Klasik taşıma gücü API merkezi düşey yük varsayar; momentli temas için TBDY motoru kullanılmalıdır.')
   return{
     value:{Nq:r.value.Nq,Nc:r.value.Nc,Ngamma:r.value.Ngamma,sc:r.value.sc,sq:r.value.sq,sgamma:r.value.sg,dc:r.value.dc,dq:r.value.dq,dgamma:r.value.dg,ic:r.value.ic,iq:r.value.iq,igamma:r.value.ig,characteristic:r.value.ultimate,designResistance:undefined,allowableGross:r.value.allowableGross,qApplied:V/Math.max(i.B*i.L,1e-9),BEffective:i.B,LEffective:i.L,ex:0,ey:0,qSurcharge:i.gamma*i.Df,resistanceFactor:undefined},
@@ -46,34 +52,37 @@ export interface Stage2SettlementInput{
 }
 
 export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
-  const B=Math.max(i.B,0),L=Math.max(i.L??i.B,0),q=Math.max(i.q,0),method=i.method??'elastic'
+  if(!Number.isFinite(i.B)||i.B<=0||!Number.isFinite(i.L)||i.L<=0||!Number.isFinite(i.q)||i.q<0) throw new Error('Stage2 oturma B, L ve q girdileri geçerli olmalıdır.')
+  if(!i.layers.length) throw new Error('Stage2 oturma için en az bir zemin tabakası gerekir.')
+  const B=i.B,L=i.L,q=i.q,qNet=i.qNet??i.q,method=i.method
+  if(!Number.isFinite(qNet)||qNet<0)throw new Error('qNet girildiyse geçerli ve negatif olmayan bir değer olmalıdır.')
+  if(!method) throw new Error('Stage2 oturma uyumluluk API için method açıkça belirtilmelidir.')
   const warnings:string[]=[]
-  if(B<=0||L<=0)warnings.push('B ve L pozitif olmalıdır.')
-  if(!i.layers.length)warnings.push('Katman tanımlanmadı.')
   if(method==='schmertmann'&&i.schmertmannC1==null)warnings.push('Schmertmann C1 verilmedi; 1.0 kullanılmadı, sonuç yalnız verilen katsayılarla üretilebilir.')
   const C1=i.schmertmannC1,C2=i.schmertmannC2
   const results:any[]=[],missing=false
   for(const [index,layer] of i.layers.entries()){
-    const H=Math.max(0,layer.thickness),zmid=Math.max(0,H/2),ds=method==='2:1'?q*B*L/Math.max((B+zmid)*(L+zmid),1e-9):Math.max(0,layer.deltaSigma)
+    const H=Math.max(0,layer.thickness),zmid=Math.max(0,H/2),ds=method==='2:1'?qNet*B*L/((B+zmid)*(L+zmid)):layer.deltaSigma
     let s=0,type='none'
+    if(!Number.isFinite(layer.thickness)||layer.thickness<0||!Number.isFinite(ds)||ds<0) throw new Error('Stage2 oturma tabaka kalınlığı ve Δσ geçerli olmalıdır.')
     if(H>0&&ds>0){
       if(method==='elastic'||method==='2:1'){
         const E=layer.Es
-        if(E!=null&&Number.isFinite(E)&&E>0){const nu=Math.max(0,Math.min(.49,layer.nu??0));s=ds*H*(1-nu*nu)/E;type=method==='elastic'?'elastic':'2:1 + elastic'}else warnings.push('Katman '+(index+1)+': Es eksik.')
+        if(E!=null&&Number.isFinite(E)&&E>0){if(layer.nu==null||!Number.isFinite(layer.nu)||layer.nu<0||layer.nu>=.5)warnings.push('Katman '+(index+1)+': elastik yöntem için ν eksik.')
+        else {const nu=layer.nu;s=ds*H*(1-nu*nu)/E;type=method==='elastic'?'elastic':'2:1 + elastic'}}else warnings.push('Katman '+(index+1)+': Es eksik.')
       }else if(method==='janbu'){
-        const M=layer.M??layer.Es
-        if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push('Katman '+(index+1)+': M eksik.')
+        const M=layer.M
+        if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push('Katman '+(index+1)+': M eksik; Es otomatik M yerine kullanılmaz.')
       }else if(method==='schmertmann'){
         const E=layer.Es
         const Iz=layer.Iz
-        if(C1!=null&&C2!=null&&E!=null&&E>0&&Iz!=null)s=C1*C2*q*Iz*H/E,type='Schmertmann'
+        if(C1!=null&&C2!=null&&E!=null&&E>0&&Iz!=null)s=C1*C2*qNet*Iz*H/E,type='Schmertmann'
         else warnings.push('Katman '+(index+1)+': Schmertmann için C1,C2,Es,Iz birlikte verilmelidir.')
       }else{
         const sigma0=Math.max(layer.sigmaV0,1e-6),sigma1=sigma0+ds
         if(layer.mv!=null&&layer.mv>=0){s=H*layer.mv*ds;type='oedometer'}
         else if(layer.Cc!=null&&layer.e0!=null&&layer.e0>-1){
-          const pc=Math.max(layer.sigmaPc??sigma0,sigma0),Cr=Math.max(0,layer.Cr??layer.Cc)
-          s=sigma1<=pc?H*Cr/(1+layer.e0)*Math.log10(sigma1/sigma0):H*Cr/(1+layer.e0)*Math.log10(pc/sigma0)+H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/pc),type='oedometer'
+          if(layer.sigmaPc!=null&&layer.Cr!=null&&layer.sigmaPc>sigma0&&layer.Cr>=0){const pc=layer.sigmaPc,Cr=layer.Cr;s=sigma1<=pc?H*Cr/(1+layer.e0)*Math.log10(sigma1/sigma0):H*Cr/(1+layer.e0)*Math.log10(pc/sigma0)+H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/pc),type='oedometer'}else if(layer.sigmaPc==null&&layer.Cr==null){s=H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/sigma0),type='oedometer'}else warnings.push('Katman '+(index+1)+': OC konsolidasyon için σ′c ve Cr birlikte verilmelidir.')
         }else warnings.push('Katman '+(index+1)+': mv veya Cc/e0 eksik.')
       }
     }

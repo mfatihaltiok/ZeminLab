@@ -3,7 +3,7 @@ import { foundationChecks } from '../../core/calculations/engineering'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { useProjectInfo } from '../../core/state/project-store'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
-import { forceToBase, momentToBase } from '../../core/units/project-units'
+import { forceToBase, forceFromBase, momentToBase, stressToBase, projectUnits } from '../../core/units/project-units'
 import { Card, Frame, Metric, Source, type ScreenId } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
 
@@ -54,7 +54,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
     })
     return liquefactionProfile({
       Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:l.unitWeight??0,gammaSat:l.saturatedUnitWeight??l.unitWeight??0,soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex})),
-      spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth
+      spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth,siteSpecificResponseAnalysisCompleted:p.geophysical.siteSpecificResponseAnalysisCompleted
     })
   },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,validSpt])
 
@@ -66,7 +66,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
           <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">YASS, SDS, Mw ve geçerli SPT kayıtları birlikte bulunmalıdır. YASS bilinmiyorsa 16.6.2 kapsamında sıvılaşma değerlendirmesi başlatılmaz.</div></Card>:
           <><div className="metric-strip"><Metric label="TBDY zorunluluğu" value={profileInput.mandatoryByProject?'EVET':'DTS/zemin koşuluna bağlı'}/><Metric label="Post-liquefaction" value={profileInput.postLiquefactionRequired?'GEREKLİ':'Tetiklenmedi'}/></div>
             {profileInput.warnings.length>0&&<Card title="TBDY UYARILARI"><div className="inline-empty">{profileInput.warnings.join(' ')}</div></Card>}
-            <Card title="SPT · SIVILAŞMA DERİNLİK TABLOSU"><div className="table-wrap"><table><thead><tr><th>z</th><th>Zemin</th><th>FC%</th><th>PI</th><th>σ′v</th><th>N60</th><th>(N1)60</th><th>(N1)60f</th><th>CRR7.5</th><th>CSR</th><th>FS</th><th>Sonuç</th></tr></thead><tbody>{profileInput.rows.map((row,i)=><tr key={i}><td>{row.depth.toFixed(2)}</td><td>{row.soil??'—'}</td><td>{row.fineContent?.toFixed(1)??'—'}</td><td>{row.plasticityIndex?.toFixed(1)??'—'}</td><td>{row.sigmaVPrime.toFixed(2)}</td><td>{row.n60.toFixed(2)}</td><td>{row.n1_60.toFixed(2)}</td><td>{row.n1_60f.toFixed(2)}</td><td>{row.crrM75?.toFixed(4)??'—'}</td><td>{row.tauEarthquake?.toFixed(2)??'—'}</td><td>{row.FS?.toFixed(3)??'—'}</td><td>{row.conclusion}</td></tr>)}</tbody></table></div></Card>
+            <Card title="SPT · SIVILAŞMA DERİNLİK TABLOSU"><div className="table-wrap"><table><thead><tr><th>z</th><th>Zemin</th><th>FC%</th><th>PI</th><th>σ′v</th><th>N60</th><th>(N1)60</th><th>(N1)60f</th><th>CRR7.5</th><th>CSR</th><th>FS</th><th>Sonuç</th></tr></thead><tbody>{profileInput.rows.map((row,i)=><tr key={i}><td>{row.depth.toFixed(2)}</td><td>{row.soil??'—'}</td><td>{row.fineContent?.toFixed(1)??'—'}</td><td>{row.plasticityIndex?.toFixed(1)??'—'}</td><td>{Number.isFinite(row.sigmaVPrime)?row.sigmaVPrime.toFixed(2):'—'}</td><td>{row.n60!=null?row.n60.toFixed(2):'—'}</td><td>{row.n1_60!=null?row.n1_60.toFixed(2):'—'}</td><td>{row.n1_60f!=null?row.n1_60f.toFixed(2):'—'}</td><td>{row.crrM75?.toFixed(4)??'—'}</td><td>{row.tauEarthquake?.toFixed(2)??'—'}</td><td>{row.FS?.toFixed(3)??'—'}</td><td>{row.conclusion}</td></tr>)}</tbody></table></div></Card>
             {profileInput.rows.length>0&&<CalculationTrace title="İlk SPT hesap izi" source={profileInput.source} rows={profileInput.rows[0].trace}/>}
           </>}
       </>}
@@ -79,13 +79,13 @@ export function Foundation(){
   const ready=f.footingWidth>0&&f.footingLength>0&&N>=0
   const r=ready?foundationChecks({
     B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,
-    deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
+    deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem),groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
     passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance
   }):undefined
   return <Frame screen="foundation"><Source>{SOURCE_NOTES.foundation} TBDY 16.8.4 yatay kayma kontrolü; 16.8.4.6 YASS altında depremde Cu yaklaşımı uygulanır.</Source>
     {!r?<Card title="TEMEL VERİSİ BEKLENİYOR"><div className="inline-empty">B, L ve yapı yükü girilmelidir.</div></Card>:
-      <><div className="metric-strip"><Metric label="B" value={f.footingWidth.toFixed(2)} unit="m"/><Metric label="L" value={f.footingLength.toFixed(2)} unit="m"/><Metric label="Vtx" value={Vx.toFixed(2)} unit="kN"/><Metric label="Vty" value={Vy.toFixed(2)} unit="kN"/><Metric label="Rth+0.3Rpt" value={r.slidingCapacityX.toFixed(2)} unit="kN"/><Metric label="Durum" value={r.evaluable&&r.slidingSafeX&&r.slidingSafeY?'YETERLİ':'KONTROL GEREKLİ'}/></div>
-        <Card title="TBDY 2018 16.8.4"><div className="table-wrap"><table><thead><tr><th>Kontrol</th><th>Değer</th><th>Oran</th><th>Durum</th></tr></thead><tbody><tr><td>X</td><td>{Vx.toFixed(2)} / {r.slidingCapacityX.toFixed(2)}</td><td>{r.slidingUtilizationX.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeX?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr><tr><td>Y</td><td>{Vy.toFixed(2)} / {r.slidingCapacityY.toFixed(2)}</td><td>{r.slidingUtilizationY.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeY?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr></tbody></table></div><div className="engineering-note">Rth={r.slidingCapacityX.toFixed(2)} kN · Rpt={r.passiveResistanceDesign.toFixed(2)} kN · mod={r.slidingMode}</div></Card>
+      <><div className="metric-strip"><Metric label="B" value={f.footingWidth.toFixed(2)} unit="m"/><Metric label="L" value={f.footingLength.toFixed(2)} unit="m"/><Metric label="Vtx" value={forceFromBase(Vx,p.unitSystem).toFixed(2)} unit={projectUnits(p.unitSystem).force}/><Metric label="Vty" value={forceFromBase(Vy,p.unitSystem).toFixed(2)} unit={projectUnits(p.unitSystem).force}/><Metric label="Rth+0.3Rpt" value={forceFromBase(r.slidingCapacityX,p.unitSystem).toFixed(2)} unit={projectUnits(p.unitSystem).force}/><Metric label="Durum" value={r.evaluable&&r.slidingSafeX&&r.slidingSafeY?'YETERLİ':'KONTROL GEREKLİ'}/></div>
+        <Card title="TBDY 2018 16.8.4"><div className="table-wrap"><table><thead><tr><th>Kontrol</th><th>Değer</th><th>Oran</th><th>Durum</th></tr></thead><tbody><tr><td>X</td><td>{forceFromBase(Vx,p.unitSystem).toFixed(2)} / {forceFromBase(r.slidingCapacityX,p.unitSystem).toFixed(2)}</td><td>{r.slidingUtilizationX.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeX?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr><tr><td>Y</td><td>{forceFromBase(Vy,p.unitSystem).toFixed(2)} / {forceFromBase(r.slidingCapacityY,p.unitSystem).toFixed(2)}</td><td>{r.slidingUtilizationY.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeY?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr></tbody></table></div><div className="engineering-note">Rth={forceFromBase(r.slidingCapacityX,p.unitSystem).toFixed(2)} {projectUnits(p.unitSystem).force} · Rpt={forceFromBase(r.passiveResistanceDesign,p.unitSystem).toFixed(2)} {projectUnits(p.unitSystem).force} · mod={r.slidingMode}</div></Card>
         {r.warnings.length>0&&<Card title="UYARILAR"><div className="inline-empty">{r.warnings.join(' ')}</div></Card>}</>}
   </Frame>
 }

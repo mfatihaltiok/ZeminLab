@@ -1,41 +1,39 @@
 # FALUZMN
 
-FALUZMN is a Windows-first geotechnical engineering desktop application built with Electron, React and TypeScript.
+FALUZMN, Electron + React + TypeScript tabanlı Windows öncelikli geoteknik mühendislik masaüstü uygulamasıdır.
 
 ## v1.0
 
-v1.0 adds the professional output/integration layer:
+v1.0 kapsamındaki ana bileşenler:
 
-- A4 PDF report export infrastructure
-- Erol 2014 and Erol 2018 local source-pack indexing
-- PaddleOCR PP-OCRv5 + Docling document-intelligence installation and offline runner
-- OCR provider settings with encrypted API-key storage
-- Electron internet/connectivity health check
-- Excel export utility
-- DXF soil-profile export utility
-- neutral SAP2000 interchange and OpenSees Tcl export adapters
+- A4 mühendislik raporu ve PDF çıktısı
+- Proje, sondaj, SPT ve laboratuvar veri yönetimi
+- İdealize zemin profili
+- TBDY 2018 taşıma gücü, temel kayması ve sıvılaşma kontrolleri
+- Çoklu oturma yöntemleri
+- Jet Grout ön tasarım / kompozit yaklaşım kontrolleri
+- Excel ve DXF yardımcı dışa aktarımları
+- SAP2000 / OpenSees için nötr veri aktarım adaptörleri
 
-### Belge istihbaratı\n\nFALUZMN uses two deterministic local layers: **PaddleOCR PP-OCRv5** for text recognition and **Docling 2.128.0** for document layout and table structure. Values are not inferred from fixed page coordinates. Ambiguous/conflicting candidates are rejected and the user must review OCR candidates before import. The runtime is CPU-first and prepared for offline operation. Docling's layout and TableFormer artifacts are prefetched into the application package.\n\nPaddleOCR itself can run locally, so the application does **not** require an API key for offline OCR. A remote OCR endpoint/API-key field may still be present for deployments that use a hosted OCR service. The key is stored encrypted through Electron's `safeStorage` when the operating system supports it.
+**OCR, görsel tarama ve belge-istihbarat özellikleri ürün kapsamından çıkarılmıştır.** FALUZMN mühendislik verilerini kullanıcı tarafından girilen/teyit edilen saha ve laboratuvar kayıtlarından yürütür.
 
-### v1.0 setup
+## Mühendislik veri ilkeleri
 
-From PowerShell:
+- Hesap motorları kN, kPa, kN/m³, kN·m ve m taban birimlerinde çalışır.
+- Kullanıcı arayüzündeki tonf birimleri yalnız giriş/çıkış gösterimidir.
+- c′/φ′, Cu, Es ve M/oedometer ayrı mühendislik parametreleridir; birbirine otomatik çevrilmez.
+- SPT düzeltmeleri eksikse N60/(N1)60 üretilmez.
+- İdealize profil SABİTLENMEDİKÇE oturma hesabı başlatılmaz.
+- ZF için saha özel zemin davranış analizi durumu ayrı bir ön koşuldur.
+- Tabakalı zemin kontrolleri “ön kontrol” olarak açıkça işaretlenir; homojen formülün yerine sessizce geçirilmez.
 
-```powershell
-.\tools\setup_stage3.ps1
-```
+## Geliştirme
 
-This creates a project-local Python runtime, installs PaddleOCR document parsing dependencies, downloads the two publisher source PDFs into the local source-pack, and indexes figure-bearing pages. The source PDFs themselves are not committed to GitHub.
-
-### Development
-
-```bash
 npm install
 npm run dev
-```
 
-### Build Windows setup
+Windows derlemesi:
 
-```bash
 npm run build:win
-```
+
+Mühendislik regresyon testi daha sonra çalıştırılmak üzere npm run test:engineering komutunda tutulur.

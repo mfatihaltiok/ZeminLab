@@ -1,4 +1,5 @@
-import { calculateSpt, fineContentCorrection } from '../engineering/spt/spt-engine'
+import { calculateSpt, fineContentCorrection, isCohesionlessSoilCode } from '../engineering/spt/spt-engine'
+import { TBDY_GAMMA_RV, TBDY_GAMMA_RH, TBDY_GAMMA_RP } from '../models/project'
 import { bearingCapacity as bearingEngine, foundationChecks as foundationEngine, jetGrout as jetGroutEngine, liquefaction as liquefactionEngine, settlement as settlementEngine, stressAtDepth as stressEngine, type BearingMethod, type CalculationResult } from '../engineering/calculation-engine'
 import { stage2BearingCapacity, stage2Settlement, type Stage2BearingInput, type Stage2SettlementInput, type Stage2BearingMethod } from '../engineering/stage2-engine'
 import { liquefactionProfile as liquefactionProfileEngine, type LiquefactionProfileInput, type LiquefactionProfileResult } from '../engineering/liquefaction/liquefaction-profile'
@@ -8,7 +9,7 @@ import { calculateSubgradeReaction, type SubgradeReactionInput } from '../engine
 
 export type { BearingMethod, LayerSettlementInput, SchmertmannLayer, LiquefactionProfileInput, LiquefactionProfileResult, Stage2BearingInput, Stage2SettlementInput, Stage2BearingMethod, SurfaceFoundationInput, SurfaceFoundationMethod, SubgradeReactionInput }
 export type SoilLayerInput={top:number;bottom:number;soil?:string;gamma:number;gammaSat:number;cohesion?:number;phi?:number;fines?:number;cu?:number;PI?:number}
-export type SptInput={depth:number;nField:number;energyRatio?:number;boreholeDiameter?:number;sampler?:'standard'|'without-liner';samplerCorrection?:number;rodLengthM?:number;hammerType?:'donut'|'safety'|'automatic'|'measured';fines?:number}
+export type SptInput={depth:number;nField:number;energyRatio?:number;boreholeDiameter?:number;sampler?:'standard'|'without-liner'|'liner';samplerCorrection?:number;rodLengthM?:number;hammerType?:'donut'|'safety'|'automatic'|'measured';fines?:number;soilCode?:string}
 
 export function classifySoilISO14688(ll?:number,pi?:number){
   if(ll==null||pi==null||!Number.isFinite(ll)||!Number.isFinite(pi)||ll<=0)return null
@@ -17,9 +18,12 @@ export function classifySoilISO14688(ll?:number,pi?:number){
 }
 export function stressAtDepth(depth:number,layers:Pick<SoilLayerInput,'top'|'bottom'|'gamma'|'gammaSat'>[],gwt:number){return stressEngine(depth,layers,gwt)}
 export function sptCorrection(x:SptInput,sigmaVPrime:number){
-  const r=calculateSpt({nField:x.nField,energyRatio:x.energyRatio,hammerType:x.hammerType,boreholeDiameterMm:x.boreholeDiameter,sampler:x.sampler==='without-liner'?'without-liner':'standard',samplerCorrection:x.samplerCorrection,rodLengthM:x.rodLengthM,effectiveStress:sigmaVPrime,fineContent:x.fines,applyOverburden:true,applyDilatancy:false})
-  const fines=Math.max(0,x.fines??0),{alpha,beta}=fineContentCorrection(fines)
-  return{CE:r.ce,CB:r.cb,CS:r.cs,CR:r.cr,CN:r.cn,N60:r.n60,N160:r.n1_60,N160f:alpha+beta*r.n1_60,alpha,beta,sigmaVPrime}
+  const behavior=x.soilCode?isCohesionlessSoilCode(x.soilCode)?'cohesionless':'cohesive':'unknown'
+  const r=calculateSpt({nField:x.nField,energyRatio:x.energyRatio,hammerType:x.hammerType,boreholeDiameterMm:x.boreholeDiameter,sampler:x.sampler, samplerCorrection:x.samplerCorrection,rodLengthM:x.rodLengthM,effectiveStress:sigmaVPrime,fineContent:x.fines,soilBehavior:behavior,applyOverburden:true,applyDilatancy:false})
+  const fines=x.fines
+  const fc=fines==null?undefined:fineContentCorrection(Math.max(0,Math.min(100,fines)))
+  const N160f=r.n1_60!=null&&fc?fc.alpha+fc.beta*r.n1_60:undefined
+  return{CE:r.ce,CB:r.cb,CS:r.cs,CR:r.cr,CN:r.cn,N60:r.n60,N160:r.n1_60,N160f,alpha:fc?.alpha,beta:fc?.beta,sigmaVPrime}
 }
 
 /** Authoritative classical bearing result. Inputs are SI base units (kPa, kN, m). */
@@ -28,7 +32,7 @@ export function bearingCapacity(i:{B:number;L:number;Df:number;gamma:number;c:nu
 }
 
 /** Authoritative TBDY surface-foundation result. Inputs are SI base units. */
-export function tbdyBearingCapacity(i:SurfaceFoundationInput){return calculateSurfaceFoundation({...i,method:'TBDY-2018',resistanceFactor:i.resistanceFactor??1.4})}
+export function tbdyBearingCapacity(i:SurfaceFoundationInput){return calculateSurfaceFoundation({...i,method:'TBDY-2018',resistanceFactor:TBDY_GAMMA_RV})}
 
 export function bearingCapacityStage2(i:Stage2BearingInput){return stage2BearingCapacity(i)}
 export function settlement(i:{B:number;q:number;Es:number;nu:number;layers?:{thickness:number;Cc?:number;e0?:number;sigma0?:number;dSigma?:number}[]}){return settlementEngine(i).value}
@@ -40,7 +44,7 @@ export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number
 export function stressSpread2to1(i:{q:number;B:number;L:number;z:number}){return stressSpread21(i)}
 export function subgradeReaction(i:SubgradeReactionInput){return calculateSubgradeReaction(i)}
 export function layerSettlement(layers:LayerSettlementInput[]){return layerSettlementEngine(layers)}
-export function schmertmann(q:number,layers:SchmertmannLayer[],C1=1,C2=1){return schmertmannSettlement(q,layers,C1,C2)}
+export function schmertmann(q:number,layers:SchmertmannLayer[],C1?:number,C2?:number){return schmertmannSettlement(q,layers,C1,C2)}
 export function jetGroutAdvanced(i:Parameters<typeof jetGroutAdvancedEngine>[0]){return jetGroutAdvancedEngine(i)}
 
 export const SOURCE_NOTES={

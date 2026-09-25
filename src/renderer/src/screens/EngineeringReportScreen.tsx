@@ -35,8 +35,8 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
       B,L,Df,gamma1:unitWeightToBase(soil.unitWeight,p.unitSystem),gamma2:unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem),
       c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,verticalLoad:N,horizontalLoad:H,momentX:Mx,momentY:My,
       groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:1.4,foundationType:f.foundationType,
-      groundwaterDepth:soil.groundwaterDepth,undrainedCu:soil.undrainedCohesion,
-      layers:profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:unitWeightToBase(x.gamma??soil.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(x.gammaSat??x.gamma??soil.saturatedUnitWeight,p.unitSystem),cohesion:stressToBase(x.cohesion??soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle}))
+      groundwaterDepth:soil.groundwaterDepth,undrainedCu:soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem),
+      layers:profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:x.gamma??unitWeightToBase(soil.unitWeight,p.unitSystem),gammaSat:x.gammaSat??undefined,cohesion:x.cohesion??stressToBase(soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle}))
     })}catch{return undefined}
   },[B,L,Df,N,H,Mx,My,soil,p,profile,f.foundationType])
 
@@ -56,11 +56,11 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
       qSoil:j.qSoil,qColumn:j.qColumn,cSoil:j.cSoil,cColumn:j.cColumn,EsSoil:j.EsSoil,EsColumn:j.EsColumn,
       load:N>0?N:undefined,foundationArea:B>0&&L>0?B*L:undefined,foundationThickness:j.foundationThickness,
       columnFrictionAngle:j.columnFrictionAngle,cohesion:j.interfaceCohesion,frictionAngle:j.interfaceFrictionAngle,
-      verticalLoad:N,horizontalLoad:H
+      verticalLoad:N,horizontalLoad:H,soilPoissonRatio:j.soilPoissonRatio
     })
   },[p.jetGrout,N,B,L,H])
   const foundation=useMemo(()=>B>0&&L>0?foundationChecks({
-    B,L,N,Vx,Vy,Mx,My,deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion,
+    B,L,N,Vx,Vy,Mx,My,deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem),
     area:undefined,groundwaterDepth:soil.groundwaterDepth,foundationDepth:Df,
     passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance
   }):undefined,[B,L,N,Vx,Vy,Mx,My,f,soil,p.unitSystem,Df])

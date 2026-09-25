@@ -9,9 +9,8 @@ declare global {
         open(): Promise<{ filePath: string; data: unknown; version: number } | null>
       }
       fieldCache: {
-        saveBoreholes(payload: unknown): Promise<{ cachePath: string; savedAt: string }>
-        saveLaboratories(payload: unknown): Promise<{ cachePath: string; savedAt: string }>
-        load(): Promise<{ boreholes?: unknown; laboratories?: unknown; savedAt?: string } | null>
+        saveBoreholes(projectId: string, payload: unknown): Promise<{ cachePath: string; savedAt: string }>
+        saveLaboratories(projectId: string, payload: unknown): Promise<{ cachePath: string; savedAt: string }>
       }
       report: {
         print(): Promise<boolean>

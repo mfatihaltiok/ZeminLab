@@ -7,7 +7,7 @@ import icon from '../../resources/icon.png?asset'
 const projectSaveFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
 const projectOpenFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
 const pdfFilter=[{name:'PDF Belgesi',extensions:['pdf']}]
-const PROJECT_SCHEMA_VERSION=1
+const PROJECT_SCHEMA_VERSION=2
 const FIELD_CACHE_SCHEMA_VERSION=1
 
 function createWindow():void{
@@ -28,7 +28,11 @@ app.whenReady().then(()=>{
 
   const writeProjectFile=async(filePath:string,payload:unknown)=>{
     const envelope={format:'FALUZMN',version:PROJECT_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:payload}
-    await fs.writeFile(filePath,JSON.stringify(envelope,null,2),'utf8')
+    const directory=join(filePath,'..')
+    const tempPath=filePath+'.tmp'
+    await fs.mkdir(directory,{recursive:true})
+    await fs.writeFile(tempPath,JSON.stringify(envelope,null,2),'utf8')
+    await fs.rename(tempPath,filePath)
     return filePath
   }
 
@@ -56,37 +60,24 @@ app.whenReady().then(()=>{
     if(result.canceled||!result.filePaths[0])return null
     const filePath=result.filePaths[0]
     const raw=await fs.readFile(filePath,'utf8')
-    const envelope=JSON.parse(raw) as {format?:string;version?:number;data?:unknown}
+    let envelope:{format?:string;version?:number;data?:unknown}
+    try{envelope=JSON.parse(raw) as {format?:string;version?:number;data?:unknown>}catch{throw new Error('FALUZMN proje dosyası geçerli JSON değil veya bozulmuş.')}
     if(envelope.format!=='FALUZMN'||typeof envelope.version!=='number'||envelope.data===undefined)throw new Error('Geçersiz veya desteklenmeyen FALUZMN proje dosyası.')
     if(envelope.version>PROJECT_SCHEMA_VERSION)throw new Error(`Bu proje dosyası daha yeni bir FALUZMN sürümüne ait (v${envelope.version}).`)
     return{filePath,data:envelope.data,version:envelope.version}
   })
 
-  const writeFieldCache=async(kind:'boreholes'|'laboratories',data:unknown)=>{
-    const cachePath=join(app.getPath('userData'),`FALUZMN-${kind}.cache.json`)
+  const writeFieldCache=async(kind:'boreholes'|'laboratories',projectId:string,data:unknown)=>{
+    if(!projectId||!/^[-_a-zA-Z0-9]+$/.test(projectId))throw new Error('Geçersiz proje kimliği; önbellek kaydedilmedi.')
+    const cachePath=join(app.getPath('userData'),`FALUZMN-${projectId}-${kind}.cache.json`)
     const envelope={format:'FALUZMN-FIELD-CACHE',version:FIELD_CACHE_SCHEMA_VERSION,savedAt:new Date().toISOString(),kind,data}
     await fs.mkdir(app.getPath('userData'),{recursive:true})
     await fs.writeFile(cachePath,JSON.stringify(envelope,null,2),'utf8')
     return {cachePath,savedAt:envelope.savedAt}
   }
 
-  ipcMain.handle('field-cache:save-boreholes',async(_event,payload:unknown)=>writeFieldCache('boreholes',payload))
-  ipcMain.handle('field-cache:save-laboratories',async(_event,payload:unknown)=>writeFieldCache('laboratories',payload))
-
-  ipcMain.handle('field-cache:load',async()=>{
-    const readCache=async(kind:'boreholes'|'laboratories')=>{
-      const cachePath=join(app.getPath('userData'),`FALUZMN-${kind}.cache.json`)
-      try{
-        const raw=await fs.readFile(cachePath,'utf8')
-        const envelope=JSON.parse(raw) as {format?:string;version?:number;kind?:string;data?:unknown;savedAt?:string}
-        if(envelope.format!=='FALUZMN-FIELD-CACHE'||envelope.version!==FIELD_CACHE_SCHEMA_VERSION||envelope.kind!==kind)return null
-        return {data:envelope.data,savedAt:envelope.savedAt}
-      }catch{return null}
-    }
-    const [boreholes,laboratories]=await Promise.all([readCache('boreholes'),readCache('laboratories')])
-    if(!boreholes&&!laboratories)return null
-    return {boreholes:boreholes?.data,laboratories:laboratories?.data,savedAt:boreholes?.savedAt??laboratories?.savedAt}
-  })
+  ipcMain.handle('field-cache:save-boreholes',async(_event,projectId:string,payload:unknown)=>writeFieldCache('boreholes',projectId,payload))
+  ipcMain.handle('field-cache:save-laboratories',async(_event,projectId:string,payload:unknown)=>writeFieldCache('laboratories',projectId,payload))
 
   ipcMain.handle('report:print',async event=>{
     const window=BrowserWindow.fromWebContents(event.sender)

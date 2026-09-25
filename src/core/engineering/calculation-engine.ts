@@ -1,152 +1,141 @@
 import { calculateSurfaceFoundation } from './surface-foundation'
+import { calculateFoundationSliding } from './foundation-sliding'
+import type { SptEngineInput } from './spt/spt-engine'
+import { calculateSpt, fineContentCorrection, soilBehaviorFromCode } from './spt/spt-engine'
 
 export type BearingMethod='Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
 export interface CalculationStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string;source?:string}
 export interface CalculationResult<T>{value:T;steps:CalculationStep[];method:string;source:string;warnings?:string[]}
-const rad=(d:number)=>d*Math.PI/180
-const clamp=(x:number,a:number,b:number)=>Math.max(a,Math.min(b,x))
+const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
+const requireNumber=(x:unknown,name:string,min=-Infinity)=>{if(!finite(x)||x<min)throw new Error(name+' geçerli bir sayı olmalıdır.');return x}
 
 export interface BearingInput{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS:number;method:BearingMethod;waterReduction?:number}
-function factors(phiDeg:number,method:BearingMethod){
-  const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi))
-  const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
-  const Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
-  let Ngamma=0
+
+function classicalFactors(i:BearingInput){
+  const B=i.B,L=i.L,Df=i.Df,phi=i.phi,ratio=Math.min(B,L)/Math.max(B,L),t=Math.tan(rad(phi)),Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2,Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
+  let Ngamma=0,sc=1,sq=1,sg=1,dc=1,dq=1,dg=1
+  const Nphi=Math.tan(Math.PI/4+rad(phi)/2)**2
   if(phi>0){
-    if(method==='Terzaghi'){const Kpy=3*(1+Math.sin(rad(phi)))/Math.max(1-Math.sin(rad(phi)),1e-9);Ngamma=.5*t*(Kpy/Math.cos(rad(phi))**2-1)}
-    else if(method==='Meyerhof')Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
-    else if(method==='Hansen')Ngamma=1.5*(Nq-1)*t
-    else Ngamma=2*(Nq+1)*t
+    if(i.method==='Terzaghi'){
+      const Kp=Math.pow(Math.tan(Math.PI/4+rad(phi)/2),2)
+      Ngamma=1.5*(Kp-1)*t
+      sc=Math.abs(B-L)<1e-12?1.3:1
+      sg=Math.abs(B-L)<1e-12?0.8:1
+    }else if(i.method==='Meyerhof'){
+      Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
+      sc=1+0.2*Nphi*ratio
+      sq=phi>10?1+0.1*Nphi*ratio:1
+      sg=phi>10?sq:1
+      dc=1+0.2*Math.sqrt(Nphi)*(Df/Math.max(B,1e-12))
+      dq=phi>10?1+0.1*Math.sqrt(Nphi)*(Df/Math.max(B,1e-12)):1
+    }else if(i.method==='Hansen'){
+      Ngamma=1.5*(Nq-1)*t
+      sc=1+(Nq/Nc)*ratio
+      sq=1+ratio*t
+      sg=Math.max(0.6,1-0.4*ratio)
+      const k=Math.atan(Df/Math.max(B,1e-12))
+      dc=1+0.4*k
+      dq=1+2*k*t*(1-Math.sin(rad(phi)))**2
+    }else{
+      Ngamma=2*(Nq-1)*t
+      sc=1+(Nq/Nc)*ratio
+      sq=1+ratio*t
+      sg=Math.max(0.6,1-0.4*ratio)
+      const k=Math.atan(Df/Math.max(B,1e-12))
+      dc=1+0.4*k
+      dq=1+2*k*t*(1-Math.sin(rad(phi)))**2
+    }
+  }else{
+    if(i.method==='Terzaghi'&&Math.abs(B-L)<1e-12){sc=1.3;sg=0.8}
   }
-  return{phi,t,Nq,Nc,Ngamma}
+  return{Nq,Nc,Ngamma,sc,sq,sg,dc,dq,dg}
 }
-function classicalFactors(method:BearingMethod,B:number,L:number,Df:number,phi:number,Nq:number,Nc:number){
-  const r=Math.min(B,L)/Math.max(B,L,1e-9),t=Math.tan(rad(phi)),Nphi=Math.tan(Math.PI/4+rad(phi)/2)**2
-  if(method==='Terzaghi')return{sc:Math.abs(B-L)<1e-9?1.3:1,sq:1,sg:Math.abs(B-L)<1e-9?.8:1,dc:1,dq:1,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
-  const sc=method==='Meyerhof'?1+.2*Nphi*r:1+(Nq/Math.max(Nc,1e-9))*r
-  const sq=method==='Meyerhof'?(phi>10?1+.1*Nphi*r:1):1+r*t
-  const sg=method==='Meyerhof'?(phi>10?sq:1):Math.max(.6,1-.4*r)
-  const k=Df/Math.max(B,1e-9),kk=k<=1?k:Math.atan(k)
-  const dc=method==='Meyerhof'?1+.2*Math.sqrt(Nphi)*k:1+.4*kk
-  const dq=method==='Meyerhof'?(phi>10?1+.1*Math.sqrt(Nphi)*k:1):1+2*t*(1-Math.sin(rad(phi)))**2*kk
-  return{sc,sq,sg,dc,dq,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
-}
+
 export function bearingCapacity(i:BearingInput):CalculationResult<any>{
-  if(i.B<=0||i.L<=0||i.Df<0||i.gamma<=0||i.c<0||i.FS<=0)throw new Error('Taşıma gücü girdileri geçersiz.')
-  const f=factors(i.phi,i.method),m=classicalFactors(i.method,i.B,i.L,i.Df,f.phi,f.Nq,f.Nc),q=i.gamma*i.Df,gammaTerm=i.waterReduction??1
-  const ultimate=i.c*f.Nc*m.sc*m.dc*m.ic*m.gc*m.bc+q*f.Nq*m.sq*m.dq*m.iq*m.gq*m.bq+.5*i.gamma*i.B*f.Ngamma*m.sg*m.dg*m.ig*m.gg*m.bg*gammaTerm
-  const netUltimate=ultimate-q
-  const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:m.sc,sq:m.sq,sg:m.sg,dc:m.dc,dq:m.dq,dg:m.dg,ultimate,netUltimate,allowableGross:ultimate/i.FS,allowableNet:netUltimate/i.FS}
-  return{value,method:i.method,source:'Klasik taşıma gücü literatür bağıntıları; sonuçlar TBDY tasarım direnci yerine klasik izin verilebilir değerler olarak raporlanır.',steps:[
-    {symbol:'Nq',title:'Taşıma gücü katsayısı',formula:'Nq=exp(πtanφ)·tan²(45°+φ/2)',value:f.Nq},
+  requireNumber(i.B,'B',Number.EPSILON);requireNumber(i.L,'L',Number.EPSILON);requireNumber(i.Df,'Df',0);requireNumber(i.gamma,'γ',Number.EPSILON);requireNumber(i.c,'c',0);requireNumber(i.phi,'φ',0);requireNumber(i.FS,'FS',Number.EPSILON)
+  if(i.phi>=90)throw new Error('φ 90° veya daha büyük olamaz.')
+  const waterReduction=i.waterReduction??1
+  if(!finite(waterReduction)||waterReduction<0||waterReduction>1)throw new Error('Su azaltma katsayısı 0–1 aralığında olmalıdır.')
+  const f=classicalFactors(i)
+  const surcharge=i.gamma*i.Df
+  const gammaTerm=.5*i.gamma*i.B*f.Ngamma*f.sg*f.dg*f.ig
+  const ultimate=(i.c*f.Nc*f.sc*f.dc)+(surcharge*f.Nq*f.sq*f.dq)+(gammaTerm*waterReduction)
+  const netUltimate=ultimate-surcharge
+  const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:f.sc,sq:f.sq,sg:f.sg,dc:f.dc,dq:f.dq,dg:f.dg,ultimate,netUltimate,allowableGross:ultimate/i.FS,allowableNet:netUltimate/i.FS}
+  return{value,method:i.method,source:'Klasik taşıma gücü karşılaştırma motoru. TBDY yüzeysel temel motorundan bağımsızdır; düzeltme katsayıları yöntem bazında açıkça seçilir.',steps:[
+    {symbol:'Nq',title:'Taşıma gücü katsayısı',formula:'Nq=e^(πtanφ)·tan²(45°+φ/2)',value:f.Nq},
     {symbol:'Nc',title:'Kohezyon katsayısı',formula:'Nc=(Nq−1)cotφ',value:f.Nc},
     {symbol:'Nγ',title:'Birim hacim ağırlığı katsayısı',formula:'Seçilen yöntemin Nγ bağıntısı',value:f.Ngamma},
-    {symbol:'q',title:'Sürşarj',formula:'q=γDf',value:q,unit:'kPa'},
-    {symbol:'qult',title:'Nihai taşıma gücü',formula:'Klasik genel taşıma gücü denklemi',value:ultimate,unit:'kPa'},
-    {symbol:'qallow',title:'İzin verilen gross',formula:'qult/FS',value:value.allowableGross,unit:'kPa'}
-  ]}
+    {symbol:'s',title:'Şekil katsayıları',formula:'sc, sq, sγ',value:f.sc},
+    {symbol:'d',title:'Derinlik katsayıları',formula:'dc, dq, dγ',value:f.dc},
+    {symbol:'qult',title:'Nihai taşıma gücü',formula:'cNcscdc + qNqsqdq + 0.5γBNγsγdγ',value:ultimate,unit:'kPa'},
+    {symbol:'qallow',title:'İzin verilen gross',formula:'qult/FS',value:value.allowableGross,unit:'kPa'}],warnings:['Bu sonuçlar TBDY qk/qt tasarım zincirinin yerine geçmez.']}
 }
 
 export interface TbdyBearingInput{
-  B:number;L:number;Df:number;gamma1:number;gamma2:number;c:number;phi:number;verticalLoad:number;horizontalLoad:number;momentX:number;momentY:number
-  groundSlope:number;baseSlope:number;resistanceFactor:number;foundationType?:'tekil'|'surekli'|'radye';groundwaterDepth?:number;layers?:Parameters<typeof calculateSurfaceFoundation>[0]['layers'];undrainedCu?:number
+ B:number;L:number;Df:number;gamma1:number;gamma2:number;c:number;phi:number;verticalLoad:number;horizontalLoad:number;momentX:number;momentY:number
+ groundSlope:number;baseSlope:number;resistanceFactor:number;foundationType?:'tekil'|'surekli'|'radye';groundwaterDepth?:number;layers?:Parameters<typeof calculateSurfaceFoundation>[0]['layers'];undrainedCu?:number
 }
 export function tbdyBearingCapacity(i:TbdyBearingInput):CalculationResult<any>{
-  const r=calculateSurfaceFoundation({B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma1,gamma2:i.gamma2,c:i.c,phi:i.phi,verticalLoad:i.verticalLoad,horizontalLoad:i.horizontalLoad,momentX:i.momentX,momentY:i.momentY,groundSlope:i.groundSlope,baseSlope:i.baseSlope,resistanceFactor:i.resistanceFactor,method:'TBDY-2018',foundationType:i.foundationType,groundwaterDepth:i.groundwaterDepth,layers:i.layers,undrainedCu:i.undrainedCu})
-  return{value:r,steps:r.steps,method:r.method,source:r.source,warnings:r.warnings}
+ const r=calculateSurfaceFoundation({...i,method:'TBDY-2018',foundationType:i.foundationType,groundwaterDepth:i.groundwaterDepth,layers:i.layers,undrainedCu:i.undrainedCu})
+ return{value:r,steps:r.steps,method:r.method,source:r.source,warnings:r.warnings}
 }
 
 export interface SettlementInput{B:number;q:number;Es:number;nu:number;layers?:{thickness:number;Cc?:number;e0?:number;sigma0?:number;dSigma?:number}[]}
 export function settlement(i:SettlementInput):CalculationResult<{immediate:number;consolidation:number;total:number}>{
-  if(i.B<=0||i.q<0||i.Es<=0||i.nu<=-1||i.nu>=.5)throw new Error('Oturma girdileri geçersiz.')
-  const immediate=i.q*i.B*(1-i.nu*i.nu)/i.Es
-  const consolidation=(i.layers??[]).reduce((sum,l)=>l.Cc!=null&&l.e0!=null&&l.sigma0!=null&&l.dSigma!=null&&l.sigma0>0&&l.Cc>=0&&l.e0>-1?sum+Math.max(0,l.thickness)*l.Cc/(1+l.e0)*Math.log10(Math.max(l.sigma0+l.dSigma,l.sigma0)/l.sigma0):sum,0)
-  return{value:{immediate,consolidation,total:immediate+consolidation},method:'Basit elastik + açık konsolidasyon parametreleri',source:'Parametre eksikleri sessizce varsayılmaz.',steps:[
-    {symbol:'si',title:'Elastik oturma',formula:'s=qB(1−ν²)/Es',value:immediate,unit:'m'},
-    {symbol:'sc',title:'Konsolidasyon',formula:'ΣH·Cc/(1+e0)·log10(σ1/σ0)',value:consolidation,unit:'m'},
-    {symbol:'st',title:'Toplam',formula:'st=si+sc',value:immediate+consolidation,unit:'m'}
-  ]}
+ requireNumber(i.B,'B',Number.EPSILON);requireNumber(i.q,'q',0);requireNumber(i.Es,'Es',Number.EPSILON);requireNumber(i.nu,'ν',0);if(i.nu>=.5)throw new Error('ν 0.5 veya daha büyük olamaz.')
+ const immediate=i.q*i.B*(1-i.nu*i.nu)/i.Es;let consolidation=0
+ for(const l of i.layers??[]){
+  if(!finite(l.thickness)||l.thickness<0)throw new Error('Konsolidasyon tabaka kalınlığı geçersiz.')
+  const has=([l.Cc,l.e0,l.sigma0,l.dSigma] as unknown[]).some(v=>v!==undefined)
+  if(!has)continue
+  if(!finite(l.Cc)||!finite(l.e0)||!finite(l.sigma0)||!finite(l.dSigma)||l.Cc<0||l.e0<=-1||l.sigma0<=0||l.dSigma<0)throw new Error('Konsolidasyon tabakasında Cc, e0, σ′0 ve Δσ birlikte geçerli verilmelidir.')
+  consolidation+=l.thickness*l.Cc/(1+l.e0)*Math.log10((l.sigma0+l.dSigma)/l.sigma0)
+ }
+ return{value:{immediate,consolidation,total:immediate+consolidation},method:'Basit elastik + açık konsolidasyon parametreleri',source:'Uyumluluk API; üretim oturma hesabı İdealize Zemin Profili kanonik motorundan yapılır.',steps:[
+  {symbol:'si',title:'Elastik oturma',formula:'s=qB(1−ν²)/Es',value:immediate,unit:'m'},
+  {symbol:'sc',title:'Konsolidasyon',formula:'ΣH·Cc/(1+e0)·log10(σ1/σ0)',value:consolidation,unit:'m'},
+  {symbol:'st',title:'Toplam',formula:'st=si+sc',value:immediate+consolidation,unit:'m'}]}
 }
 
 export interface LiquefactionInput{Mw:number;Sds:number;depth:number;N160f:number;sigmaV:number;sigmaVPrime:number}
 export function liquefaction(i:LiquefactionInput):CalculationResult<any>{
-  const z=Math.max(i.depth,.01),rd=z<=9.15?1-.00765*z:z<=23?1.174-.0267*z:z<=30?.744-.008*z:.5,N=clamp(i.N160f,.1,33.9)
-  const CRRM75=N>=29.9?2:1/(34-N)+N/135+50/(10*N+45)**2-.005
-  const CM=10**2.24/Math.max(i.Mw,1)**2.56,Rtau=CRRM75*CM*Math.max(i.sigmaVPrime,0),tau=.65*.4*Math.max(i.Sds,0)*Math.max(i.sigmaV,0)*Math.max(rd,0),ratio=Rtau/Math.max(tau,1e-9)
-  return{value:{rd,CRRM75,CM,Rtau,tau,ratio,safe:ratio>=1.1},method:'TBDY 2018 Ek 16B',source:'Ek 16B tetiklenme zinciri; ana uygulama liquefaction-profile.ts üzerinden yapılmalıdır.',steps:[
-    {symbol:'rd',title:'Gerilme azaltma',formula:'Ek 16B derinlik bağıntısı',value:rd},
-    {symbol:'CRR7.5',title:'Çevrimsel dayanım',formula:'Ek 16B',value:CRRM75},
-    {symbol:'FS',title:'Sıvılaşma güvenlik oranı',formula:'FS=Rτ/τdeprem',value:ratio}
-  ]}
+ requireNumber(i.Mw,'Mw',Number.EPSILON);requireNumber(i.Sds,'SDS',0);requireNumber(i.depth,'z',0);requireNumber(i.N160f,'(N1)60f',0.000001);requireNumber(i.sigmaV,'σv0',0);requireNumber(i.sigmaVPrime,'σ′v0',Number.EPSILON)
+ if(i.N160f>=34)throw new Error('(N1)60f ≥ 34 için bu CRR bağıntısı kullanılmaz.')
+ const z=i.depth,N=i.N160f,rd=z<=9.15?1-.00765*z:z<=23?1.174-.0267*z:z<=30?.744-.008*z:.5,CRRM75=1/(34-N)+N/135+50/(10*N+45)**2-.005,CM=10**2.24/i.Mw**2.56,Rtau=CRRM75*CM*i.sigmaVPrime,tau=.65*.4*i.Sds*i.sigmaV*rd,ratio=tau>0?Rtau/tau:Number.POSITIVE_INFINITY
+ return{value:{rd,CRRM75,CM,Rtau,tau,ratio,safe:ratio>=1.1},method:'TBDY 2018 Ek 16B',source:'Tek nokta uyumluluk API; proje kapsamı ve veri yeterliliği liquefaction-profile.ts üzerinden yönetilir.',warnings:['Bu tek nokta API proje düzeyindeki zorunluluk/kapsam kararının yerine geçmez.'],steps:[
+  {symbol:'rd',title:'Gerilme azaltma',formula:'Ek 16B derinlik bağıntısı',value:rd},{symbol:'CRR7.5',title:'Çevrimsel dayanım',formula:'Ek 16B',value:CRRM75},{symbol:'FS',title:'Sıvılaşma güvenlik oranı',formula:'FS=Rτ/τdeprem',value:ratio}]}
 }
 
-export interface FoundationCheckInput{
-  B:number;L:number;N:number;Vx?:number;Vy?:number;V?:number;Mx:number;My:number;deltaTan?:number;cu?:number;area?:number
-  groundwaterDepth?:number;foundationDepth?:number;passiveResistanceCharacteristic?:number;usePassiveResistance?:boolean;gammaRh?:number;gammaRp?:number
-}
-export function foundationChecks(i:FoundationCheckInput){
-  if(i.B<=0||i.L<=0)throw new Error('Temel boyutları pozitif olmalıdır.')
-  const N=Math.max(0,i.N),ex=N!==0?i.My/N:0,ey=N!==0?i.Mx/N:0
-  const qAvg=N/(i.B*i.L)
-  const qMax=qAvg*(1+6*Math.abs(ex)/i.B+6*Math.abs(ey)/i.L)
-  const qMin=qAvg*(1-6*Math.abs(ex)/i.B-6*Math.abs(ey)/i.L)
-  const effectiveLength=Math.max(0,i.L-2*Math.abs(ey)),effectiveWidth=Math.max(0,i.B-2*Math.abs(ex))
-  const contactArea=i.area??effectiveWidth*effectiveLength
-  const rh=i.gammaRh??1.10,rp=i.gammaRp??1.40
-  const rawTan=i.deltaTan??.60,deltaTan=Math.min(.60,Math.max(0,rawTan))
-  const warnings:string[]=[]
-  let rth=0
-  const submerged=i.groundwaterDepth!=null&&i.foundationDepth!=null&&i.groundwaterDepth<=i.foundationDepth
-  if(submerged){
-    if(i.cu!=null&&i.cu>0)rth=contactArea*i.cu/rh
-    else warnings.push('Temel YASS altında/aynı kotta. TBDY 16.8.4.6 gereği deprem sürtünme direnci cu ile hesaplanmalı; cu girilmedi.')
-  }else{
-    rth=N*deltaTan/rh
-    if(rawTan>0.60)warnings.push('tanδ, TBDY Tablo 16.3 üst sınırı olan 0.60 ile sınırlandı.')
-  }
-  const rpk=Math.max(0,i.passiveResistanceCharacteristic??0)
-  const rpt=i.usePassiveResistance?rpk/rp:0
-  if(rpk>0&&!i.usePassiveResistance)warnings.push('Karakteristik pasif direnç girilmiş ancak pasif direnç kredilendirmesi kapalıdır.')
-  const designResistance=rth+.30*rpt
-  const vx=Math.abs(i.Vx??i.V??0),vy=Math.abs(i.Vy??0)
-  const utilizationX=designResistance>0?vx/designResistance:Infinity
-  const utilizationY=designResistance>0?vy/designResistance:Infinity
-  const safeX=designResistance>0&&vx<=designResistance,safeY=designResistance>0&&vy<=designResistance
-  if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
-  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; qmin<0 olabilir.')
-  const requiredData=submerged&&(i.cu==null||i.cu<=0)
-  return{
-    ex,ey,qAvg,qMax,qMin,contactArea,effectiveWidth,effectiveLength,
-    slidingFS:Math.abs(i.V??0)>0?designResistance/Math.abs(i.V!):Infinity,
-    slidingCapacityX:designResistance,slidingCapacityY:designResistance,
-    slidingUtilizationX:utilizationX,slidingUtilizationY:utilizationY,slidingSafeX:safeX,slidingSafeY:safeY,
-    slidingResistanceFactor:rh,passiveResistanceDesign:rpt,passiveResistanceCharacteristic:rpk,slidingTanDelta:deltaTan,
-    slidingMode:submerged?'undrained-cu':'drained-interface',evaluable:!requiredData,warnings
-  }
-}
+export type FoundationCheckInput=Parameters<typeof calculateFoundationSliding>[0]
+export function foundationChecks(i:FoundationCheckInput){return calculateFoundationSliding(i)}
 
 export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number}){
-  const Ac=Math.PI*i.columnDiameter**2/4,ratio=Math.min(1,Ac/Math.max(i.spacing**2,1e-9)),composite=(1-ratio)*i.qultSoil+ratio*i.qultColumn*i.improvementFactor
-  return{value:{Ac,ratio,composite,allowable:composite/Math.max(i.FS,1e-9),columnLoad:Ac*i.columnStrength/Math.max(i.FS,1e-9)},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio}],method:'Jet Grout ön model',source:'Proje kaynak paketi'}
+ requireNumber(i.columnDiameter,'Kolon çapı',Number.EPSILON);requireNumber(i.spacing,'Aks aralığı',Number.EPSILON);requireNumber(i.qultSoil,'Zemin qult',0);requireNumber(i.qultColumn,'Kolon qult',0);requireNumber(i.improvementFactor,'İyileştirme katsayısı',0);requireNumber(i.FS,'FS',Number.EPSILON);requireNumber(i.columnStrength,'Kolon dayanımı',0)
+ const Ac=Math.PI*i.columnDiameter**2/4,ratio=Ac/(i.spacing**2);if(ratio<=0||ratio>1)throw new Error('Jet Grout iyileştirme oranı 0<ρ≤1 olmalıdır.')
+ const composite=(1-ratio)*i.qultSoil+ratio*i.qultColumn*i.improvementFactor
+ return{value:{Ac,ratio,composite,allowable:composite/i.FS,columnLoad:Ac*i.columnStrength/i.FS},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio}],method:'Jet Grout ön model',source:'Uyumluluk API; ileri Jet Grout motorunun yerine geçmez.',warnings:['Basitleştirilmiş ön model.']}
 }
 
 export function stressAtDepth(depth:number,layers:{top:number;bottom:number;gamma:number;gammaSat:number}[],gwt:number){
-  let sigmaV=0
-  for(const layer of [...layers].filter(x=>x.bottom>x.top).sort((a,b)=>a.top-b.top)){
-    const z0=Math.max(0,layer.top),z1=Math.min(depth,layer.bottom)
-    if(z1<=z0)continue
-    const dry=gwt>=0?Math.max(0,Math.min(z1,gwt)-z0):z1-z0,sat=Math.max(0,z1-z0-dry)
-    sigmaV+=dry*layer.gamma+sat*layer.gammaSat
-  }
-  const u=gwt>=0&&depth>gwt?9.80665*(depth-gwt):0
-  return{sigmaV,sigmaVPrime:Math.max(0,sigmaV-u),u}
+ requireNumber(depth,'Derinlik',0);requireNumber(gwt,'YASS',0)
+ let sigmaV=0,cursor=0
+ for(const layer of [...layers].filter(x=>x.bottom>x.top).sort((a,b)=>a.top-b.top)){
+  if(layer.top>cursor+1e-9&&layer.top<depth-1e-9)throw new Error('Gerilme profili süreksiz.')
+  const z0=Math.max(cursor,layer.top),z1=Math.min(depth,layer.bottom);if(z1<=z0)continue
+  requireNumber(layer.gamma,'γ',Number.EPSILON);requireNumber(layer.gammaSat,'γsat',Number.EPSILON)
+  const dry=Math.max(0,Math.min(z1,gwt)-z0),sat=(z1-z0)-dry;sigmaV+=dry*layer.gamma+sat*layer.gammaSat;cursor=z1;if(cursor>=depth-1e-9)break
+ }
+ if(cursor<depth-1e-9)throw new Error('Gerilme profili hesap derinliğine kadar tamamlanmamış.')
+ const u=depth>gwt?(depth-gwt)*9.80665:0
+ return{sigmaV,sigmaVPrime:Math.max(0,sigmaV-u),u}
 }
 
 export const SOURCE_NOTES={
-  investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',
-  liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',
-  bearing:'TBDY 2018 Bölüm 16.8.2–16.8.3; klasik yöntemler Terzaghi, Meyerhof, Hansen ve Vesic.',
-  settlement:'TBDY 2018 Bölüm 16.7.3.4 ve 16.8.3.4; yöntem kaynakları ayrıca raporlanır.',
-  foundation:'TBDY 2018 16.7.3.3 ve 16.8.4; γRv=1.40, γRh=1.10, γRp=1.40.',
-  jetGroutAdvanced:'Jet Grout kompozit yaklaşımı; proje deneyleri ve kalite kontrol ile doğrulanmalıdır.'
+ investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',
+ liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',
+ bearing:'TBDY 2018 Bölüm 16.8.2–16.8.3; klasik yöntemler Terzaghi, Meyerhof, Hansen ve Vesic.',
+ settlement:'TBDY 2018 Bölüm 16.7.3.4 ve 16.8.3.4; yöntem kaynakları ayrıca raporlanır.',
+ foundation:'TBDY 2018 16.7.3.3 ve 16.8.4; γRv=1.40, γRh=1.10, γRp=1.40.',
+ jetGroutAdvanced:'Jet Grout kompozit yaklaşımı; proje deneyleri ve kalite kontrol ile doğrulanmalıdır.'
 }

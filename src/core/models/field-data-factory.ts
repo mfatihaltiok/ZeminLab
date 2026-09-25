@@ -23,6 +23,7 @@ export function createEmptySpt(depth: number): SptRecord {
     depthTo: depth + 0.45,
     testType: 'SPT',
     laboratoryLinked: true,
+    correction: { applyOverburdenCorrection: true, applyDilatancyCorrection: false },
     source: 'manual',
     confirmed: false
   }
