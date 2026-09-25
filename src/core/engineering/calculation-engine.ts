@@ -95,6 +95,9 @@ export function foundationChecks(i:FoundationCheckInput){
   const rh=i.gammaRh??1.10,rp=i.gammaRp??1.40
   const rawTan=i.deltaTan??.60,deltaTan=Math.min(.60,Math.max(0,rawTan))
   const warnings:string[]=[]
+  if(i.deltaTan==null)warnings.push('tanδ girilmedi; 0.60 üst sınırı varsayımsal olarak kullanıldı. TBDY Tablo 16.3 gerçek arayüz koşuluna göre ayrıca doğrulanmalıdır.')
+  if(rh!==1.10)warnings.push('TBDY 2018 Tablo 16.2 için γRh=1.10 kullanılmalıdır.')
+  if(rp!==1.40)warnings.push('TBDY 2018 Tablo 16.2 için γRp=1.40 kullanılmalıdır.')
   let rth=0
   const submerged=i.groundwaterDepth!=null&&i.foundationDepth!=null&&i.groundwaterDepth<=i.foundationDepth
   if(submerged){
@@ -108,18 +111,22 @@ export function foundationChecks(i:FoundationCheckInput){
   const rpt=i.usePassiveResistance?rpk/rp:0
   if(rpk>0&&!i.usePassiveResistance)warnings.push('Karakteristik pasif direnç girilmiş ancak pasif direnç kredilendirmesi kapalıdır.')
   const designResistance=rth+.30*rpt
-  const vx=Math.abs(i.Vx??i.V??0),vy=Math.abs(i.Vy??0)
-  const utilizationX=designResistance>0?vx/designResistance:Infinity
-  const utilizationY=designResistance>0?vy/designResistance:Infinity
-  const safeX=designResistance>0&&vx<=designResistance,safeY=designResistance>0&&vy<=designResistance
+  const vx=i.Vx??0,vy=i.Vy??0
+  const vh=Math.hypot(vx,vy)
+  const utilizationX=designResistance>0?Math.abs(vx)/designResistance:Infinity
+  const utilizationY=designResistance>0?Math.abs(vy)/designResistance:Infinity
+  const utilizationResultant=designResistance>0?vh/designResistance:Infinity
+  const safeX=designResistance>0&&Math.abs(vx)<=designResistance,safeY=designResistance>0&&Math.abs(vy)<=designResistance
+  const safeResultant=designResistance>0&&vh<=designResistance
   if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
   if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; qmin<0 olabilir.')
   const requiredData=submerged&&(i.cu==null||i.cu<=0)
   return{
     ex,ey,qAvg,qMax,qMin,contactArea,effectiveWidth,effectiveLength,
-    slidingFS:Math.abs(i.V??0)>0?designResistance/Math.abs(i.V!):Infinity,
-    slidingCapacityX:designResistance,slidingCapacityY:designResistance,
-    slidingUtilizationX:utilizationX,slidingUtilizationY:utilizationY,slidingSafeX:safeX,slidingSafeY:safeY,
+    horizontalResultant:vh,slidingFS:vh>0?designResistance/vh:Infinity,
+    slidingCapacityX:designResistance,slidingCapacityY:designResistance,slidingCapacityResultant:designResistance,
+    slidingUtilizationX:utilizationX,slidingUtilizationY:utilizationY,slidingUtilizationResultant:utilizationResultant,
+    slidingSafeX:safeX,slidingSafeY:safeY,slidingSafeResultant:safeResultant,
     slidingResistanceFactor:rh,passiveResistanceDesign:rpt,passiveResistanceCharacteristic:rpk,slidingTanDelta:deltaTan,
     slidingMode:submerged?'undrained-cu':'drained-interface',evaluable:!requiredData,warnings
   }
