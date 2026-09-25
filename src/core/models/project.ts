@@ -31,7 +31,8 @@ export function normalizeProjectInfo(value:Partial<ProjectInfo>):ProjectInfo{
   const sd1Value=calculateSd1Seismic(seismic.s1,seismic.f1)
   const resolvedSds=sdsValue??seismic.sds
   const resolvedSd1=sd1Value??seismic.sd1
-  const resolvedDts=resolvedSds===undefined?seismic.dts:determineDts(resolvedSds,seismic.bks)
+  let resolvedDts=seismic.dts
+  if(resolvedSds!==undefined) resolvedDts=determineDts(resolvedSds,seismic.bks)
   return{
     ...defaultProjectInfo,...value,unitSystem,
     geophysical:{...defaultProjectInfo.geophysical,...(value.geophysical??{})},
