@@ -17,7 +17,7 @@ export function JetGroutEngineeringScreen(){
   const set=(key:keyof typeof j,value:number|undefined|string)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
   const d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=j.qSoil!=null?stressFromBase(j.qSoil,p.unitSystem).toString():'',column=j.qColumn!=null?stressFromBase(j.qColumn,p.unitSystem).toString():''
   const soilEs=j.EsSoil!=null?modulusFromBase(j.EsSoil,p.unitSystem).toString():'',columnEs=j.EsColumn!=null?modulusFromBase(j.EsColumn,p.unitSystem).toString():'',soilC=j.cSoil!=null?stressFromBase(j.cSoil,p.unitSystem).toString():'',columnC=j.cColumn!=null?stressFromBase(j.cColumn,p.unitSystem).toString():''
-  const thickness=j.foundationThickness?.toString()??'',phi=j.columnFrictionAngle?.toString()??'',c=j.interfaceCohesion!=null?stressFromBase(j.interfaceCohesion,p.unitSystem).toString():'',,angle=j.interfaceFrictionAngle?.toString()??'',nu=j.soilPoissonRatio?.toString()??''
+  const thickness=j.foundationThickness?.toString()??'',phi=j.columnFrictionAngle?.toString()??'',c=j.interfaceCohesion!=null?stressFromBase(j.interfaceCohesion,p.unitSystem).toString():'',angle=j.interfaceFrictionAngle?.toString()??'',nu=j.soilPoissonRatio?.toString()??''
   const layout=j.layout??'square'
   const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)
   const r=useMemo(()=>{
