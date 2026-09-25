@@ -11,6 +11,7 @@ export interface SurfaceFoundationStep{symbol:string;title:string;formula:string
 export interface SurfaceFoundationResult{
   Nq:number;Nc:number;Ngamma:number;sc:number;sq:number;sg:number;dc:number;dq:number;dg:number;ic:number;iq:number;ig:number;gc:number;gq:number;gg:number;bc:number;bq:number;bg:number
   surcharge:number;gammaBelow:number;ex:number;ey:number;Be:number;Le:number;effectiveArea:number;qk:number;qt:number;qo:number;utilization:number;adequate:boolean;effectiveDepth:number
+  qAvg:number;qMax:number;qMin:number;contactState:'FULL'|'PARTIAL'|'NO_CONTACT';coreContact:boolean
   representativeC:number;representativePhi:number;representativeGamma:number;ultimateClassical?:number;allowableClassical?:number;undrainedQk?:number
   layeredScreeningOnly:boolean;finalDesignEligible:boolean
   layerChecks:Array<{top:number;bottom:number;c:number;phi:number;gamma:number;qk:number;controlling:boolean}>;warnings:string[];method:SurfaceFoundationMethod;foundationType:FoundationType;source:string;steps:SurfaceFoundationStep[]
@@ -99,6 +100,46 @@ function methodFactors(method:SurfaceFoundationMethod,B:number,L:number,Df:numbe
 
 function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number,baseQ:number,mf:ReturnType<typeof methodFactors>,method:SurfaceFoundationMethod){
   if(!layers?.length)return[]
+  const active=layers
+    .filter(l=>l.bottomDepth>Df&&l.topDepth<Df+influence&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
+    .sort((a,b)=>a.topDepth-b.topDepth)
+  return active.map(l=>{
+    const top=Math.max(l.topDepth,Df),bottom=Math.min(l.bottomDepth,Df+influence),thickness=Math.max(0,bottom-top)
+    const phi=clamp(l.phi,0,50),ff=factors(phi,method)
+    const gamma=finite(l.gammaSat)?Math.max(l.gammaSat-gammaW,.001):Math.max(l.gamma,.001)
+    const qk=Math.max(0,l.cohesion)*ff.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+baseQ*ff.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+0.5*gamma*Math.max(.01,Math.min(1e3,influence))*ff.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
+    return{top:l.topDepth,bottom:l.bottomDepth,c:l.cohesion,phi,gamma,qk,controlling:false}
+  })
+}
+
+function equivalentLayerParameters(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number){
+  if(!layers?.length)return null
+  const active=layers
+    .filter(l=>l.bottomDepth>Df&&l.topDepth<Df+influence&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
+    .sort((a,b)=>a.topDepth-b.topDepth)
+  if(!active.length)return null
+  let covered=0,cWeighted=0,tanPhiWeighted=0,gammaWeighted=0
+  const segments:SurfaceFoundationLayer[]=[]
+  for(const l of active){
+    const top=Math.max(l.topDepth,Df),bottom=Math.min(l.bottomDepth,Df+influence),h=Math.max(0,bottom-top)
+    if(h<=0)continue
+    covered+=h
+    cWeighted+=l.cohesion*h
+    tanPhiWeighted+=Math.tan(rad(clamp(l.phi,0,50)))*h
+    const gammaEff=finite(l.gammaSat)?Math.max(l.gammaSat-gammaW,.001):Math.max(l.gamma,.001)
+    gammaWeighted+=gammaEff*h
+    segments.push({...l,topDepth:top,bottomDepth:bottom,gamma:gammaEff})
+  }
+  const coverageTolerance=1e-9
+  if(covered<influence-coverageTolerance)return{complete:false,covered,influence,segments}
+  return{
+    complete:true,covered,influence,segments,
+    c:cWeighted/influence,
+    phi:Math.atan(tanPhiWeighted/influence)*180/Math.PI,
+    gamma:gammaWeighted/influence
+  }
+}
+  if(!layers?.length)return[]
   const active=layers.filter(l=>l.bottomDepth>Df&&l.topDepth<Df+influence&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
   return active.map(l=>{
     const phi=clamp(l.phi,0,50),ff=factors(phi,method),gamma=l.gammaSat!=null?Math.max(l.gammaSat-gammaW,.001):Math.max(l.gamma,.001)
@@ -112,54 +153,97 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(i.gamma1<=0)throw new Error('γ doğal birim hacim ağırlığı pozitif olmalıdır.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=0))throw new Error('YASS tanımlandıysa γsat pozitif olmalıdır.')
   if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük negatif olamaz.')
-  const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad,H=Math.abs(i.horizontalLoad??0)
+  if(!finite(i.phi)||i.phi<0||i.phi>50)throw new Error('φ 0° ile 50° arasında olmalıdır.')
+  const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad,H=Math.hypot(i.horizontalLoad??0,0)
+  const Vh=Math.abs(i.horizontalLoad??0)
   const groundSlope=Math.abs(i.groundSlope??0),baseSlope=Math.abs(i.baseSlope??0)
   if(groundSlope>=90||baseSlope>=90||groundSlope+baseSlope>=90)throw new Error('Arazi ve temel tabanı eğimleri geçersiz.')
   const warnings:string[]=[]
   const ex=N>0?(i.momentY??0)/N:0,ey=N>0?(i.momentX??0)/N:0
   if(N===0&&(i.momentX!==0||i.momentY!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
+  const coreContact=Math.abs(ex)<=i.B/6+1e-12&&Math.abs(ey)<=i.L/6+1e-12
   const Be=i.B-2*Math.abs(ex),Le=i.L-2*Math.abs(ey),effectiveArea=Math.max(0,Be)*Math.max(0,Le)
-  if(Be<=0||Le<=0)warnings.push('Eksantrisite temel boyutunu tüketiyor; q0 kontrolü geçersizdir.')
-  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; gerçek temas alanı ve q dağılımı ayrıca incelenmelidir.')
+  const contactState:SurfaceFoundationResult['contactState']=Be<=0||Le<=0?'NO_CONTACT':coreContact?'FULL':'PARTIAL'
+  if(contactState==='NO_CONTACT')warnings.push('Eksantrisite temel tabanında basınçlı temas bölgesini ortadan kaldırıyor; taşıma gücü ve temas basıncı sonucu geçersizdir.')
+  if(contactState==='PARTIAL')warnings.push('Eksantrisite çekirdek dışındadır. B′/L′ taşıma gücü hesabında etkin boyut olarak kullanılır; gerçek kısmi temas basıncı ayrıca belirtilmiştir.')
   const Bp=Math.min(Math.max(Be,1e-9),Math.max(Le,1e-9)),Lp=Math.max(Be,Le)
-  const f=factors(i.phi,method),water=groundwater(i.Df,Bp,i.gamma1,i.gamma2,i.groundwaterDepth)
-  const mf=methodFactors(method,Bp,Lp,i.Df,f.phi,f.Nq,f.Nc,H,N,i.c,groundSlope,baseSlope)
-  const qk=i.c*f.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge*f.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+0.5*water.gammaBelow*Bp*f.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
-  const resistanceFactor=method==='TBDY-2018'?i.resistanceFactor??1.4:1
-  const qt=qk/Math.max(resistanceFactor,1e-9),qo=effectiveArea>0?N/effectiveArea:0
-  const utilization=qt>0?qo/qt:Infinity
-  const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,mf,method)
-  if(checks.length){
-    const min=Math.min(...checks.map(x=>x.qk))
-    checks.forEach(x=>x.controlling=Math.abs(x.qk-min)<1e-9)
-    warnings.push('Tabakalı zemin kontrolü: etkin derinlikteki tabakalar ayrı hesaplandı; en düşük karakteristik qk ek kontrol olarak kullanıldı. Bu, 16.8.3.3 için muhafazakâr bir ekran kontrolüdür ve özel tabakalı-zemin mekanizmasının yerini tutmaz.')
+  const f=factors(i.phi,method)
+  const water=groundwater(i.Df,Bp,i.gamma1,i.gamma2,i.groundwaterDepth)
+  const mf=methodFactors(method,Bp,Lp,i.Df,f.phi,f.Nq,f.Nc,Vh,N,i.c,groundSlope,baseSlope)
+
+  let representativeC=i.c,representativePhi=f.phi,representativeGamma=water.gammaBelow
+  let layerData:ReturnType<typeof equivalentLayerParameters>=null
+  let layeredComplete=true
+  if(i.layers?.length){
+    layerData=equivalentLayerParameters(i.layers,i.Df,2*Bp)
+    if(!layerData){
+      layeredComplete=false
+      warnings.push('Tabakalı zemin verisi mevcut ancak temel tabanı ile 2B′ etki bölgesini tanımlayan geçerli tabaka bulunamadı.')
+    }else if(!layerData.complete){
+      layeredComplete=false
+      warnings.push('Tabakalı zemin profili 16.8.3.3 kapsamında gerekli 2B′ etki derinliğini tam kaplamıyor; eksik derinlik tamamlanmadan nihai tasarım sonucu uygun kabul edilmez.')
+      representativeC=layerData.c??i.c
+      representativePhi=layerData.phi??f.phi
+      representativeGamma=layerData.gamma??water.gammaBelow
+    }else{
+      representativeC=layerData.c
+      representativePhi=layerData.phi
+      representativeGamma=layerData.gamma
+      warnings.push('Tabakalı zemin için 2B′ etki derinliğinde eşdeğer parametreler kullanıldı: c ağırlıklı, tanφ ağırlıklı ve γ′ kalınlık ağırlıklı ortalama. TBDY 16.8.3.3 tabakaların etkisinin dikkate alınmasını ister; tek bir tabakalı-zemin bağıntısı tarif etmediği için bu yaklaşım mühendislik modeli olarak raporlanır.')
+    }
   }
-  const controlling=checks.length?Math.min(qk,...checks.map(x=>x.qk)):qk,designQt=controlling/Math.max(resistanceFactor,1e-9),adequate=qo<=designQt&&Be>0&&Le>0
-  if(method==='TBDY-2018'&&Math.abs((i.resistanceFactor??1.4)-1.4)>1e-9)warnings.push('TBDY 2018 Tablo 16.2 yüzeysel temel için γRv=1.40 kullanılmalıdır.')
-  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: γ′ ve ağırlıklı γ kullanıldı.')
-  if(groundSlope>0)warnings.push('Arazi eğimi katsayıları Vesic tipi genel kabul görmüş bağıntılarla uygulanmıştır; β<φ′ koşulu kontrol edildi.')
-  if(baseSlope>0)warnings.push('Temel tabanı eğimi katsayıları Vesic tipi genel kabul görmüş bağıntılarla uygulanmıştır.')
-  if(foundationType==='radye')warnings.push('Radye temel için taşıma gücünün yanında toplam/farklı oturma ayrıca kontrol edilmelidir.')
+
+  const rf=method==='TBDY-2018'?i.resistanceFactor??1.4:1
+  if(rf<=0)throw new Error('Direnç katsayısı pozitif olmalıdır.')
+  if(method==='TBDY-2018'&&Math.abs(rf-1.4)>1e-9)warnings.push('TBDY 2018 Tablo 16.2 yüzeysel temel taşıma gücü için γRv=1.40 kullanılmalıdır.')
+  const ef=factors(representativePhi,method)
+  const qk=representativeC*ef.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+
+    water.surcharge*ef.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+
+    0.5*representativeGamma*Bp*ef.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
+  const qt=qk/rf
+  const qAvg=effectiveArea>0?N/(i.B*i.L):Infinity
+  const qo=effectiveArea>0?N/effectiveArea:Infinity
+  const pressureFactor=coreContact?1+6*Math.abs(ex)/i.B+6*Math.abs(ey)/i.L:Infinity
+  const pressureMinFactor=coreContact?1-6*Math.abs(ex)/i.B-6*Math.abs(ey)/i.L:-Infinity
+  const qMax=Number.isFinite(qAvg)&&coreContact?qAvg*pressureFactor:Infinity
+  const qMin=Number.isFinite(qAvg)&&coreContact?qAvg*pressureMinFactor: -Infinity
+  const utilization=qt>0?qo/qt:Infinity
+  let adequate=qo<=qt&&contactState!=='NO_CONTACT'&&(!i.layers||layeredComplete)
+  const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,mf,method)
+  checks.forEach(x=>x.controlling=false)
+  if(i.layers?.length&&layerData?.complete)warnings.push('Tabaka kontrolleri artık bağımsız min(qk) olarak tasarım direncine indirilmez; eşdeğer parametreli hesap ana sonucu, tabaka listesi ise izlenebilirlik kontrolüdür.')
+  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: sürşarj ve γ′/ağırlıklı γ dikkate alındı.')
+  if(groundSlope>0)warnings.push('Arazi eğimi katsayıları genel kabul görmüş Vesic tipi bağıntılarla uygulanmıştır; β<φ′ koşulu kontrol edildi.')
+  if(baseSlope>0)warnings.push('Temel tabanı eğimi katsayıları genel kabul görmüş Vesic tipi bağıntılarla uygulanmıştır.')
+  if(foundationType==='radye')warnings.push('Radye temel için taşıma gücünün yanında toplam ve farklı oturma ayrıca kontrol edilmelidir.')
   if(i.groundwaterDepth!=null&&i.groundwaterDepth<=i.Df&&i.undrainedCu==null)warnings.push('Temel YASS altında/aynı kotta ise deprem durumunda 16.8.4.6 gereği cu ile drenajsız kayma ayrıca gereklidir.')
+
   const steps:SurfaceFoundationStep[]=[
     {symbol:'ex/ey',title:'Yük eksantriklikleri',formula:'ex=My/N ; ey=Mx/N',value:Math.max(Math.abs(ex),Math.abs(ey)),unit:'m'},
-    {symbol:'B′/L′',title:'Etkin boyutlar',formula:'B′=B−2|ex| ; L′=L−2|ey|',value:Math.min(Be,Le),unit:'m'},
-    {symbol:'Nq/Nc/Nγ',title:'Taşıma gücü katsayıları',formula:'Nq=e^(πtanφ)tan²(45°+φ/2); Nc=(Nq−1)cotφ; Nγ=2(Nq−1)tanφ',value:f.Nq,note:method==='TBDY-2018'?'TBDY 2018 Denk. 16.8b':''},
+    {symbol:'B′/L′',title:'Taşıma gücü etkin boyutları',formula:'B′=B−2|ex| ; L′=L−2|ey|',value:Math.min(Be,Le),unit:'m',note:'Etkin boyutlar taşıma gücü hesabında kullanılır; temas basıncı dağılımı için qmax/qmin ayrı hesaplanır.'},
+    {symbol:'qavg',title:'Gerçek taban ortalama basıncı',formula:'qavg=N/(B·L)',value:qAvg,unit:'kPa'},
+    {symbol:'qmax/qmin',title:'Çekirdek içi temas basıncı zarfı',formula:'qmax/min=qavg[1±6|ex|/B±6|ey|/L]',value:qMax,unit:'kPa',note:coreContact?'İki eksenli doğrusal basınç dağılımı.':'Çekirdek dışı: kısmi temas; doğrusal tam temas zarfı uygulanmaz.'},
+    {symbol:'Nq/Nc/Nγ',title:'Taşıma gücü katsayıları',formula:'Nq=e^(πtanφ)tan²(45°+φ/2); Nc=(Nq−1)cotφ; Nγ=2(Nq−1)tanφ',value:ef.Nq,note:method==='TBDY-2018'?'TBDY 2018 Denk. 16.8b':''},
     {symbol:'s',title:'Şekil katsayıları',formula:'sc,sq,sγ',value:mf.sc},
     {symbol:'d',title:'Derinlik katsayıları',formula:'dc,dq,dγ',value:mf.dc},
     {symbol:'i',title:'Yük eğikliği katsayıları',formula:'ic,iq,iγ',value:mf.ic},
     {symbol:'g',title:'Arazi eğimi katsayıları',formula:'gc,gq,gγ',value:mf.gc},
     {symbol:'b',title:'Temel tabanı eğimi katsayıları',formula:'bc,bq,bγ',value:mf.bc},
-    {symbol:'qk',title:'Karakteristik taşıma gücü',formula:'cNcscdcicgc bc + qNqsqdqiqgq bq + 0.5γ′B′Nγsγdγiγgγbγ',value:controlling,unit:'kPa'},
-    {symbol:'qt',title:'Tasarım taşıma gücü',formula:'qt=qk/γRv',value:designQt,unit:'kPa'},
-    {symbol:'q0',title:'Temel tabanındaki tasarım basıncı',formula:'q0=N/(B′L′)',value:qo,unit:'kPa'},
-    {symbol:'η',title:'Kullanım oranı',formula:'η=q0/qt',value:qo/Math.max(designQt,1e-9)}
+    {symbol:'qk',title:'Karakteristik taşıma gücü',formula:'cNcscdcicgc bc + qNqsqdqiqgq bq + 0.5γ′B′Nγsγdγiγgγbγ',value:qk,unit:'kPa'},
+    {symbol:'qt',title:'Tasarım taşıma gücü',formula:'qt=qk/γRv',value:qt,unit:'kPa'},
+    {symbol:'q0',title:'Etkin alan ortalama basıncı',formula:'q0=N/(B′L′)',value:qo,unit:'kPa'},
+    {symbol:'η',title:'Taşıma gücü kullanım oranı',formula:'η=q0/qt',value:utilization}
   ]
-  const resultBase={
-    Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,...mf,surcharge:water.surcharge,gammaBelow:water.gammaBelow,ex,ey,Be,Le,effectiveArea,qk:controlling,qt:designQt,qo,utilization:qo/Math.max(designQt,1e-9),adequate,effectiveDepth:2*Bp,
-    representativeC:i.c,representativePhi:f.phi,representativeGamma:water.gammaBelow,ultimateClassical:qk,allowableClassical:qk/Math.max(i.safetyFactor??3,1e-9),
+
+  const value={Nq:ef.Nq,Nc:ef.Nc,Ngamma:ef.Ngamma,sc:mf.sc,sq:mf.sq,sg:mf.sg,dc:mf.dc,dq:mf.dq,dg:mf.dg,ic:mf.ic,iq:mf.iq,ig:mf.ig,gc:mf.gc,gq:mf.gq,gg:mf.gg,bc:mf.bc,bq:mf.bq,bg:mf.bg,surcharge:water.surcharge,gammaBelow:representativeGamma,ex,ey,Be,Le,effectiveArea,qk,qt,qo,utilization,adequate,effectiveDepth:2*Bp}
+  return{
+    Nq:ef.Nq,Nc:ef.Nc,Ngamma:ef.Ngamma,...mf,surcharge:water.surcharge,gammaBelow:representativeGamma,ex,ey,Be,Le,effectiveArea,qk,qt,qo,utilization,adequate,effectiveDepth:2*Bp,
+    qAvg,qMax,qMin,contactState,coreContact,
+    representativeC,representativePhi,representativeGamma,ultimateClassical:qk,allowableClassical:qk/Math.max(i.safetyFactor??3,1e-9),
     undrainedQk:i.undrainedCu!=null?i.undrainedCu*5.14*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge:undefined,
-    layeredScreeningOnly:checks.length>0,finalDesignEligible:checks.length===0,layerChecks:checks,warnings,method,foundationType
+    layeredScreeningOnly:Boolean(i.layers?.length),finalDesignEligible:!i.layers?.length||layeredComplete,
+    layerChecks:checks,warnings,method,foundationType,
+    source:'TBDY 2018 16.8.3.1–16.8.3.4; tabakalı zemin için 2B′ etki derinliğinde eşdeğer parametre mühendislik yaklaşımı; eğim katsayıları genel kabul görmüş Vesic tipi bağıntılar.',
+    steps,value
   }
-  return{...resultBase,source:'TBDY 2018 16.8.3.1–16.8.3.4; Denk. 16.8. Arazi ve temel tabanı eğimi katsayıları için genel kabul görmüş Vesic tipi bağıntılar kullanılır; tabakalı zemin kontrolü ayrıca raporlanır.',steps,value:{Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:mf.sc,sq:mf.sq,sg:mf.sg,dc:mf.dc,dq:mf.dq,dg:mf.dg,ic:mf.ic,iq:mf.iq,ig:mf.ig,gc:mf.gc,gq:mf.gq,gg:mf.gg,bc:mf.bc,bq:mf.bq,bg:mf.bg,surcharge:water.surcharge,gammaBelow:water.gammaBelow,ex,ey,Be,Le,effectiveArea,qk:controlling,qt:designQt,qo,utilization:qo/Math.max(designQt,1e-9),adequate,effectiveDepth:2*Bp}}
 }
