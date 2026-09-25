@@ -3,8 +3,7 @@ import { foundationChecks } from '../../core/calculations/engineering'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../core/engineering/liquefaction/liquefaction-profile'
 import { useProjectInfo } from '../../core/state/project-store'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
-import { deriveSptValues } from '../../core/engineering/field-calculations'
-import { forceFromBase, forceToBase, momentToBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
+import { forceToBase, momentToBase } from '../../core/units/project-units'
 import { Card, Frame, Metric, Source, type ScreenId } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
 
@@ -36,7 +35,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
   const [selected,setSelected]=useState(boreholes[0]?.id??'')
   const b=boreholes.find(x=>x.id===selected)??boreholes[0]
   const sds=p.seismic.sds
-  const validSpt=useMemo(()=>b?.spt.filter(x=>x.testType==='SPT'&&Number.isFinite(x.n2)&&Number.isFinite(x.n3)).sort((a,c)=>a.depth-c.depth)??[],[b])
+  const validSpt=useMemo(()=>b?[...b.spt].filter(x=>x.testType==='SPT'&&Number.isFinite(x.n2)&&Number.isFinite(x.n3)).sort((a,c)=>a.depth-c.depth):[],[b])
   const profileInput=useMemo(()=>{
     if(!b||b.groundwaterDepth==null||sds==null||p.seismic.magnitude==null||validSpt.length===0)return undefined
     const rows:LiquefactionSptRecord[]=validSpt.map(record=>{
