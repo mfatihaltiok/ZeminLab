@@ -43,14 +43,6 @@ function stressAtDepth(depth:number,layers:LiquefactionSoilLayer[],gwt:number,ga
   const u=Math.max(0,depth-gwt)*gammaW
   return{sigmaV,porePressure:u,sigmaVPrime:Math.max(.01,sigmaV-u),covered}
 }
-function rdAtDepth(z:number){
-  const d=Math.max(z,0)
-  if(d<=9.15)return 1-.00765*d
-  if(d<=23)return 1.174-.0267*d
-  if(d<=30)return .744-.008*d
-  return .50
-}
-function magnitudeCorrection(Mw:number){return Math.pow(10,2.24)/Math.pow(Math.max(Mw,.01),2.56)}
 function soilIsPotential(code:string,pi:number|undefined){
   const c=code.trim().toUpperCase().replace(/İ/g,'I')
   if(pi!=null&&pi>=12)return false
@@ -66,10 +58,10 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
   const gammaW=input.gammaW??ENGINEERING_CONSTANTS.gammaW
   if(!finite(gammaW)||gammaW<=0)throw new Error('Su birim hacim ağırlığı pozitif olmalıdır.')
   const CM=magnitudeCorrection(input.Mw),warnings:string[]=[]
+  const zfBlocked=input.soilGroup==='ZF'&&input.siteSpecificResponseAnalysisCompleted!==true
   const scopeComplete=input.dts!==undefined&&input.soilGroup!==undefined&&input.continuousOrThickLens!==undefined
   const mandatoryByProject=scopeComplete&&!zfBlocked&&mandatoryDts(input.dts)&&mandatorySoilGroup(input.soilGroup)&&input.continuousOrThickLens===true
   if(!scopeComplete)warnings.push('DTS, TBDY zemin grubu ve/veya 16.6.1 sürekli tabaka/kalın mercek doğrulaması eksik; sıvılaşma zorunluluğu kesinleştirilemedi.')
-  const zfBlocked=input.soilGroup==='ZF'&&input.siteSpecificResponseAnalysisCompleted!==true
   if(input.soilGroup==='ZF')warnings.push(zfBlocked?'ZF için saha özel zemin davranış analizi tamamlanmadan sonuç üretilmez.':'ZF saha özel zemin davranış analizi tamamlandı.')
   const rows=input.spt.filter(x=>finite(x.depth)&&x.depth>=0).sort((a,b)=>a.depth-b.depth).map((record):LiquefactionProfileRow=>{
     const layer=input.layers.find(l=>record.depth>=l.top&&record.depth<l.bottom)
