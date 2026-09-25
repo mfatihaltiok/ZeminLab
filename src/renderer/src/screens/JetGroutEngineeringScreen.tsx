@@ -28,7 +28,7 @@ export function JetGroutEngineeringScreen(){
       EsSoil:Number(soilEs)>0?modulusToBase(Number(soilEs),p.unitSystem):undefined,EsColumn:Number(columnEs)>0?modulusToBase(Number(columnEs),p.unitSystem):undefined,soilPoissonRatio:Number(nu)>0?Number(nu):undefined,
       load:projectLoad>0?projectLoad:undefined,foundationArea:projectArea>0?projectArea:undefined,
       foundationThickness:Number(thickness)>0?Number(thickness):undefined,
-      columnFrictionAngle:Number(phi)>0?Number(phi):undefined,cohesion:Number(c)>0?Number(c):undefined,
+      columnFrictionAngle:Number(phi)>0?Number(phi):undefined,cohesion:Number(c)>0?stressToBase(Number(c),p.unitSystem):undefined,
       frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH
     })
   },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,phi,c,angle,nu,projectLoad,projectArea,projectH,p.unitSystem])
@@ -49,7 +49,7 @@ export function JetGroutEngineeringScreen(){
       <Field label="İyileştirme kalınlığı H (m)" value={thickness} onChange={v=>set('foundationThickness',num(v))}/>
       <Field label="Kolon φ (°)" value={phi} onChange={v=>set('columnFrictionAngle',num(v))}/>
       <Field label={"Arayüz c′ ("+projectUnits(p.unitSystem).stress+")"} value={c} onChange={v=>set('interfaceCohesion',num(v))}/>
-      <Field label="Arayüz φ′ (°)" value={angle} onChange={v=>set('interfaceFrictionAngle',num(v))}/>
+      <Field label="Arayüz φ′ (°)" value={angle} onChange={v=>set('interfaceFrictionAngle',num(v))}/><Field label="Zemin ν (0–0.49)" value={nu} onChange={v=>set('soilPoissonRatio',num(v))}/>
       <Metric label="Temel alanı" value={projectArea.toFixed(2)} unit="m²"/>
       <Metric label="G+Q" value={forceFromBase(projectLoad,p.unitSystem).toFixed(2)} unit={projectUnits(p.unitSystem).force}/>
       <Metric label="H" value={forceFromBase(projectH,p.unitSystem).toFixed(2)} unit={projectUnits(p.unitSystem).force}/>
