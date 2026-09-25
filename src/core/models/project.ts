@@ -6,6 +6,21 @@ export type BuildingUseClass=1|2|3
 export type EarthquakeDesignClass='1'|'1a'|'2'|'2a'|'3'|'3a'|'4'|'4a'
 
 export interface ProjectVisualDocuments{aerialPhoto?:string;layoutPlan?:string;architecturalSection?:string;foundationPlan?:string;foundationStress?:string}
+export interface JetGroutProjectParameters{
+  columnDiameter?:number
+  spacing?:number
+  layout?:'square'|'triangular'
+  qSoil?:number
+  qColumn?:number
+  cSoil?:number
+  cColumn?:number
+  EsSoil?:number
+  EsColumn?:number
+  foundationThickness?:number
+  columnFrictionAngle?:number
+  interfaceCohesion?:number
+  interfaceFrictionAngle?:number
+}
 export interface GeophysicalParameters{vs30?:number;soilGroup?:'ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF';soilGroupSource?:'VS30'|'USER'|'SITE_SPECIFIC';siteSpecificResponseAnalysisCompleted?:boolean;source?:string;notes?:string}
 export interface SeismicParameters{
   ss?:number;s1?:number;fs?:number;f1?:number;sds?:number;sd1?:number;ta?:number;tb?:number;tl?:number;magnitude?:number
@@ -46,7 +61,7 @@ export interface FoundationParameters{
 export interface ProjectInfo{
   id:string;title:string;projectNo:string;date:string;location:string;province:string;district:string;address:string;parcelInfo:string;pafta:string;ada:string;parsel:string;zoningStatus:string
   engineer:string;clientName:string;firmName:string;buildingType:string;basementCount:number;normalFloorCount:number;unitSystem:UnitSystem
-  geophysical:GeophysicalParameters;seismic:SeismicParameters;soilParameters:SoilParameters;foundationParameters:FoundationParameters;visualDocuments:ProjectVisualDocuments
+  geophysical:GeophysicalParameters;seismic:SeismicParameters;soilParameters:SoilParameters;foundationParameters:FoundationParameters;jetGrout:JetGroutProjectParameters;visualDocuments:ProjectVisualDocuments
 }
 
 export const defaultProjectInfo:ProjectInfo={
@@ -59,6 +74,7 @@ export const defaultProjectInfo:ProjectInfo={
     foundationType:'tekil',footingWidth:0,footingLength:0,footingDepth:0,safetyFactor:3,verticalLoad:0,horizontalLoad:0,momentX:0,momentY:0,
     resistanceFactorRv:1.4,vtX:0,vtY:0,structuralWeight:0,baseFrictionTanDelta:0.6,passiveResistanceCharacteristic:0,usePassiveResistance:false
   },
+  jetGrout:{layout:'square'},
   visualDocuments:{}
 }
 
@@ -105,6 +121,7 @@ export function normalizeProjectInfo(value:Partial<ProjectInfo>):ProjectInfo{
     seismic:{...seismic,sds,sd1,dts},
     soilParameters:{...soil,classification:{...defaultProjectInfo.soilParameters.classification,...(soil.classification??{})}},
     foundationParameters:{...foundation,foundationType,structuralWeight,verticalLoad:structuralWeight},
+    jetGrout:{...defaultProjectInfo.jetGrout,...(value.jetGrout??{})},
     visualDocuments:value.visualDocuments??{}
   }
 }
