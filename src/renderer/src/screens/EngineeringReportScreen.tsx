@@ -137,8 +137,8 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
 
       {liquidations.map(({borehole,result})=><Section key={borehole.id} title={'Sıvılaşma · '+borehole.name} landscape>
         {result?<><div className="report-metrics"><div><span>DTS</span><b>{p.seismic.dts||'—'}</b></div><div><span>YASS</span><b>{fmt(borehole.groundwaterDepth)} m</b></div><div><span>Zorunluluk</span><b>{result.mandatoryByProject?'EVET':'Koşula bağlı'}</b></div></div>
-          <Table head={['z','Zemin','FC%','PI','σ′v','N60','(N1)60','(N1)60f','CRR7.5','FS','Durum']}>
-            {result.rows.map((r,i)=><tr key={i}><td>{fmt(r.depth)}</td><td>{r.soil||'—'}</td><td>{fmt(r.fineContent,1)}</td><td>{fmt(r.plasticityIndex,1)}</td><td>{fmt(r.sigmaVPrime,1)}</td><td>{fmt(r.n60)}</td><td>{fmt(r.n1_60)}</td><td>{fmt(r.n1_60f)}</td><td>{fmt(r.crrM75,3)}</td><td>{fmt(r.FS,3)}</td><td>{r.status}</td></tr>)}
+          <Table head={['z','Zemin','FC%','PI','σ′v','N60','(N1)60','(N1)60f','CRR7.5','FS','Sonuç']}>
+            {result.rows.map((r,i)=><tr key={i}><td>{fmt(r.depth)}</td><td>{r.soil||'—'}</td><td>{fmt(r.fineContent,1)}</td><td>{fmt(r.plasticityIndex,1)}</td><td>{fmt(r.sigmaVPrime,1)}</td><td>{fmt(r.n60)}</td><td>{fmt(r.n1_60)}</td><td>{fmt(r.n1_60f)}</td><td>{fmt(r.crrM75,3)}</td><td>{fmt(r.FS,3)}</td><td>{r.conclusion}</td></tr>)}
           </Table>{info('Uyarılar',result.warnings.join(' ')||'Yok')}</>:info('Sonuç','Bu sondaj için YASS/SDS/Mw veya SPT verisi eksik.')}
       </Section>)}
 
