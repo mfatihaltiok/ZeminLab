@@ -137,7 +137,7 @@ function LaboratoryGrid({ borehole, labs, onChange, projectUnitSystem }: { boreh
   const update = (row: LaboratoryRecord, key: keyof LaboratoryRecord, raw: string) => {
     const inputValue = raw === '' ? undefined : LAB_NUMERIC.includes(key) ? Number(raw) : raw
     const engineeringField: LaboratoryEngineeringField | undefined = key === 'unitWeight' ? 'unitWeight' : key === 'directShearC' || key === 'c' ? 'cohesion' : key === 'uuC' ? 'uuC' : key === 'elasticModulus' ? 'elasticModulus' : undefined
-    const value = typeof inputValue === 'number' && engineeringField ? laboratoryValueToBase(engineeringField,inputValue,projectUnitSystem) : inputValue
+    const value = typeof inputValue === 'number' && engineeringField ? laboratoryValueFromBase(engineeringField,laboratoryValueToBase(engineeringField,inputValue,projectUnitSystem),row.unitSystem) : inputValue
     const next = {...row,[key]:value} as LaboratoryRecord
     if (key==='liquidLimit' || key==='plasticLimit') next.plasticityIndex = next.liquidLimit !== undefined && next.plasticLimit !== undefined ? next.liquidLimit-next.plasticLimit : undefined
     next.soilDescription = next.soilCode ? soilMap.get(next.soilCode)?.description : next.soilDescription
