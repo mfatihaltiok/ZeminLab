@@ -23,11 +23,11 @@ export interface SptEngineResult{
 function finitePositive(value:number|undefined){return value!==undefined&&Number.isFinite(value)&&value>0}
 
 function resolveEnergyRatio(input:SptEngineInput){
-  if(finitePositive(input.energyRatio))return {value:input.energyRatio!,source:'ölçülmüş/girilen enerji oranı'}
-  if(input.hammerType==='automatic')return {value:80,source:'otomatik şahmerdan varsayılan %80'}
-  if(input.hammerType==='donut')return {value:45,source:'donut şahmerdan varsayılan %45'}
-  if(input.hammerType==='safety')return {value:60,source:'safety şahmerdan varsayılan %60'}
-  return {value:60,source:'enerji oranı girilmedi; %60 proje varsayılanı'}
+  if(finitePositive(input.energyRatio))return {value:input.energyRatio!,source:'ölçülmüş/girilen enerji oranı',assumption:false}
+  if(input.hammerType==='automatic')return {value:80,source:'otomatik şahmerdan için proje varsayımı %80',assumption:true}
+  if(input.hammerType==='donut')return {value:45,source:'donut şahmerdan için proje varsayımı %45',assumption:true}
+  if(input.hammerType==='safety')return {value:60,source:'safety şahmerdan için proje varsayımı %60',assumption:true}
+  return {value:60,source:'enerji oranı girilmedi; %60 proje varsayımı',assumption:true}
 }
 
 function boreholeFactor(diameter?:number){
@@ -69,7 +69,7 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const warnings:string[]=[]
   const er=resolveEnergyRatio(input)
   if(er.value<=0||er.value>100)throw new Error('SPT enerji oranı %0–100 arasında olmalıdır.')
-  if(input.energyRatio===undefined)warnings.push(er.source)
+  if(er.assumption)warnings.push('CE için kullanılan enerji oranı TBDY Tablo 16B.1 içindeki olası aralıktan seçilmiş bir proje varsayımıdır; ölçülmüş ER varsa girilmelidir. '+er.source)
   const ce=er.value/60
   const cb=boreholeFactor(input.boreholeDiameterMm)
   const cs=samplerFactor(input)
