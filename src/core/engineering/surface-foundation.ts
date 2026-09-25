@@ -154,7 +154,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=0))throw new Error('YASS tanımlandıysa γsat pozitif olmalıdır.')
   if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük negatif olamaz.')
   if(!finite(i.phi)||i.phi<0||i.phi>50)throw new Error('φ 0° ile 50° arasında olmalıdır.')
-  const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad,H=Math.hypot(i.horizontalLoad??0,0)
+  const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad
   const Vh=Math.abs(i.horizontalLoad??0)
   const groundSlope=Math.abs(i.groundSlope??0),baseSlope=Math.abs(i.baseSlope??0)
   if(groundSlope>=90||baseSlope>=90||groundSlope+baseSlope>=90)throw new Error('Arazi ve temel tabanı eğimleri geçersiz.')
