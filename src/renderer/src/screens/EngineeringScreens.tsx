@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { foundationChecks } from '../../core/calculations/engineering'
-import { liquefactionProfile, type LiquefactionSptRecord } from '../../core/engineering/liquefaction/liquefaction-profile'
+import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { useProjectInfo } from '../../core/state/project-store'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
 import { forceToBase, momentToBase } from '../../core/units/project-units'
