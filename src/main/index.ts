@@ -28,7 +28,11 @@ app.whenReady().then(()=>{
 
   const writeProjectFile=async(filePath:string,payload:unknown)=>{
     const envelope={format:'FALUZMN',version:PROJECT_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:payload}
-    await fs.writeFile(filePath,JSON.stringify(envelope,null,2),'utf8')
+    const directory=join(filePath,'..')
+    const tempPath=filePath+'.tmp'
+    await fs.mkdir(directory,{recursive:true})
+    await fs.writeFile(tempPath,JSON.stringify(envelope,null,2),'utf8')
+    await fs.rename(tempPath,filePath)
     return filePath
   }
 
@@ -56,7 +60,8 @@ app.whenReady().then(()=>{
     if(result.canceled||!result.filePaths[0])return null
     const filePath=result.filePaths[0]
     const raw=await fs.readFile(filePath,'utf8')
-    const envelope=JSON.parse(raw) as {format?:string;version?:number;data?:unknown}
+    let envelope:{format?:string;version?:number;data?:unknown}
+    try{envelope=JSON.parse(raw) as {format?:string;version?:number;data?:unknown>}catch{throw new Error('FALUZMN proje dosyası geçerli JSON değil veya bozulmuş.')}
     if(envelope.format!=='FALUZMN'||typeof envelope.version!=='number'||envelope.data===undefined)throw new Error('Geçersiz veya desteklenmeyen FALUZMN proje dosyası.')
     if(envelope.version>PROJECT_SCHEMA_VERSION)throw new Error(`Bu proje dosyası daha yeni bir FALUZMN sürümüne ait (v${envelope.version}).`)
     return{filePath,data:envelope.data,version:envelope.version}
