@@ -153,7 +153,7 @@ export const SOURCE_NOTES={
   investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',
   liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',
   bearing:'TBDY 2018 Bölüm 16.8.2–16.8.3; klasik yöntemler Terzaghi, Meyerhof, Hansen ve Vesic.',
-  settlement:'TBDY 2018 Bölüm 16.7.3.4 ve 16.8.3.4; yöntem kaynakları ayrıca raporlanır.',
+  settlement:'TBDY 2018 Bölüm 16.8.3.4; oturma yöntemi ayrıca kaynaklandırılmalı ve deprem/liquefaction oturması ayrı değerlendirilmelidir.',
   foundation:'TBDY 2018 16.7.3.3 ve 16.8.4; γRv=1.40, γRh=1.10, γRp=1.40.',
   jetGroutAdvanced:'Jet Grout kompozit yaklaşımı; proje deneyleri ve kalite kontrol ile doğrulanmalıdır.'
 }
