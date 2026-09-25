@@ -49,7 +49,6 @@ function rdAtDepth(z:number){
   if(d<=30)return .744-.008*d
   return .50
 }
-function magnitudeCorrection(Mw:number){return Math.pow(10,2.24)/Math.pow(Math.max(Mw,.01),2.56)}
 function soilIsPotential(code:string,pi:number|undefined){
   const c=code.trim().toUpperCase().replace(/İ/g,'I')
   if(pi!=null&&pi>=12)return false
@@ -64,7 +63,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
   if(!finite(input.gwt)||input.gwt<0)throw new Error('Sıvılaşma değerlendirmesi için geçerli YASS gerekir.')
   const gammaW=input.gammaW??9.81
   if(!finite(gammaW)||gammaW<=0)throw new Error('Su birim hacim ağırlığı pozitif olmalıdır.')
-  const CM=magnitudeCorrection(input.Mw),warnings:string[]=[]
+  const warnings:string[]=[]
   const scopeComplete=input.dts!==undefined&&input.soilGroup!==undefined&&input.continuousOrThickLens!==undefined
   const mandatoryByProject=scopeComplete&&mandatoryDts(input.dts)&&mandatorySoilGroup(input.soilGroup)&&input.continuousOrThickLens===true
   if(!scopeComplete)warnings.push('DTS, TBDY zemin grubu ve/veya 16.6.1 sürekli tabaka/kalın mercek doğrulaması eksik; sıvılaşma zorunluluğu kesinleştirilemedi.')
