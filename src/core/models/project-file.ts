@@ -87,8 +87,9 @@ export function migrateProjectData(value: unknown, version: number): ProjectDocu
   const rawProject = object(root.projectInfo)
   if (!rawProject) throw new Error('FALUZMN proje bilgileri eksik.')
   const projectInfo = normalizeProjectInfo(rawProject as Partial<ProjectInfo>)
-  const boreholes = (Array.isArray(root.boreholes) ? structuredClone(root.boreholes) : []) as BoreholeRecord[]
-  const labs = (Array.isArray(root.labs) ? structuredClone(root.labs) : []) as LaboratoryRecord[]
+  if (!Array.isArray(root.boreholes) || !Array.isArray(root.labs)) throw new Error('FALUZMN saha verileri eksik veya bozuk.')
+  const boreholes = structuredClone(root.boreholes) as BoreholeRecord[]
+  const labs = structuredClone(root.labs) as LaboratoryRecord[]
   const boreholeIds = validateBoreholes(boreholes, projectInfo.unitSystem)
   const labIds = validateLabs(labs, boreholeIds, projectInfo.unitSystem)
   const sptIds = new Set(boreholes.flatMap(x => x.spt.map(s => s.id)))

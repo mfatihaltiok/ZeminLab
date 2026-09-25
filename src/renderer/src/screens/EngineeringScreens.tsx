@@ -56,7 +56,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
       Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:l.unitWeight!=null?unitWeightToBase(l.unitWeight,b.unitSystem):0,gammaSat:l.saturatedUnitWeight!=null?unitWeightToBase(l.saturatedUnitWeight,b.unitSystem):l.unitWeight!=null?unitWeightToBase(l.unitWeight,b.unitSystem):0,soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex,clayContent:undefined})),
       spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth,siteSpecificResponseAnalysisCompleted:p.geophysical.siteSpecificResponseAnalysisCompleted
     })
-  },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,validSpt])
+  },[b,labs,p.seismic.magnitude,p.seismic.dts,p.geophysical.soilGroup,p.geophysical.siteSpecificResponseAnalysisCompleted,p.soilParameters.liquefactionContinuousOrThickLens,p.foundationParameters.footingDepth,sds,validSpt])
 
   return <Frame screen="liquefaction">
     <Source>{SOURCE_NOTES.liquefaction} 16.6.1 kapsam koşulları, 16.6.2–16.6.6 tetiklenme koşulları ve Ek 16B hesabı aynı sonuç zincirinde gösterilir.</Source>
@@ -76,7 +76,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
 export function Foundation(){
   const p=useProjectInfo(),f=p.foundationParameters,soil=p.soilParameters
   const N=forceToBase(f.structuralWeight,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
-  const ready=f.footingWidth>0&&f.footingLength>0&&N>=0&&f.baseFrictionTanDelta!=null&&Number.isFinite(f.baseFrictionTanDelta)&&f.baseFrictionTanDelta>=0
+  const ready=f.footingWidth>0&&f.footingLength>0&&N>=0&&f.baseFrictionTanDelta!=null&&Number.isFinite(f.baseFrictionTanDelta)&&f.baseFrictionTanDelta>=0&&f.baseFrictionTanDelta!=null&&Number.isFinite(f.baseFrictionTanDelta)&&f.baseFrictionTanDelta>=0
   const r=ready?foundationChecks({
     B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,
     deltaTan:f.baseFrictionTanDelta!,cu:soil.undrainedCohesion,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,

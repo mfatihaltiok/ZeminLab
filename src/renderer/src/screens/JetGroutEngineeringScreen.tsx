@@ -17,7 +17,7 @@ export function JetGroutEngineeringScreen(){
   const set=(key:keyof typeof j,value:number|undefined|string)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
   const displayStress=(v?:number)=>v==null?'':stressFromBase(v,p.unitSystem).toString(),displayModulus=(v?:number)=>v==null?'':modulusFromBase(v,p.unitSystem).toString(),d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=displayStress(j.qSoil),column=displayStress(j.qColumn)
   const soilEs=displayModulus(j.EsSoil),columnEs=displayModulus(j.EsColumn),soilC=displayStress(j.cSoil),columnC=displayStress(j.cColumn)
-  const thickness=j.foundationThickness?.toString()??'',soilNu,normalStress=displayStress(j.interfaceNormalStress)=j.soilPoissonRatio?.toString()??'',phi=j.columnFrictionAngle?.toString()??'',c=j.interfaceCohesion?.toString()??'',angle=j.interfaceFrictionAngle?.toString()??''
+  const thickness=j.foundationThickness?.toString()??'',soilNu=j.soilPoissonRatio?.toString()??'',normalStress=displayStress(j.interfaceNormalStress),phi=j.columnFrictionAngle?.toString()??'',c=j.interfaceCohesion?.toString()??'',angle=j.interfaceFrictionAngle?.toString()??''
   const layout=j.layout??'square'
   const ready=[d,spacing,soil,column].every(x=>x!==''&&Number.isFinite(Number(x))&&Number(x)>0)&&Number.isFinite(Number(soilNu))&&Number(soilNu)>-1&&Number(soilNu)<.5
   const r=useMemo(()=>{
