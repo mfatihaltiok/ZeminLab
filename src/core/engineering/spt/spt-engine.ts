@@ -22,7 +22,12 @@ export function fineContentCorrection(fines:number){if(!Number.isFinite(fines))t
 export function calculateSpt(input:SptEngineInput):SptEngineResult{
   if(!Number.isFinite(input.nField)||input.nField<0)throw new Error('SPT N değeri geçerli olmalıdır.')
   const warnings:string[]=[];const trace:SptTraceStep[]=[{symbol:'N',title:'Ham SPT',formula:'N=N₂+N₃',value:input.nField,note:'Sahada ölçülen 30 cm penetrasyon vuruş sayısı.'}]
-  const er=input.energyRatio!==undefined&&Number.isFinite(input.energyRatio)&&input.energyRatio>0&&input.energyRatio<=160?input.energyRatio:undefined
+  const rawEr=input.energyRatio
+  let er: number|undefined = rawEr!==undefined&&Number.isFinite(rawEr)&&rawEr>0&&rawEr<=160?rawEr:undefined
+  if(er!==undefined&&input.hammerType==='donut'&&(er<45||er>100)) throw new Error('Halkalı/donut tokmak için ER 45–100 % aralığında olmalıdır.')
+  if(er!==undefined&&input.hammerType==='safety'&&(er<60||er>117)) throw new Error('Güvenli/safety tokmak için ER 60–117 % aralığında olmalıdır.')
+  if(er!==undefined&&input.hammerType==='automatic'&&(er<90||er>160)) throw new Error('Otomatik tokmak için ER 90–160 % aralığında olmalıdır.')
+  if(rawEr!==undefined&&!Number.isFinite(rawEr)) er=undefined
   if(er===undefined)warnings.push('ER (enerji oranı) girilmeden CE hesaplanmaz; hammerType tek başına sayısal CE üretmez.')
   const cb=boreholeFactor(input.boreholeDiameterMm);if(cb===undefined)warnings.push('Sondaj çapı bilinmiyor; CB hesaplanmadı.')
   const cs=samplerFactor(input.sampler,input.samplerCorrection);if(cs===undefined)warnings.push('Numune alıcı tipi seçilmedi; CS hesaplanmadı.')
