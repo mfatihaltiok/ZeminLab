@@ -3,7 +3,7 @@ import { foundationChecks } from '../../core/calculations/engineering'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { useProjectInfo } from '../../core/state/project-store'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
-import { forceToBase, momentToBase } from '../../core/units/project-units'
+import { forceToBase, forceFromBase, momentToBase, stressToBase, projectUnits } from '../../core/units/project-units'
 import { Card, Frame, Metric, Source, type ScreenId } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
 
@@ -84,8 +84,8 @@ export function Foundation(){
   }):undefined
   return <Frame screen="foundation"><Source>{SOURCE_NOTES.foundation} TBDY 16.8.4 yatay kayma kontrolü; 16.8.4.6 YASS altında depremde Cu yaklaşımı uygulanır.</Source>
     {!r?<Card title="TEMEL VERİSİ BEKLENİYOR"><div className="inline-empty">B, L ve yapı yükü girilmelidir.</div></Card>:
-      <><div className="metric-strip"><Metric label="B" value={f.footingWidth.toFixed(2)} unit="m"/><Metric label="L" value={f.footingLength.toFixed(2)} unit="m"/><Metric label="Vtx" value={Vx.toFixed(2)} unit="kN"/><Metric label="Vty" value={Vy.toFixed(2)} unit="kN"/><Metric label="Rth+0.3Rpt" value={r.slidingCapacityX.toFixed(2)} unit="kN"/><Metric label="Durum" value={r.evaluable&&r.slidingSafeX&&r.slidingSafeY?'YETERLİ':'KONTROL GEREKLİ'}/></div>
-        <Card title="TBDY 2018 16.8.4"><div className="table-wrap"><table><thead><tr><th>Kontrol</th><th>Değer</th><th>Oran</th><th>Durum</th></tr></thead><tbody><tr><td>X</td><td>{Vx.toFixed(2)} / {r.slidingCapacityX.toFixed(2)}</td><td>{r.slidingUtilizationX.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeX?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr><tr><td>Y</td><td>{Vy.toFixed(2)} / {r.slidingCapacityY.toFixed(2)}</td><td>{r.slidingUtilizationY.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeY?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr></tbody></table></div><div className="engineering-note">Rth={r.slidingCapacityX.toFixed(2)} kN · Rpt={r.passiveResistanceDesign.toFixed(2)} kN · mod={r.slidingMode}</div></Card>
+      <><div className="metric-strip"><Metric label="B" value={f.footingWidth.toFixed(2)} unit="m"/><Metric label="L" value={f.footingLength.toFixed(2)} unit="m"/><Metric label="Vtx" value={forceFromBase(Vx,p.unitSystem).toFixed(2)} unit={projectUnits(p.unitSystem).force}/><Metric label="Vty" value={forceFromBase(Vy,p.unitSystem).toFixed(2)} unit={projectUnits(p.unitSystem).force}/><Metric label="Rth+0.3Rpt" value={forceFromBase(r.slidingCapacityX,p.unitSystem).toFixed(2)} unit={projectUnits(p.unitSystem).force}/><Metric label="Durum" value={r.evaluable&&r.slidingSafeX&&r.slidingSafeY?'YETERLİ':'KONTROL GEREKLİ'}/></div>
+        <Card title="TBDY 2018 16.8.4"><div className="table-wrap"><table><thead><tr><th>Kontrol</th><th>Değer</th><th>Oran</th><th>Durum</th></tr></thead><tbody><tr><td>X</td><td>{forceFromBase(Vx,p.unitSystem).toFixed(2)} / {forceFromBase(r.slidingCapacityX,p.unitSystem).toFixed(2)}</td><td>{r.slidingUtilizationX.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeX?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr><tr><td>Y</td><td>{forceFromBase(Vy,p.unitSystem).toFixed(2)} / {forceFromBase(r.slidingCapacityY,p.unitSystem).toFixed(2)}</td><td>{r.slidingUtilizationY.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeY?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr></tbody></table></div><div className="engineering-note">Rth={forceFromBase(r.slidingCapacityX,p.unitSystem).toFixed(2)} {projectUnits(p.unitSystem).force} · Rpt={forceFromBase(r.passiveResistanceDesign,p.unitSystem).toFixed(2)} {projectUnits(p.unitSystem).force} · mod={r.slidingMode}</div></Card>
         {r.warnings.length>0&&<Card title="UYARILAR"><div className="inline-empty">{r.warnings.join(' ')}</div></Card>}</>}
   </Frame>
 }
