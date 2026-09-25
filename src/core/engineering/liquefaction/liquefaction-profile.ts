@@ -1,4 +1,4 @@
-import { calculateSpt, fineContentCorrection, isCohesionlessSoilCode, type SptEngineInput, type SptTraceStep } from '../spt/spt-engine'
+import { calculateSpt, fineContentCorrection, soilBehaviorFromCode, type SptEngineInput, type SptTraceStep } from '../spt/spt-engine'
 import type { EarthquakeDesignClass } from '../../models/project'
 
 export type LiquefactionSoilGroup='ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF'
@@ -36,10 +36,7 @@ function stressAtDepth(depth:number,layers:LiquefactionSoilLayer[],gwt:number,ga
 }
 function rdAtDepth(z:number){const d=Math.max(z,0);return d<=9.15?1-.00765*d:d<=23?1.174-.0267*d:d<=30?.744-.008*d:.5}
 function magnitudeCorrection(Mw:number){return Math.pow(10,2.24)/Math.pow(Mw,2.56)}
-function soilIsPotential(code:string,pi:number|undefined){
- const c=code.trim().toUpperCase().replace(/İ/g,'I');if(pi!=null&&pi>=12)return false
- return c==='SA'||c==='GRSA'||c==='SISA'||c==='CLSA'||c==='SM'||c==='SI'||c==='ML'||c==='SP'||c==='SW'||c.includes('KUM')||c.includes('SAND')
-}
+function soilIsPotential(code:string,pi:number|undefined){if(pi!=null&&pi>=12)return false;return soilBehaviorFromCode(code)==='cohesionless'}
 function mandatoryDts(dts:EarthquakeDesignClass|undefined){return dts==='1'||dts==='1a'||dts==='2'||dts==='2a'}
 function mandatorySoilGroup(group:LiquefactionSoilGroup|undefined){return group==='ZD'||group==='ZE'||group==='ZF'}
 function exceptionDts4(dts:EarthquakeDesignClass|undefined,pi?:number,clay?:number,fines?:number,n1?:number){
@@ -60,7 +57,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
  const rows=input.spt.filter(x=>finite(x.depth)&&x.depth>=0).sort((a,b)=>a.depth-b.depth).map((record):LiquefactionProfileRow=>{
   const layer=input.layers.find(l=>record.depth>=l.top&&record.depth<l.bottom),stress=stressAtDepth(record.depth,input.layers,input.gwt,gammaW),soil=record.soil??layer?.soil
   const fineContent=record.fineContent??layer?.finesContent,pi=record.plasticityIndex??layer?.plasticityIndex,clayContent=record.clayContent??layer?.clayContent,waterContent=record.waterContent
-  const behavior=isCohesionlessSoilCode(soil),npt=finite(stress.sigmaVPrime)&&stress.sigmaVPrime>0?calculateSpt({nField:record.nField,energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM,effectiveStress:stress.sigmaVPrime,fineContent,soilBehavior:behavior?'cohesionless':'unknown',applyOverburden:true,applyDilatancy:false}):calculateSpt({nField:record.nField,energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM,effectiveStress:undefined,fineContent,soilBehavior:behavior?'cohesionless':'unknown',applyOverburden:false,applyDilatancy:false})
+  const behavior=soilBehaviorFromCode(soil),npt=finite(stress.sigmaVPrime)&&stress.sigmaVPrime>0?calculateSpt({nField:record.nField,energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM,effectiveStress:stress.sigmaVPrime,fineContent,soilBehavior:behavior,applyOverburden:true,applyDilatancy:false}):calculateSpt({nField:record.nField,energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM,effectiveStress:undefined,fineContent,soilBehavior:behavior?'cohesionless':'unknown',applyOverburden:false,applyDilatancy:false})
   const saturated=record.depth>input.gwt+1e-9,within20=record.depth<=20+1e-9,belowFoundation=record.depth>(input.foundationDepth??0)+1e-9,potentiallyLiquefiable=saturated&&within20&&belowFoundation&&soilIsPotential(soil??'',pi),exemption=exceptionDts4(input.dts,pi,clayContent,fineContent,npt.n1_60)
   const mandatoryAnalysis=potentiallyLiquefiable&&mandatoryByProject&&!exemption,researchDataComplete=fineContent!=null&&pi!=null&&waterContent!=null,n1Valid=npt.n1_60!=null&&Number.isFinite(npt.n1_60)
   const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired:false,postLiquefactionRequired:false}
