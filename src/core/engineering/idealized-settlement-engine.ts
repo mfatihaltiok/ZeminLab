@@ -11,10 +11,10 @@ type SettlementLayerResult={
 }
 export interface IdealizedSettlementInput{
   profile:IdealizedSoilProfile;method:IdealizedSettlementMethod;B:number;L:number;Df:number;qGross:number;groundwaterDepth?:number;verticalLoad?:number;momentX?:number;momentY?:number
-  foundationType?:FoundationType;timeYears?:number;burlandNTrend?:BurlandNTrend;burlandSoftLayerBottomDepth?:number;burlandState?:'NC'|'OC';burlandPreconsolidationPressure?:number
+  foundationType?:FoundationType;timeYears?:number;burlandNTrend?:BurlandNTrend;burlandState?:'NC'|'OC';burlandPreconsolidationPressure?:number
 }
 export interface IdealizedSettlementResult{
-  method:IdealizedSettlementMethod;layers:SettlementLayerResult[];totalImmediate:number;totalConsolidation:number;totalSettlement:number
+  method:IdealizedSettlementMethod;layers:SettlementLayerResult[];totalImmediate:number;totalConsolidation:number;totalSettlement:number;grossFoundationPressure:number
   influenceDepth:number;netFoundationPressure:number;foundationEffectiveStress:number;effectiveB:number;effectiveL:number;foundationArea:number;ready:boolean;warnings:string[];source:string
 }
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
@@ -55,7 +55,7 @@ function adjustedBurlandN(layer:IdealizedSoilLayer,midDepth:number,gwt:number){
   else if(gwt>=0&&midDepth>=gwt&&fineSand&&n>15)n=15+.5*(n-15)
   return n
 }
-function burlandInfluenceDepth(B:number,trend:BurlandNTrend,softLayerBottomDepth?:number,Df=0){const zi=1.4*Math.pow(B/.3,.75)*.3;if(trend==='decreasing'){if(!finite(softLayerBottomDepth)||softLayerBottomDepth!<=Df)return 2*B;return Math.min(2*B,softLayerBottomDepth!-Df)}return zi}
+function burlandInfluenceDepth(B:number,trend:BurlandNTrend){const zi=1.4*Math.pow(B/.3,.75)*.3;return trend==='decreasing'?2*B:zi}
 function burlandSettlementTotal(qNet:number,B:number,L:number,avgN:number,zI: number,state:'NC'|'OC',pc?:number){
   const Br=.3,ratio=L/Math.max(B,1e-9),Cs=Math.pow((1.25*ratio)/(ratio+.25),2),Ic=state==='NC'?1.71/Math.pow(avgN,1.4):.57/Math.pow(avgN,1.4)
   const qb=state==='NC'?.14*(qNet/100)*Br*Math.pow(B/Br,.7):qNet<=((pc??-1))?.047*(qNet/100)*Br*Math.pow(B/Br,.7):.14*Math.max(0,qNet-.67*(pc??0))/100*Br*Math.pow(B/Br,.7)
@@ -86,7 +86,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   const layers=[...profile.layers].sort((a,b)=>a.topDepth-b.topDepth)
   if(profile.status!=='SABİTLENDİ')warnings.push('İdealize Zemin Profili SABİTLENDİ durumunda değil.')
   if(profile.parameterUnitSystem!=='kN-m')warnings.push('Profil mühendislik birimleri kN-m taban sisteminde değil; sonuç üretilmedi.')
-  if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,effectiveB:0,effectiveL:0,foundationArea:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve pozitif yük girdileri geçerli olmalıdır.'],source:'FALUZMN ortak oturma motoru'}
+  if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,grossFoundationPressure:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,effectiveB:0,effectiveL:0,foundationArea:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve pozitif yük girdileri geçerli olmalıdır.'],source:'FALUZMN ortak oturma motoru'}
   const verticalLoad=finite(input.verticalLoad)?input.verticalLoad!:qGross*B*L
   if(verticalLoad<=0||!finite(verticalLoad))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,effectiveB:0,effectiveL:0,foundationArea:0,ready:false,warnings:[...warnings,'Oturma için pozitif düşey temel yükü gerekir.'],source:'FALUZMN ortak oturma motoru'}
   const ex=(input.momentY??0)/verticalLoad,ey=(input.momentX??0)/verticalLoad,effectiveB=B-2*Math.abs(ex),effectiveL=L-2*Math.abs(ey),foundationArea=Math.max(0,effectiveB)*Math.max(0,effectiveL)
@@ -98,7 +98,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(!finite(baseStress.effective))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,effectiveB,effectiveL,foundationArea,ready:false,warnings:[...warnings,'Df seviyesine kadar γ/γsat profili eksik veya geçersiz.'],source:'FALUZMN ortak oturma motoru'}
   const qNet=Math.max(0,appliedQ-baseStress.effective)
   const ratio=effectiveL/Math.max(effectiveB,1e-9)
-  const influenceDepth=method==='burland-burbidge'?burlandInfluenceDepth(effectiveB,input.burlandNTrend??'unknown',input.burlandSoftLayerBottomDepth,input.Df):method==='schmertmann'?(input.foundationType==='surekli'?4*effectiveB:(ratio>=10?4*effectiveB:2*effectiveB)):method==='janbu'?Math.max(2*effectiveB,1):2*effectiveB
+  const influenceDepth=method==='burland-burbidge'?burlandInfluenceDepth(effectiveB,input.burlandNTrend??'unknown'):method==='schmertmann'?(input.foundationType==='surekli'?4*effectiveB:(ratio>=10?4*effectiveB:2*effectiveB)):method==='janbu'?Math.max(2*effectiveB,1):2*effectiveB
   if(qNet<=0)warnings.push('Temel seviyesinde net ilave basınç sıfır/negatif; seçilen yöntem yük artışı açısından hesaplanamaz.')
   let totalImmediate=0,totalConsolidation=0
   const results:SettlementLayerResult[]=[]
@@ -164,5 +164,5 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(method==='2to1-layer')warnings.push('2:1 + M yöntemi tek boyutlu sıkışma gerinimini M ile entegre eder; E_s kullanılmaz.')
   if(method==='janbu')warnings.push('Janbu sonucu yalnız açık m ve a girdileriyle üretilir; otomatik m/a korelasyonu yapılmaz.')
   if(method==='schmertmann')warnings.push('Schmertmann granüler zemin içindir; C1 ve C2 açıkça hesaplanır.')
-  return{method,layers:results,totalImmediate,totalConsolidation,totalSettlement:totalImmediate+totalConsolidation,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,effectiveB,effectiveL,foundationArea,ready:methodReady&&results.length>0,warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978) ve Janbu (1967) tangent modulus; yöntem kapsamları ayrı tutulur.'}
+  return{method,layers:results,totalImmediate,totalConsolidation,totalSettlement:totalImmediate+totalConsolidation,grossFoundationPressure:appliedQ,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,effectiveB,effectiveL,foundationArea,ready:methodReady&&results.length>0,warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978) ve Janbu (1967) tangent modulus; yöntem kapsamları ayrı tutulur.'}
 }
