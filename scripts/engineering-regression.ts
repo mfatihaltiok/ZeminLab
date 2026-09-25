@@ -45,6 +45,9 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   const withPassive=foundationChecks({B:2,L:2,N:1000,V:600,Vx:600,Vy:0,Mx:0,My:0,deltaTan:.6,passiveResistanceCharacteristic:500,usePassiveResistance:true})
   assert.ok(withoutPassive.slidingUtilizationX>withPassive.slidingUtilizationX)
   assert.equal(withPassive.passiveResistanceDesign,500/1.4)
+  const resultant=foundationChecks({B:2,L:2,N:1000,Vx:300,Vy:400,Mx:0,My:0,deltaTan:.6})
+  approx(resultant.horizontalResultant,500)
+  approx(resultant.slidingFS,resultant.slidingCapacityResultant/500)
 }
 
 {
@@ -59,6 +62,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(result.rows[0].n1_60,12.266276470940088,1e-10)
   approx(result.rows[0].beta,1.1543167672515497,1e-12)
   assert.ok(result.rows[0].FS !== undefined)
+  assert.equal(result.rows[0].postLiquefactionRequired,true)
   assert.equal(result.rows[0].conclusion,'SIVILAŞMA RİSKİ VAR')
 }
 
