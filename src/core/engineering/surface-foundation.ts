@@ -22,7 +22,7 @@ const gammaW=9.80665,rad=(d:number)=>d*Math.PI/180,finite=(x:unknown):x is numbe
 function factors(phiDeg:number,method:SurfaceFoundationMethod){
  const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi)),Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2,Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
  let Ngamma=0
- if(phi>0)Ngamma=method==='Meyerhof'?(Nq-1)*Math.tan(rad(1.4*phi)):method==='Hansen'?1.5*(Nq-1)*t:method==='Vesic'?2*(Nq+1)*t:2*(Nq-1)*t
+ if(phi>0){if(method==='Terzaghi'){const Kpy=3*(1+Math.sin(rad(phi)))/Math.max(1-Math.sin(rad(phi)),1e-9);Ngamma=.5*t*(Kpy/Math.cos(rad(phi))**2-1)}else Ngamma=method==='Meyerhof'?(Nq-1)*Math.tan(rad(1.4*phi)):method==='Hansen'?1.5*(Nq-1)*t:2*(Nq+1)*t}
  return{phi,t,Nq,Nc,Ngamma}
 }
 function effectiveBaseStress(Df:number,gamma1:number,gammaSat:number|undefined,gwt:number|undefined){
