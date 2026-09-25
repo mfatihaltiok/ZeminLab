@@ -10,7 +10,7 @@ import { CalculationTrace } from '../components/CalculationTrace'
 export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile}){
   const p=useProjectInfo(),soil=p.soilParameters,f=p.foundationParameters
   const [method,setMethod]=useState<BearingMethod>('Terzaghi')
-  const FS=f.safetyFactor>0?f.safetyFactor:3
+  const FS=f.safetyFactor
   const units=p.unitSystem==='ton-m'?PROJECT_UNIT_LABELS.ton:PROJECT_UNIT_LABELS.kN
   const B=Number(f.footingWidth),L=Number(f.footingLength),Df=Number(f.footingDepth)
   const gamma1=unitWeightToBase(Number(soil.unitWeight),p.unitSystem),gamma2=unitWeightToBase(Number(soil.saturatedUnitWeight),p.unitSystem)
@@ -18,7 +18,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
   const N=forceToBase(Number(f.structuralWeight),p.unitSystem)
   const Vx=forceToBase(Number(f.vtX),p.unitSystem),Vy=forceToBase(Number(f.vtY),p.unitSystem),H=Math.hypot(Vx,Vy)
   const Mx=momentToBase(Number(f.momentX),p.unitSystem),My=momentToBase(Number(f.momentY),p.unitSystem)
-  const valid=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<50&&Number.isFinite(N)&&N>=0
+  const valid=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<50&&Number.isFinite(N)&&N>=0&&Number.isFinite(FS)&&FS>0
   const layered=useMemo(()=>profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:unitWeightToBase(x.gamma??soil.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(x.gammaSat??x.gamma??soil.saturatedUnitWeight,p.unitSystem),cohesion:stressToBase(x.cohesion??soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle})).filter(x=>x.bottomDepth>x.topDepth),[profile,soil,p.unitSystem])
   const calculation=useMemo(()=>{
     if(!valid)return {result:null,error:'Temel, zemin veya yük girdileri tamamlanmalı.'}
@@ -45,7 +45,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
       <Metric label="G+Q" value={force(N).toFixed(2)} unit={units.force}/>
       <Metric label="H" value={force(H).toFixed(2)} unit={units.force}/>
       <Metric label="Mx / My" value={Mx.toFixed(2)+' / '+My.toFixed(2)} unit={units.moment}/>
-      <Metric label="γRv" value="1.40"/>
+      <Metric label="Klasik FS" value={FS.toFixed(2)}/><Metric label="γRv" value="1.40"/>
     </div></Card>
     <Card title="KLASİK YÖNTEMLER"><Table headers={['Yöntem','qult','qallow gross','qallow net']} rows={generic.map(x=>[x.method,x.result.ultimate.toFixed(2)+' kPa',x.result.allowableGross.toFixed(2)+' kPa',x.result.allowableNet.toFixed(2)+' kPa'])}/><div className="engineering-note">Bu dört sütun klasik izin verilebilir taşıma gücüdür; TBDY tasarım dayanımı değildir.</div></Card>
     <div className="metric-strip"><Metric label="TBDY qk" value={stress(r.qk).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="TBDY qt" value={stress(r.qt).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="q0" value={stress(r.qo).toFixed(2)} unit={units.stress}/><Metric label="B′ / L′" value={r.Be.toFixed(3)+' / '+r.Le.toFixed(3)} unit="m"/><Metric label="Kullanım" value={(r.utilization*100).toFixed(1)} unit="%"/><Metric label="Kontrol" value={r.adequate?'UYGUN':'YETERSİZ'}/></div>
