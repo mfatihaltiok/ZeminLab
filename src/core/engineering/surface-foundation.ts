@@ -12,6 +12,7 @@ export interface SurfaceFoundationResult{
   Nq:number;Nc:number;Ngamma:number;sc:number;sq:number;sg:number;dc:number;dq:number;dg:number;ic:number;iq:number;ig:number;gc:number;gq:number;gg:number;bc:number;bq:number;bg:number
   surcharge:number;gammaBelow:number;ex:number;ey:number;Be:number;Le:number;effectiveArea:number;qk:number;qt:number;qo:number;utilization:number;adequate:boolean;effectiveDepth:number
   representativeC:number;representativePhi:number;representativeGamma:number;ultimateClassical?:number;allowableClassical?:number;undrainedQk?:number
+  layeredScreeningOnly:boolean;finalDesignEligible:boolean
   layerChecks:Array<{top:number;bottom:number;c:number;phi:number;gamma:number;qk:number;controlling:boolean}>;warnings:string[];method:SurfaceFoundationMethod;foundationType:FoundationType;source:string;steps:SurfaceFoundationStep[]
   value:{Nq:number;Nc:number;Ngamma:number;sc:number;sq:number;sg:number;dc:number;dq:number;dg:number;ic:number;iq:number;ig:number;gc:number;gq:number;gg:number;bc:number;bq:number;bg:number;surcharge:number;gammaBelow:number;ex:number;ey:number;Be:number;Le:number;effectiveArea:number;qk:number;qt:number;qo:number;utilization:number;adequate:boolean;effectiveDepth:number}
 }
@@ -158,7 +159,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
     Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,...mf,surcharge:water.surcharge,gammaBelow:water.gammaBelow,ex,ey,Be,Le,effectiveArea,qk:controlling,qt:designQt,qo,utilization:qo/Math.max(designQt,1e-9),adequate,effectiveDepth:2*Bp,
     representativeC:i.c,representativePhi:f.phi,representativeGamma:water.gammaBelow,ultimateClassical:qk,allowableClassical:qk/Math.max(i.safetyFactor??3,1e-9),
     undrainedQk:i.undrainedCu!=null?i.undrainedCu*5.14*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge:undefined,
-    layerChecks:checks,warnings,method,foundationType
+    layeredScreeningOnly:checks.length>0,finalDesignEligible:checks.length===0,layerChecks:checks,warnings,method,foundationType
   }
   return{...resultBase,source:'TBDY 2018 16.8.3.1–16.8.3.4; Denk. 16.8. Arazi ve temel tabanı eğimi katsayıları için genel kabul görmüş Vesic tipi bağıntılar kullanılır; tabakalı zemin kontrolü ayrıca raporlanır.',steps,value:{Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:mf.sc,sq:mf.sq,sg:mf.sg,dc:mf.dc,dq:mf.dq,dg:mf.dg,ic:mf.ic,iq:mf.iq,ig:mf.ig,gc:mf.gc,gq:mf.gq,gg:mf.gg,bc:mf.bc,bq:mf.bq,bg:mf.bg,surcharge:water.surcharge,gammaBelow:water.gammaBelow,ex,ey,Be,Le,effectiveArea,qk:controlling,qt:designQt,qo,utilization:qo/Math.max(designQt,1e-9),adequate,effectiveDepth:2*Bp}}
 }
