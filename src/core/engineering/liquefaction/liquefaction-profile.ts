@@ -1,4 +1,5 @@
 import { calculateSpt, fineContentCorrection, type SptEngineInput, type SptTraceStep } from '../spt/spt-engine'
+import { tbdy2018Liquefaction } from './tbdy2018-liquefaction'
 import type { EarthquakeDesignClass } from '../../models/project'
 
 export type LiquefactionSoilGroup='ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF'
@@ -127,20 +128,25 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       trace.push({symbol:'(N1)60f',title:'CRR aralığı',formula:'(N1)60f<34',value:n1_60f,note:'Ek 16B CRR bağıntısı için geçerli aralık dışı.'})
       return{...base,status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
-    const crrM75=1/(34-n1_60f)+n1_60f/135+50/Math.pow(10*n1_60f+45,2)-1/200
-    const tauResistance=crrM75*CM*stress.sigmaVPrime
-    const tauEarthquake=.65*(.4*input.Sds)*stress.sigmaV*rdAtDepth(record.depth)
-    const FS=tauEarthquake>0?tauResistance/tauEarthquake:Infinity
+    const core=tbdy2018Liquefaction({
+      depth:record.depth,totalStress:stress.sigmaV,effectiveStress:stress.sigmaVPrime,rawSPT:record.nField,
+      CE:npt.ce,CB:npt.cb,CR:npt.cr,CS:npt.cs,finesContent:fines,Mw:input.Mw,SDS:input.Sds
+    })
+    if(!Number.isFinite(core.FS)){
+      trace.push({symbol:'CRR',title:'CRR geçerlilik kontrolü',formula:'0<(N1)60f<34',value:n1_60f,note:'Ek 16B CRR bağıntısı geçerli aralıkta değil.'})
+      return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
+    }
+    const crrM75=core.CRRM75,tauResistance=core.Rtau,tauEarthquake=core.tauEarthquake,FS=core.FS
     const postRequired=FS<1.10
     trace.push(
       {symbol:'CRR7.5',title:'Çevrimsel dayanım oranı',formula:'Ek 16B',value:crrM75},
-      {symbol:'CM',title:'Deprem büyüklüğü düzeltmesi',formula:'CM=10^2.24/Mw^2.56',value:CM},
+      {symbol:'CM',title:'Deprem büyüklüğü düzeltmesi',formula:'CM=10^2.24/Mw^2.56',value:core.CM},
       {symbol:'Rτ',title:'Sıvılaşma direnci',formula:'Rτ=CRR7.5·CM·σ′v0',value:tauResistance,unit:'kPa'},
-      {symbol:'rd',title:'Gerilme azaltma katsayısı',formula:'Ek 16B',value:rdAtDepth(record.depth)},
+      {symbol:'rd',title:'Gerilme azaltma katsayısı',formula:'Ek 16B',value:core.rd},
       {symbol:'τdeprem',title:'Deprem kayma gerilmesi',formula:'0.65·(0.4SDS)·σv0·rd',value:tauEarthquake,unit:'kPa'},
       {symbol:'FS',title:'Sıvılaşmaya karşı güvenlik',formula:'Rτ/τdeprem',value:FS,note:'TBDY 16.6.9: FS≥1.10'}
     )
-    return{...base,crrM75,CM,tauResistance,tauEarthquake,FS,postLiquefactionRequired:postRequired,status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:FS<1.10?'SIVILAŞMA RİSKİ VAR':'SIVILAŞMA RİSKİ YOK',liquefactionCheck:'evaluate',trace}
+    return{...base,crrM75,CM:core.CM,tauResistance,tauEarthquake,FS,postLiquefactionRequired:postRequired,status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:FS<1.10?'SIVILAŞMA RİSKİ VAR':'SIVILAŞMA RİSKİ YOK',liquefactionCheck:'evaluate',trace}
   })
   if(!input.spt.length)warnings.push('SPT kaydı bulunmadığı için profil hesabı üretilemedi.')
   if(!input.layers.length)warnings.push('Zemin katmanı yok; düşey gerilme hesabı yapılamaz.')
