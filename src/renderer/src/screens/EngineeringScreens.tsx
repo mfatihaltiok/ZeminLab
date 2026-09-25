@@ -79,7 +79,7 @@ export function Foundation(){
   const ready=f.footingWidth>0&&f.footingLength>0&&N>=0
   const r=ready?foundationChecks({
     B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,
-    deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
+    deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem),groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
     passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance
   }):undefined
   return <Frame screen="foundation"><Source>{SOURCE_NOTES.foundation} TBDY 16.8.4 yatay kayma kontrolü; 16.8.4.6 YASS altında depremde Cu yaklaşımı uygulanır.</Source>
