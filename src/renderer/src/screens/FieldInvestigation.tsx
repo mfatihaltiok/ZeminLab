@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import '../assets/field-workspace.css'
-import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../../../core/models/field-data'
+import type { BoreholeRecord, LaboratoryRecord, SptCorrectionConfig, SptRecord } from '../../../core/models/field-data'
 import { deriveSptValues } from '../../../core/engineering/field-calculations'
 import { applyLaboratoryDerivedValues } from '../../../core/engineering/laboratory-calculations'
 import { appendSpt, createEmptyBorehole } from '../../../core/models/field-data-factory'
@@ -51,6 +51,9 @@ function syncLabs(labs: LaboratoryRecord[], borehole: BoreholeRecord): Laborator
 }
 
 function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (b: BoreholeRecord) => void }) {
+  const sptRows = borehole.spt.filter(row => row.testType === 'SPT')
+  const [selectedCorrectionId, setSelectedCorrectionId] = useState(sptRows[0]?.id ?? '')
+  const selectedCorrection = borehole.spt.find(row => row.id === selectedCorrectionId && row.testType === 'SPT') ?? sptRows[0]
   const updateMeta = (key: 'firstSptDepth'|'totalDepth'|'groundwaterDepth', value: string) => {
     const n = value === '' ? undefined : Number(value)
     if (key === 'firstSptDepth') {
@@ -71,7 +74,12 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
     onChange({ ...borehole, spt: borehole.spt.map(r => r.id === id ? next : r).sort((a,b) => a.depth-b.depth) })
   }
   const updateUdDepth = (id: string, value: string) => { const n = Number(value); if (Number.isFinite(n)) updateRow(id, { depth: n, depthTo: n + 0.5 }) }
-  const add = () => { const next = appendSpt(borehole); if (next) onChange(next) }
+  const add = () => { const next = appendSpt(borehole); if (next) { onChange(next); setSelectedCorrectionId(next.spt.filter(x => x.testType === 'SPT').at(-1)?.id ?? '') } }
+  const updateCorrection = (patch: Partial<SptCorrectionConfig>) => {
+    if (!selectedCorrection) return
+    const correction = { ...(selectedCorrection.correction ?? {}), ...patch }
+    onChange({ ...borehole, spt: borehole.spt.map(row => row.id === selectedCorrection.id ? { ...row, correction } : row) })
+  }
   return <>
     <div className="field-meta-strip">
       <label>İlk deney derinliği (m)<input type="number" value={borehole.firstSptDepth} min="0" step="0.1" onChange={e => updateMeta('firstSptDepth', e.target.value)} /></label>
@@ -100,6 +108,19 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
           </tr>
         })}</tbody>
       </table>
+    </div>
+    <div className="engineering-grid-wrap spt-correction-wrap">
+      <div className="grid-toolbar"><b>SPT DÜZELTME AYARLARI</b><span>Eksik düzeltme girdisi varsa N60 / (N1)60 sonucu üretilmez.</span></div>
+      {selectedCorrection ? <div className="form-grid">
+        <label>SPT kaydı<select value={selectedCorrection.id} onChange={e => setSelectedCorrectionId(e.target.value)}>{sptRows.map(row => <option key={row.id} value={row.id}>{fmt(row.depth)} m · {row.soilCode ?? 'Zemin seçilmedi'}</option>)}</select></label>
+        <label>Şahmerdan<select value={selectedCorrection.correction?.hammerType ?? ''} onChange={e => updateCorrection({ hammerType: e.target.value ? e.target.value as SptCorrectionConfig['hammerType'] : undefined })}><option value="">Seçiniz</option><option value="automatic">Automatic</option><option value="safety">Safety</option><option value="donut">Donut</option><option value="measured">Ölçülmüş ER</option></select></label>
+        <label>ER (%)<input type="number" min="0" max="100" step="0.1" value={selectedCorrection.correction?.energyRatio ?? ''} onChange={e => updateCorrection({ energyRatio: e.target.value === '' ? undefined : Number(e.target.value) })}/></label>
+        <label>Numune alıcı<select value={selectedCorrection.correction?.sampler ?? ''} onChange={e => updateCorrection({ sampler: e.target.value ? e.target.value as SptCorrectionConfig['sampler'] : undefined })}><option value="">Seçiniz</option><option value="standard">Standard</option><option value="liner">Liner</option><option value="without-liner">İç tüpsüz</option></select></label>
+        {selectedCorrection.correction?.sampler === 'without-liner' && <label>CS<input type="number" min="1.10" max="1.30" step="0.01" value={selectedCorrection.correction?.samplerCorrection ?? ''} onChange={e => updateCorrection({ samplerCorrection: e.target.value === '' ? undefined : Number(e.target.value) })}/></label>}
+        <label>Rod boyu (m)<input type="number" min="3" step="0.1" value={selectedCorrection.correction?.rodLengthM ?? ''} onChange={e => updateCorrection({ rodLengthM: e.target.value === '' ? undefined : Number(e.target.value) })}/></label>
+        <label>CN / (N1)60<select value={selectedCorrection.correction?.applyOverburdenCorrection === undefined ? '' : selectedCorrection.correction.applyOverburdenCorrection ? 'yes' : 'no'} onChange={e => updateCorrection({ applyOverburdenCorrection: e.target.value === '' ? undefined : e.target.value === 'yes' })}><option value="">Seçiniz</option><option value="yes">Uygula</option><option value="no">Uygulama</option></select></label>
+        <label>Dilatansi<select value={selectedCorrection.correction?.applyDilatancyCorrection ? 'yes' : 'no'} onChange={e => updateCorrection({ applyDilatancyCorrection: e.target.value === 'yes' })}><option value="no">Uygulama</option><option value="yes">Uygula</option></select></label>
+      </div> : <div className="inline-empty">SPT kaydı bulunmuyor.</div>}
     </div>
   </>
 }
