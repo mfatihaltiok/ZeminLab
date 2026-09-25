@@ -23,8 +23,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
-  const s=calculateSpt({nField:10,energyRatio:60,rodLengthM:2.9,effectiveStress:100})
-  assert.throws(()=>s, /rod boyu 3 m’den küçük/)
+  assert.throws(() => calculateSpt({nField:10,energyRatio:60,rodLengthM:2.9,effectiveStress:100}), /rod boyu 3 m’den küçük/)
 }
 
 {
