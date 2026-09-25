@@ -6,7 +6,7 @@ export type BuildingUseClass=1|2|3
 export type EarthquakeDesignClass='1'|'1a'|'2'|'2a'|'3'|'3a'|'4'|'4a'
 
 export interface ProjectVisualDocuments{aerialPhoto?:string;layoutPlan?:string;architecturalSection?:string;foundationPlan?:string;foundationStress?:string}
-export interface GeophysicalParameters{vs30?:number;soilGroup?:'ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF';source?:string;notes?:string}
+export interface GeophysicalParameters{vs30?:number;soilGroup?:'ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF';soilGroupSource?:'VS30'|'USER'|'SITE_SPECIFIC';siteSpecificResponseAnalysisCompleted?:boolean;source?:string;notes?:string}
 export interface SeismicParameters{
   ss?:number;s1?:number;fs?:number;f1?:number;sds?:number;sd1?:number;ta?:number;tb?:number;tl?:number;magnitude?:number
   bks?:BuildingUseClass;dts?:EarthquakeDesignClass
@@ -52,7 +52,7 @@ export interface ProjectInfo{
 export const defaultProjectInfo:ProjectInfo={
   id:'',title:'',projectNo:'',date:'',location:'',province:'',district:'',address:'',parcelInfo:'',pafta:'',ada:'',parsel:'',zoningStatus:'',
   engineer:'',clientName:'',firmName:'',buildingType:'',basementCount:0,normalFloorCount:0,unitSystem:'ton-m',
-  geophysical:{},
+  geophysical:{soilGroupSource:'VS30',siteSpecificResponseAnalysisCompleted:false},
   seismic:{bks:2},
   soilParameters:{unitWeight:0,saturatedUnitWeight:0,cohesion:0,frictionAngle:0,undrainedCohesion:undefined,groundwaterDepth:undefined,surfaceSlope:0,foundationBaseSlope:0,finesContent:0,classification:{system:'TS EN ISO 14688-2'}},
   foundationParameters:{
