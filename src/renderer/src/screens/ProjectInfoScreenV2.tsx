@@ -48,11 +48,23 @@ export function ProjectInfoScreenV2(){
 
       <Card title="JEOFİZİK · TBDY ZEMİN GRUBU">
         <div className="form-grid">
-          <Field label="Vs30 (m/s)" value={p.geophysical.vs30??''} onChange={v=>setProject({geophysical:{...p.geophysical,vs30:v===''?undefined:Number(v),soilGroup:classifyVs30(v===''?undefined:Number(v))}})}/>
-          <Metric label="Otomatik grup" value={vs30Group??'—'}/>
-          <Metric label="Tanım" value={vs30Group?descriptions[vs30Group]:'Vs30 bekleniyor'}/>
+          <Field label="Vs30 (m/s)" value={p.geophysical.vs30??''} onChange={v=>{
+            const vs=v===''?undefined:Number(v)
+            setProject({geophysical:{...p.geophysical,vs30:vs,soilGroup:classifyVs30(vs),soilGroupSource:'VS30'}})
+          }}/>
+          <label>TBDY zemin grubu
+            <select value={p.geophysical.soilGroup??vs30Group??''} onChange={e=>setProject({geophysical:{...p.geophysical,soilGroup:e.target.value as NonNullable<typeof p.geophysical.soilGroup>,soilGroupSource:e.target.value==='ZF'?'SITE_SPECIFIC':'USER'}})}>
+              <option value="">Vs30 bekleniyor</option><option value="ZA">ZA</option><option value="ZB">ZB</option><option value="ZC">ZC</option><option value="ZD">ZD</option><option value="ZE">ZE</option><option value="ZF">ZF</option>
+            </select>
+          </label>
+          <Metric label="Zemin grubu tanımı" value={(p.geophysical.soilGroup??vs30Group)?descriptions[p.geophysical.soilGroup??vs30Group!]:'—'}/>
+          <label>ZF saha özel zemin davranış analizi
+            <select value={p.geophysical.siteSpecificResponseAnalysisCompleted?'yes':'no'} onChange={e=>setProject({geophysical:{...p.geophysical,siteSpecificResponseAnalysisCompleted:e.target.value==='yes'}})}>
+              <option value="no">Tamamlanmadı</option><option value="yes">Tamamlandı</option>
+            </select>
+          </label>
         </div>
-        <div className="classification-note">ZF otomatik atanmaz; 16.5.1.3 gereği sahaya özel zemin davranış analizi gerekir.</div>
+        <div className="classification-note">ZF seçilirse TBDY 16.5.1.3 uyarınca sahaya özel zemin davranış analizi zorunludur; burada yalnız durum kaydı tutulur, analiz motoru yerine geçmez.</div>
       </Card>
 
       <Card title="DEPREM TASARIM PARAMETRELERİ">
