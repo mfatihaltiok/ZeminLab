@@ -139,14 +139,6 @@ function equivalentLayerParameters(layers:SurfaceFoundationLayer[]|undefined,Df:
     gamma:gammaWeighted/influence
   }
 }
-  if(!layers?.length)return[]
-  const active=layers.filter(l=>l.bottomDepth>Df&&l.topDepth<Df+influence&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
-  return active.map(l=>{
-    const phi=clamp(l.phi,0,50),ff=factors(phi,method),gamma=l.gammaSat!=null?Math.max(l.gammaSat-gammaW,.001):Math.max(l.gamma,.001)
-    const qk=Math.max(0,l.cohesion)*ff.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+baseQ*ff.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+0.5*gamma*Math.max(.01,Math.min(1e3,influence))*ff.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
-    return{top:l.topDepth,bottom:l.bottomDepth,c:l.cohesion,phi,gamma,qk,controlling:false}
-  })
-}
 
 export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoundationResult{
   if(i.B<=0||i.L<=0||i.Df<0)throw new Error('Temel B ve L pozitif, Df negatif olmayan değer olmalıdır.')
