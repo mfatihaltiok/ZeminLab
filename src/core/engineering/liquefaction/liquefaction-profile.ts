@@ -20,9 +20,19 @@ export interface LiquefactionProfileRow{
 export interface LiquefactionProfileResult{rows:LiquefactionProfileRow[];method:string;source:string;warnings:string[];mandatoryByProject:boolean;postLiquefactionRequired:boolean}
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x),clamp=(x:number,a:number,b:number)=>Math.min(b,Math.max(a,x))
 function stressAtDepth(depth:number,layers:LiquefactionSoilLayer[],gwt:number,gammaW:number){
- let sigmaV=0,covered=0
- for(const layer of [...layers].filter(x=>x.bottom>x.top).sort((a,b)=>a.top-b.top)){const z0=Math.max(0,layer.top),z1=Math.min(depth,layer.bottom);if(z1<=z0)continue;if(z0>covered+1e-9){} covered+=z1-z0;const dry=Math.max(0,Math.min(z1,gwt)-z0),sat=(z1-z0)-dry;sigmaV+=dry*Math.max(layer.gamma,0)+sat*Math.max(layer.gammaSat,0)}
- const u=Math.max(0,depth-gwt)*gammaW;return{sigmaV,porePressure:u,sigmaVPrime:sigmaV-u,covered}
+  let sigmaV=0,cursor=0
+  for(const layer of [...layers].filter(x=>x.bottom>x.top).sort((a,b)=>a.top-b.top)){
+    if(layer.top>cursor+1e-9&&layer.top<depth-1e-9)return{sigmaV:NaN,porePressure:NaN,sigmaVPrime:NaN,covered:cursor}
+    const z0=Math.max(cursor,layer.top),z1=Math.min(depth,layer.bottom)
+    if(z1<=z0)continue
+    if(!finite(layer.gamma)||!finite(layer.gammaSat)||layer.gamma<=0||layer.gammaSat<=0)return{sigmaV:NaN,porePressure:NaN,sigmaVPrime:NaN,covered:cursor}
+    const dry=Math.max(0,Math.min(z1,gwt)-z0),sat=(z1-z0)-dry
+    sigmaV+=dry*layer.gamma+sat*layer.gammaSat
+    cursor=z1
+    if(cursor>=depth-1e-9)break
+  }
+  const u=Math.max(0,depth-gwt)*gammaW
+  return{sigmaV,porePressure:u,sigmaVPrime:sigmaV-u,covered:cursor}
 }
 function rdAtDepth(z:number){const d=Math.max(z,0);return d<=9.15?1-.00765*d:d<=23?1.174-.0267*d:d<=30?.744-.008*d:.5}
 function magnitudeCorrection(Mw:number){return Math.pow(10,2.24)/Math.pow(Mw,2.56)}
