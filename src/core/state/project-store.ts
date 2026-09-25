@@ -10,6 +10,18 @@ export type ProjectEnvelope = { format:'FALUZMN'; version:number; savedAt:string
 
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 const nonNegative=(x:unknown)=>finite(x)&&x>=0
+function convertJetGroutToBase(j:any,system:ProjectInfo['unitSystem']){
+  if(!j||typeof j!=='object')return{}
+  return{...j,
+    qSoil:finite(j.qSoil)?stressToBase(j.qSoil,system):j.qSoil,
+    qColumn:finite(j.qColumn)?stressToBase(j.qColumn,system):j.qColumn,
+    cSoil:finite(j.cSoil)?stressToBase(j.cSoil,system):j.cSoil,
+    cColumn:finite(j.cColumn)?stressToBase(j.cColumn,system):j.cColumn,
+    interfaceCohesion:finite(j.interfaceCohesion)?stressToBase(j.interfaceCohesion,system):j.interfaceCohesion,
+    EsSoil:finite(j.EsSoil)?modulusToBase(j.EsSoil,system):j.EsSoil,
+    EsColumn:finite(j.EsColumn)?modulusToBase(j.EsColumn,system):j.EsColumn
+  }
+}
 function convertLabRecord(l:LaboratoryRecord,system:ProjectInfo['unitSystem']):LaboratoryRecord{
   const convert=(value:unknown,fn:(v:number,s:ProjectInfo['unitSystem'])=>number)=>finite(value as number)?fn(value as number,system):undefined
   return {...l,
@@ -44,8 +56,9 @@ export function migrateProjectData(value:unknown,version:number):ProjectDocument
   if(version>PROJECT_SCHEMA_VERSION)throw new Error(`Bu proje dosyası daha yeni bir FALUZMN sürümüne ait (v${version}).`)
   const d=value as Partial<ProjectDocument>
   if(!d.projectInfo||!Array.isArray(d.boreholes)||!Array.isArray(d.labs))throw new Error('FALUZMN proje verisi eksik veya bozuk.')
-  const projectInfo=normalizeProjectInfo(d.projectInfo)
-  const oldSystem=projectInfo.unitSystem
+  const projectInfoRaw=normalizeProjectInfo(d.projectInfo)
+  const oldSystem=projectInfoRaw.unitSystem
+  const projectInfo=version<2?{...projectInfoRaw,jetGrout:convertJetGroutToBase(projectInfoRaw.jetGrout,oldSystem)}:projectInfoRaw
   const labs=d.labs.map(normalizeLab).map(l=>l.engineeringUnitSystem==='kN-m'?l:convertLabRecord(l,oldSystem))
   const boreholes=d.boreholes.map(normalizeBorehole).map(b=>({...b,lithology:b.lithology.map(l=>convertLayer(l,oldSystem))}))
   return {projectInfo,boreholes,labs,idealizedSoilProfile:normalizeProfile(d.idealizedSoilProfile,oldSystem)}
