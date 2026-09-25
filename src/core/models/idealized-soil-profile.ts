@@ -1,5 +1,6 @@
 export type IdealizedProfileStatus = 'TASLAK' | 'SABİTLENDİ'
 export type ParameterSourceType = 'LABORATUVAR' | 'SPT_KORELASYONU' | 'LİTOLOJİ' | 'KULLANICI'
+export type ConsolidationState = 'NC' | 'OC' | 'UNKNOWN'
 
 export interface IdealizedParameterSource {
   type: ParameterSourceType
@@ -28,12 +29,18 @@ export interface IdealizedSoilLayer {
   plasticLimit?: number
   plasticityIndex?: number
   finesContent?: number
+  /** c' and phi' only. UU strength is stored separately in undrainedCohesion. */
   cohesion?: number
   frictionAngle?: number
+  undrainedCohesion?: number
   compressionIndexCc?: number
   recompressionIndexCr?: number
   initialVoidRatio?: number
   preconsolidationPressure?: number
+  consolidationState?: ConsolidationState
+  /** Young's modulus Es. */
+  elasticModulus?: number
+  /** Constrained/oedometer modulus M. Never populated from Es automatically. */
   constrainedModulus?: number
   oedometricModulus?: number
   poissonRatio?: number
@@ -57,19 +64,22 @@ export interface IdealizedSoilProfile {
   sourceLaboratoryIds: string[]
   layers: IdealizedSoilLayer[]
   methodology: string
+  /** All engineering values in layers are stored in kN, kPa, kN/m³ and kN·m compatible base units. */
+  parameterUnitSystem: 'kN-m'
   notes?: string
 }
 
 export function createEmptyIdealizedProfile(): IdealizedSoilProfile {
   return {
     id: crypto.randomUUID(),
-    version: 1,
+    version: 2,
     status: 'TASLAK',
     targetLayerCount: 3,
     generatedAt: new Date().toISOString(),
     sourceBoreholeIds: [],
     sourceLaboratoryIds: [],
     layers: [],
-    methodology: 'TBDY 2018 + Türk mevzuatı ve ilgili TS/TS EN/TS EN ISO standartları esas alınır. Katman sınırları; litoloji, SPT, laboratuvar verileri ve mühendislik değerlendirmesi birlikte dikkate alınarak oluşturulur.'
+    parameterUnitSystem:'kN-m',
+    methodology: 'Katman sınırları mühendis tarafından tanımlanır; SPT deneyleri kaynak olarak seçilir ve kalınlık kullanıcı tarafından girilir. Efektif dayanım parametreleri yalnız uygun laboratuvar deneylerinden alınır; UU parametreleri c′/φ′ yerine kullanılmaz. Es ve M/oedometer birbirinden bağımsız tutulur.'
   }
 }
