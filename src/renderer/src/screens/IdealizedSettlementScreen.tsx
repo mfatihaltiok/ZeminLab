@@ -53,6 +53,8 @@ function ProfileDiagram({ result }: { result: ReturnType<typeof calculateIdealiz
   )
 }
 
+export let latestIdealizedSettlementResult: ReturnType<typeof calculateIdealizedSettlement> | undefined
+
 export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile?: IdealizedSoilProfile; boreholes?: BoreholeRecord[] }) {
   const p = useProjectInfo()
   const [method, setMethod] = useState<IdealizedSettlementMethod>('burland-burbidge')
@@ -78,6 +80,8 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       groundwaterDepth: b?.groundwaterDepth,
     })
   }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth])
+
+  latestIdealizedSettlementResult = result
 
   const surfaceLayer = profile?.layers.find(x => x.bottomDepth > f.footingDepth)
   const ks = useMemo(() => {
