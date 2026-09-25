@@ -18,7 +18,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
   const N=forceToBase(Number(f.structuralWeight),p.unitSystem)
   const Vx=forceToBase(Number(f.vtX),p.unitSystem),Vy=forceToBase(Number(f.vtY),p.unitSystem),H=Math.hypot(Vx,Vy)
   const Mx=momentToBase(Number(f.momentX),p.unitSystem),My=momentToBase(Number(f.momentY),p.unitSystem)
-  const validTBDY=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<90&&Number.isFinite(N)&&N>=0
+  const validTBDY=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<90&&Number.isFinite(N)&&N>0
   const validClassical=validTBDY&&Number.isFinite(FS)&&FS>0
   const layered=useMemo(()=>profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:x.gamma??unitWeightToBase(soil.unitWeight,p.unitSystem),gammaSat:x.gammaSat??undefined,cohesion:x.cohesion??stressToBase(soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle})).filter(x=>x.bottomDepth>x.topDepth),[profile,soil,p.unitSystem])
   const calculation=useMemo(()=>{
@@ -50,7 +50,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
       <Metric label="Klasik FS" value={validClassical?FS.toFixed(2):'—'}/><Metric label="γRv" value="1.40"/>
     </div></Card>
     <Card title="KLASİK YÖNTEMLER"><Table headers={['Yöntem','qult','qallow gross','qallow net']} rows={generic.map(x=>[x.method,x.result.ultimate.toFixed(2)+' kPa',x.result.allowableGross.toFixed(2)+' kPa',x.result.allowableNet.toFixed(2)+' kPa'])}/><div className="engineering-note">Bu dört sütun klasik izin verilebilir taşıma gücüdür; TBDY tasarım dayanımı değildir.</div></Card>
-    <div className="metric-strip"><Metric label="TBDY qk" value={stress(r.qk).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="TBDY qt" value={stress(r.qt).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="q0" value={stress(r.qo).toFixed(2)} unit={units.stress}/><Metric label="B′ / L′" value={r.Be.toFixed(3)+' / '+r.Le.toFixed(3)} unit="m"/><Metric label="Kullanım" value={(r.utilization*100).toFixed(1)} unit="%"/><Metric label="Kontrol" value={r.layeredScreeningOnly?'ÖN KONTROL':p.geophysical.soilGroup==='ZF'&&!p.geophysical.siteSpecificResponseAnalysisCompleted?'ÖZEL SAHA ANALİZİ GEREKLİ':r.adequate?'UYGUN':'YETERSİZ'}/></div>
+    <div className="metric-strip"><Metric label="TBDY qk" value={stress(r.qk).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="TBDY qt" value={stress(r.qt).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="q0" value={stress(r.qo).toFixed(2)} unit={units.stress}/><Metric label="B′ / L′" value={r.Be.toFixed(3)+' / '+r.Le.toFixed(3)} unit="m"/><Metric label="Kullanım" value={(r.utilization*100).toFixed(1)} unit="%"/><Metric label="Kontrol" value={r.finalDesignEligible?(r.adequate?'UYGUN':'YETERSİZ'):r.layeredScreeningOnly?'ÖN KONTROL':'VERİ EKSİK / ÖN KONTROL'}/></div>
     {r.warnings.length>0&&<Card title="TBDY UYARILARI"><div className="inline-empty">{r.warnings.join(' ')}</div></Card>}
     <CalculationTrace title="TBDY 2018 16.8 hesap zinciri" source={calculation.result?.source??SOURCE_NOTES.bearing} rows={calculation.result?.steps??[]}/>
   </Frame>
