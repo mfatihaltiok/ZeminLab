@@ -18,10 +18,11 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
   const N=forceToBase(Number(f.structuralWeight),p.unitSystem)
   const Vx=forceToBase(Number(f.vtX),p.unitSystem),Vy=forceToBase(Number(f.vtY),p.unitSystem),H=Math.hypot(Vx,Vy)
   const Mx=momentToBase(Number(f.momentX),p.unitSystem),My=momentToBase(Number(f.momentY),p.unitSystem)
-  const valid=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<90&&Number.isFinite(N)&&N>=0&&Number.isFinite(FS)&&FS>0
+  const validTBDY=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<90&&Number.isFinite(N)&&N>=0
+  const validClassical=validTBDY&&Number.isFinite(FS)&&FS>0
   const layered=useMemo(()=>profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:x.gamma??unitWeightToBase(soil.unitWeight,p.unitSystem),gammaSat:x.gammaSat??undefined,cohesion:x.cohesion??stressToBase(soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle})).filter(x=>x.bottomDepth>x.topDepth),[profile,soil,p.unitSystem])
   const calculation=useMemo(()=>{
-    if(!valid)return {result:null,error:'Temel, zemin veya yük girdileri tamamlanmalı.'}
+    if(!validTBDY)return {result:null,error:'TBDY taşıma gücü için temel, efektif zemin parametreleri ve düşey yük tamamlanmalı.'}
     try{
       return {result:tbdyBearingCapacity({
         B,L,Df,gamma1,gamma2,c,phi,verticalLoad:N,horizontalLoad:H,horizontalLoadB:Math.abs(Vx),horizontalLoadL:Math.abs(Vy),momentX:Mx,momentY:My,
@@ -31,11 +32,11 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
       }),error:null}
     }catch(e){return{result:null,error:e instanceof Error?e.message:String(e)}}
   },[valid,B,L,Df,gamma1,gamma2,c,phi,N,H,Mx,My,Vx,Vy,soil.surfaceSlope,soil.foundationBaseSlope,f.foundationType,soil.groundwaterDepth,soil.undrainedCohesion,layered,p.geophysical.soilGroup,p.geophysical.siteSpecificResponseAnalysisCompleted])
-  const generic=useMemo(()=>valid?(['Terzaghi','Meyerhof','Hansen','Vesic'] as BearingMethod[]).map(m=>({method:m,result:bearingCapacityEngine({B,L,Df,gamma:gamma1,c,phi,FS,method:m}).value})):[],[valid,B,L,Df,gamma1,c,phi,FS])
+  const generic=useMemo(()=>validClassical?(['Terzaghi','Meyerhof','Hansen','Vesic'] as BearingMethod[]).map(m=>({method:m,result:bearingCapacityEngine({B,L,Df,gamma:gamma1,c,phi,FS,method:m}).value})):[],[validClassical,B,L,Df,gamma1,c,phi,FS])
   const r=calculation.result?.value
   const stress=(v:number)=>stressFromBase(v,p.unitSystem)
   const force=(v:number)=>forceFromBase(v,p.unitSystem)
-  if(!valid||!r){
+  if(!validTBDY||!r){
     return <Frame screen="bearing-capacity"><Source>{SOURCE_NOTES.bearing}</Source><Card title="TAŞIMA GÜCÜ HESABI HAZIR DEĞİL"><div className="engineering-note">{calculation.error??'Eksik proje girdisi.'}</div></Card></Frame>
   }
   return <Frame screen="bearing-capacity">
@@ -46,7 +47,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
       <Metric label="G+Q" value={force(N).toFixed(2)} unit={units.force}/>
       <Metric label="H" value={force(H).toFixed(2)} unit={units.force}/>
       <Metric label="Mx / My" value={Mx.toFixed(2)+' / '+My.toFixed(2)} unit={units.moment}/>
-      <Metric label="Klasik FS" value={FS.toFixed(2)}/><Metric label="γRv" value="1.40"/>
+      <Metric label="Klasik FS" value={validClassical?FS.toFixed(2):'—'}/><Metric label="γRv" value="1.40"/>
     </div></Card>
     <Card title="KLASİK YÖNTEMLER"><Table headers={['Yöntem','qult','qallow gross','qallow net']} rows={generic.map(x=>[x.method,x.result.ultimate.toFixed(2)+' kPa',x.result.allowableGross.toFixed(2)+' kPa',x.result.allowableNet.toFixed(2)+' kPa'])}/><div className="engineering-note">Bu dört sütun klasik izin verilebilir taşıma gücüdür; TBDY tasarım dayanımı değildir.</div></Card>
     <div className="metric-strip"><Metric label="TBDY qk" value={stress(r.qk).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="TBDY qt" value={stress(r.qt).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="q0" value={stress(r.qo).toFixed(2)} unit={units.stress}/><Metric label="B′ / L′" value={r.Be.toFixed(3)+' / '+r.Le.toFixed(3)} unit="m"/><Metric label="Kullanım" value={(r.utilization*100).toFixed(1)} unit="%"/><Metric label="Kontrol" value={r.layeredScreeningOnly?'ÖN KONTROL':p.geophysical.soilGroup==='ZF'&&!p.geophysical.siteSpecificResponseAnalysisCompleted?'ÖZEL SAHA ANALİZİ GEREKLİ':r.adequate?'UYGUN':'YETERSİZ'}/></div>
