@@ -8,7 +8,7 @@ import { calculateSubgradeReaction, type SubgradeReactionInput } from '../engine
 
 export type { BearingMethod, LayerSettlementInput, SchmertmannLayer, LiquefactionProfileInput, LiquefactionProfileResult, Stage2BearingInput, Stage2SettlementInput, Stage2BearingMethod, SurfaceFoundationInput, SurfaceFoundationMethod, SubgradeReactionInput }
 export type SoilLayerInput={top:number;bottom:number;soil?:string;gamma:number;gammaSat:number;cohesion?:number;phi?:number;fines?:number;cu?:number;PI?:number}
-export type SptInput={depth:number;nField:number;energyRatio?:number;boreholeDiameter?:number;sampler?:'standard'|'without-liner';samplerCorrection?:number;fines?:number}
+export type SptInput={depth:number;nField:number;energyRatio?:number;boreholeDiameter?:number;sampler?:'standard'|'without-liner';samplerCorrection?:number;rodLengthM?:number;hammerType?:'donut'|'safety'|'automatic'|'measured';fines?:number}
 
 export function classifySoilISO14688(ll?:number,pi?:number){
   if(ll==null||pi==null||!Number.isFinite(ll)||!Number.isFinite(pi)||ll<=0)return null
@@ -17,7 +17,7 @@ export function classifySoilISO14688(ll?:number,pi?:number){
 }
 export function stressAtDepth(depth:number,layers:Pick<SoilLayerInput,'top'|'bottom'|'gamma'|'gammaSat'>[],gwt:number){return stressEngine(depth,layers,gwt)}
 export function sptCorrection(x:SptInput,sigmaVPrime:number){
-  const r=calculateSpt({nField:x.nField,energyRatio:x.energyRatio,boreholeDiameterMm:x.boreholeDiameter,sampler:x.sampler==='without-liner'?'without-liner':'standard',samplerCorrection:x.samplerCorrection,effectiveStress:sigmaVPrime,fineContent:x.fines,applyOverburden:true,applyDilatancy:false})
+  const r=calculateSpt({nField:x.nField,energyRatio:x.energyRatio,hammerType:x.hammerType,boreholeDiameterMm:x.boreholeDiameter,sampler:x.sampler==='without-liner'?'without-liner':'standard',samplerCorrection:x.samplerCorrection,rodLengthM:x.rodLengthM,effectiveStress:sigmaVPrime,fineContent:x.fines,applyOverburden:true,applyDilatancy:false})
   const fines=Math.max(0,x.fines??0),{alpha,beta}=fineContentCorrection(fines)
   return{CE:r.ce,CB:r.cb,CS:r.cs,CR:r.cr,CN:r.cn,N60:r.n60,N160:r.n1_60,N160f:alpha+beta*r.n1_60,alpha,beta,sigmaVPrime}
 }
@@ -35,7 +35,7 @@ export function settlement(i:{B:number;q:number;Es:number;nu:number;layers?:{thi
 export function settlementStage2(i:Stage2SettlementInput){return stage2Settlement(i)}
 export function liquefaction(i:{Mw:number;Sds:number;depth:number;N160f:number;sigmaV:number;sigmaVPrime:number}){return liquefactionEngine(i)}
 export function liquefactionProfile(i:LiquefactionProfileInput){return liquefactionProfileEngine(i)}
-export function foundationChecks(i:{B:number;L:number;N:number;Vx?:number;Vy?:number;V?:number;Mx:number;My:number;deltaTan?:number;cu?:number;area?:number}){return foundationEngine(i).value}
+export function foundationChecks(i:{B:number;L:number;N:number;Vx?:number;Vy?:number;V?:number;Mx:number;My:number;deltaTan?:number;cu?:number;area?:number;groundwaterDepth?:number;foundationDepth?:number;passiveResistanceCharacteristic?:number;usePassiveResistance?:boolean;gammaRh?:number;gammaRp?:number}){return foundationEngine(i)}
 export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number}){return jetGroutEngine(i).value}
 export function stressSpread2to1(i:{q:number;B:number;L:number;z:number}){return stressSpread21(i)}
 export function subgradeReaction(i:SubgradeReactionInput){return calculateSubgradeReaction(i)}

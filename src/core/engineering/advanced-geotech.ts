@@ -164,12 +164,16 @@ export interface JetGroutAdvancedResult {
  * silently applied to Jet Grout.
  */
 export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResult {
-  const d = Math.max(i.columnDiameter, 1e-9)
-  const s = Math.max(i.spacing, d)
+  if (!Number.isFinite(i.columnDiameter) || i.columnDiameter <= 0) throw new Error('Jet Grout kolon çapı d > 0 olmalıdır.')
+  if (!Number.isFinite(i.spacing) || i.spacing <= 0) throw new Error('Jet Grout aks aralığı s > 0 olmalıdır.')
+  if (i.spacing < i.columnDiameter) throw new Error('Aks aralığı kolon çapından küçük olamaz; örtüşen kolon geometrisi bu modelde desteklenmez.')
+  const d = i.columnDiameter
+  const s = i.spacing
   const layout: JetGroutLayout = i.layout ?? 'square'
   const Ac = Math.PI * d * d / 4
   const cellArea = layout === 'triangular' ? Math.sqrt(3) * s * s / 2 : s * s
-  const ar = Math.min(0.99, Ac / cellArea)
+  const ar = Ac / cellArea
+  if (ar >= 1) throw new Error('Jet Grout alan değiştirme oranı 1.0 veya üzeri olamaz.')
   const qSoil = Math.max(0, i.qSoil)
   const qColumn = Math.max(0, i.qColumn)
   const compositeCapacity = ar * qColumn + (1 - ar) * qSoil
