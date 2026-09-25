@@ -116,8 +116,8 @@ export function ProjectInfoScreenV2(){
           <Field label="φ′ (°)" value={soil.frictionAngle||''} onChange={v=>setSoil({frictionAngle:num(v)})}/>
           <Field label="YASS (m)" value={soil.groundwaterDepth??''} onChange={v=>setSoil({groundwaterDepth:v===''?undefined:num(v)})}/>
           <label>TBDY 16.6.1 sürekli tabaka / kalın mercek
-            <select value={soil.liquefactionContinuousOrThickLens?'yes':'no'} onChange={e=>setSoil({liquefactionContinuousOrThickLens:e.target.value==='yes'})}>
-              <option value="no">Doğrulanmadı</option><option value="yes">Doğrulandı</option>
+            <select value={soil.liquefactionContinuousOrThickLens===undefined?'unknown':soil.liquefactionContinuousOrThickLens?'yes':'no'} onChange={e=>setSoil({liquefactionContinuousOrThickLens:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
+              <option value="unknown">Bilinmiyor</option><option value="no">Hayır</option><option value="yes">Evet</option>
             </select>
           </label>
           <Field label="Arazi eğimi β (°)" value={soil.surfaceSlope||''} onChange={v=>setSoil({surfaceSlope:num(v)})}/>
