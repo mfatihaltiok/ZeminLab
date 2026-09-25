@@ -17,7 +17,7 @@ export function JetGroutEngineeringScreen(){
   const set=(key:keyof typeof j,value:number|undefined|string)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
   const displayStress=(v?:number)=>v==null?'':stressFromBase(v,p.unitSystem).toString(),displayModulus=(v?:number)=>v==null?'':modulusFromBase(v,p.unitSystem).toString(),d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=displayStress(j.qSoil),column=displayStress(j.qColumn)
   const soilEs=displayModulus(j.EsSoil),columnEs=displayModulus(j.EsColumn),soilC=displayStress(j.cSoil),columnC=displayStress(j.cColumn)
-  const thickness=j.foundationThickness?.toString()??'',soilNu=j.soilPoissonRatio?.toString()??'',phi=j.columnFrictionAngle?.toString()??'',c=j.interfaceCohesion?.toString()??'',angle=j.interfaceFrictionAngle?.toString()??''
+  const thickness=j.foundationThickness?.toString()??'',soilNu,normalStress=displayStress(j.interfaceNormalStress)=j.soilPoissonRatio?.toString()??'',phi=j.columnFrictionAngle?.toString()??'',c=j.interfaceCohesion?.toString()??'',angle=j.interfaceFrictionAngle?.toString()??''
   const layout=j.layout??'square'
   const ready=[d,spacing,soil,column].every(x=>x!==''&&Number.isFinite(Number(x))&&Number(x)>0)&&Number.isFinite(Number(soilNu))&&Number(soilNu)>-1&&Number(soilNu)<.5
   const r=useMemo(()=>{
@@ -29,9 +29,9 @@ export function JetGroutEngineeringScreen(){
       load:projectLoad>0?projectLoad:undefined,foundationArea:projectArea>0?projectArea:undefined,
       foundationThickness:Number(thickness)>0?Number(thickness):undefined,
       columnFrictionAngle:Number(phi)>0?Number(phi):undefined,soilPoissonRatio:Number(soilNu),cohesion:Number(c)>0?Number(c):undefined,
-      frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH,shearNormalStress:undefined
+      frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH,shearNormalStress:j.interfaceNormalStress
     })
-  },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,soilNu,phi,c,angle,projectLoad,projectArea,projectH])
+  },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,soilNu,phi,c,angle,normalStress,projectLoad,projectArea,projectH])
   latestJetGroutResult=r
 
   return <Frame screen="jet-grout">
@@ -49,7 +49,7 @@ export function JetGroutEngineeringScreen(){
       <Field label="İyileştirme kalınlığı H (m)" value={thickness} onChange={v=>set('foundationThickness',num(v))}/>
       <Field label="Zemin ν" value={soilNu} onChange={v=>set('soilPoissonRatio',num(v))}/><Field label="Kolon φ (°)" value={phi} onChange={v=>set('columnFrictionAngle',num(v))}/>
       <Field label={`Arayüz c′ (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})`} value={c} onChange={v=>set('interfaceCohesion',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
-      <Field label="Arayüz φ′ (°)" value={angle} onChange={v=>set('interfaceFrictionAngle',num(v))}/>
+      <Field label="Arayüz φ′ (°)" value={angle} onChange={v=>set('interfaceFrictionAngle',num(v))}/><Field label={`σ′n (${PROJECT_UNIT_LABELS[p.unitSystem==='ton-m'?'ton':'kN'].stress})`} value={normalStress} onChange={v=>set('interfaceNormalStress',v===''?undefined:stressToBase(Number(v),p.unitSystem))}/>
       <Metric label="Temel alanı" value={projectArea.toFixed(2)} unit="m²"/>
       <Metric label="G+Q" value={projectLoad.toFixed(2)} unit="kN"/>
       <Metric label="H" value={projectH.toFixed(2)} unit="kN"/>

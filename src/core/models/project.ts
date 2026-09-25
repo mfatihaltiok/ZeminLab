@@ -6,7 +6,7 @@ export type BuildingUseClass=1|2|3
 export type EarthquakeDesignClass='1'|'1a'|'2'|'2a'|'3'|'3a'|'4'|'4a'
 export const ENGINEERING_CONSTANTS={gammaW:9.80665,TBDY_GAMMA_RV:1.40,TBDY_GAMMA_RH:1.10,TBDY_GAMMA_RP:1.40} as const
 export interface ProjectVisualDocuments{aerialPhoto?:string;layoutPlan?:string;architecturalSection?:string;foundationPlan?:string;foundationStress?:string}
-export interface JetGroutProjectParameters{columnDiameter?:number;spacing?:number;layout?:'square'|'triangular';qSoil?:number;qColumn?:number;cSoil?:number;cColumn?:number;EsSoil?:number;EsColumn?:number;foundationThickness?:number;columnFrictionAngle?:number;interfaceCohesion?:number;interfaceFrictionAngle?:number;soilPoissonRatio?:number}
+export interface JetGroutProjectParameters{columnDiameter?:number;spacing?:number;layout?:'square'|'triangular';qSoil?:number;qColumn?:number;cSoil?:number;cColumn?:number;EsSoil?:number;EsColumn?:number;foundationThickness?:number;columnFrictionAngle?:number;interfaceCohesion?:number;interfaceFrictionAngle?:number;interfaceNormalStress?:number;soilPoissonRatio?:number}
 export interface GeophysicalParameters{vs30?:number;soilGroup?:'ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF';soilGroupSource?:'VS30'|'USER'|'SITE_SPECIFIC';siteSpecificResponseAnalysisCompleted?:boolean;source?:string;notes?:string}
 export interface SeismicParameters{ss?:number;s1?:number;fs?:number;f1?:number;sds?:number;sd1?:number;ta?:number;tb?:number;tl?:number;magnitude?:number;bks?:BuildingUseClass;dts?:EarthquakeDesignClass}
 export interface SoilClassification{system:SoilClassificationSystem;code?:SoilClassificationCode}
