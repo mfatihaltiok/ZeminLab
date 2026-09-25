@@ -90,7 +90,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   const layers=[...profile.layers].sort((a,b)=>a.topDepth-b.topDepth)
   const gwt=finite(input.groundwaterDepth)?input.groundwaterDepth!:-1
   if(profile.status!=='SABİTLENDİ')warnings.push('İdealize Zemin Profili SABİTLENDİ durumunda değil.')
-  if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve yük girdileri geçerli olmalıdır.'],source:'ZeminLab idealize zemin profili oturma motoru'}
+  if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSecondary:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve yük girdileri geçerli olmalıdır.'],source:'ZeminLab idealize zemin profili oturma motoru'}
   const baseStress=effectiveStressAtDepth(layers,Df,gwt)
   const coverageLimit=Df+Math.max(2*B,method==='schmertmann'?(L/B>=10?4*B:2*B):2*B)
   let coverageCursor=Df
