@@ -23,7 +23,7 @@ function convertLayer(l:any,system:ProjectInfo['unitSystem']){
   return {...l,unitWeight:finite(l.unitWeight)?unitWeightToBase(l.unitWeight,system):l.unitWeight,saturatedUnitWeight:finite(l.saturatedUnitWeight)?unitWeightToBase(l.saturatedUnitWeight,system):l.saturatedUnitWeight,
     cohesion:finite(l.cohesion)?stressToBase(l.cohesion,system):l.cohesion,undrainedCohesion:finite(l.undrainedCohesion)?stressToBase(l.undrainedCohesion,system):l.undrainedCohesion,
     elasticModulus:finite(l.elasticModulus)?modulusToBase(l.elasticModulus,system):l.elasticModulus,
-    constrainedModulus:undefined,oedometricModulus:undefined,parameterSources:l.parameterSources??{},consolidationState:l.consolidationState??'UNKNOWN'
+    constrainedModulus:undefined,oedometricModulus:undefined,preconsolidationPressure:finite(l.preconsolidationPressure)?stressToBase(l.preconsolidationPressure,system):l.preconsolidationPressure,parameterSources:l.parameterSources??{},consolidationState:l.consolidationState??'UNKNOWN'
   }
 }
 function normalizeBorehole(b:BoreholeRecord):BoreholeRecord{
@@ -35,8 +35,8 @@ function normalizeLab(l:LaboratoryRecord):LaboratoryRecord{return {...l,depth:Ma
 function normalizeProfile(p:IdealizedSoilProfile|undefined,system:ProjectInfo['unitSystem']):IdealizedSoilProfile|undefined{
   if(!p||!Array.isArray(p.layers))return undefined
   const legacy=p.version<2||p.parameterUnitSystem!=='kN-m'
-  const layers=legacy?p.layers.map((l:any)=>convertLayer(l,system)):p.layers
-  const migrationNote=legacy?'MIGRASYON: Es/M alanları ile c′/φ′ kaynağı eski şemada kesin ayrıştırılamadığı için M alanları temizlendi; LAB kaynağı yeniden doğrulanmalıdır.':''
+  const layers=legacy?p.layers.map((l:any)=>({...convertLayer(l,system),cohesion:undefined,frictionAngle:undefined,constrainedModulus:undefined,oedometricModulus:undefined})):p.layers
+  const migrationNote=legacy?'MIGRASYON: Es/M ve c′/φ′ anlamları eski şemada kesin ayrıştırılamadığı için eski M, c′ ve φ′ alanları temizlendi; ilgili laboratuvar kaynakları yeniden doğrulanmalıdır.':''
   return {...p,version:2,parameterUnitSystem:'kN-m',status:p.status==='SABİTLENDİ'?'SABİTLENDİ':'TASLAK',layers,notes:[p.notes??'',migrationNote].filter(Boolean).join(' ')}
 }
 export function migrateProjectData(value:unknown,version:number):ProjectDocument{
