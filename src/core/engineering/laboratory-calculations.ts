@@ -16,7 +16,7 @@ export type LaboratoryDerivedValues = {
 
 export function calculatePlasticityIndex(liquidLimit?: number, plasticLimit?: number): number | undefined {
   if (liquidLimit === undefined || plasticLimit === undefined) return undefined
-  if (!Number.isFinite(liquidLimit) || !Number.isFinite(plasticLimit)) return undefined
+  if (!Number.isFinite(liquidLimit) || !Number.isFinite(plasticLimit) || liquidLimit < 0 || plasticLimit < 0 || plasticLimit > liquidLimit) return undefined
   return liquidLimit - plasticLimit
 }
 
@@ -24,7 +24,7 @@ export function deriveLaboratoryValues(record: LaboratoryRecord): LaboratoryDeri
   const plasticityIndex = calculatePlasticityIndex(record.liquidLimit, record.plasticLimit)
   const dryUnitWeight =
     record.unitWeight != null && Number.isFinite(record.unitWeight) && record.waterContent != null && Number.isFinite(record.waterContent)
-      ? record.unitWeight / (1 + Math.max(0, record.waterContent) / 100)
+      ? record.unitWeight / (1 + record.waterContent / 100)
       : undefined
   const porosityFromVoidRatio =
     record.voidRatio != null && Number.isFinite(record.voidRatio) && record.voidRatio >= 0
