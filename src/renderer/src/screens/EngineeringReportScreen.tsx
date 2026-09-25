@@ -36,7 +36,7 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
       c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,verticalLoad:N,horizontalLoad:H,momentX:Mx,momentY:My,
       groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:1.4,foundationType:f.foundationType,
       groundwaterDepth:soil.groundwaterDepth,undrainedCu:soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem),
-      layers:profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:x.gamma??unitWeightToBase(soil.unitWeight,p.unitSystem),gammaSat:x.gammaSat??unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem),cohesion:x.cohesion??stressToBase(soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle}))
+      layers:profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:x.gamma??unitWeightToBase(soil.unitWeight,p.unitSystem),gammaSat:x.gammaSat??undefined,cohesion:x.cohesion??stressToBase(soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle}))
     })}catch{return undefined}
   },[B,L,Df,N,H,Mx,My,soil,p,profile,f.foundationType])
 
