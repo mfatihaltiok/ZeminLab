@@ -82,6 +82,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=0))throw new Error('YASS tanımlıysa γsat pozitif olmalıdır.')
  if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük negatif olamaz.')
  const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad,H=Math.hypot(i.horizontalLoad??0,0),groundSlope=Math.abs(i.groundSlope??0),baseSlope=Math.abs(i.baseSlope??0),warnings:string[]=[]
+ if(i.groundwaterDepth==null)warnings.push('YASS girilmedi; nihai efektif gerilme/temel tasarım sonucu üretilemez.')
  if(groundSlope>=90||baseSlope>=90||groundSlope+baseSlope>=90)throw new Error('Arazi ve temel tabanı eğimleri geçersiz.')
  const ex=N>0?(i.momentY??0)/N:0,ey=N>0?(i.momentX??0)/N:0,Be=i.B-2*Math.abs(ex),Le=i.L-2*Math.abs(ey),effectiveArea=Math.max(0,Be)*Math.max(0,Le)
  if(N===0&&(i.momentX!==0||i.momentY!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
@@ -97,7 +98,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
  const layeredScreeningOnly=checks.length>0
  const zfBlocked=i.soilGroup==='ZF'&&!i.siteSpecificResponseAnalysisCompleted
  if(zfBlocked)warnings.push('ZF için saha özel zemin davranış analizi tamamlanmadan nihai deprem tasarım sonucu uygun kabul edilmez.')
- const finalDesignEligible=!layeredScreeningOnly&&!zfBlocked
+ const finalDesignEligible=!layeredScreeningOnly&&!zfBlocked&&i.groundwaterDepth!=null
  const adequate=finalDesignEligible&&qo<=qt&&Be>0&&Le>0
  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: efektif temel sürşarjı ve ağırlıklı γ′ kullanıldı.')
  if(groundSlope>0)warnings.push('Arazi eğimi katsayıları β<φ′ koşulu kontrol edilerek uygulandı.')
