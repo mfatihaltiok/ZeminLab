@@ -115,6 +115,11 @@ export function ProjectInfoScreenV2(){
           <Field label={"c′ ("+units.stress+")"} value={soil.cohesion||''} onChange={v=>setSoil({cohesion:num(v)})}/>
           <Field label="φ′ (°)" value={soil.frictionAngle||''} onChange={v=>setSoil({frictionAngle:num(v)})}/>
           <Field label="YASS (m)" value={soil.groundwaterDepth??''} onChange={v=>setSoil({groundwaterDepth:v===''?undefined:num(v)})}/>
+          <label>TBDY 16.6.1 sürekli tabaka / kalın mercek
+            <select value={soil.liquefactionContinuousOrThickLens?'yes':'no'} onChange={e=>setSoil({liquefactionContinuousOrThickLens:e.target.value==='yes'})}>
+              <option value="no">Doğrulanmadı</option><option value="yes">Doğrulandı</option>
+            </select>
+          </label>
           <Field label="Arazi eğimi β (°)" value={soil.surfaceSlope||''} onChange={v=>setSoil({surfaceSlope:num(v)})}/>
           <Field label="Temel tabanı eğimi θ (°)" value={soil.foundationBaseSlope||''} onChange={v=>setSoil({foundationBaseSlope:num(v)})}/>
         </div>
