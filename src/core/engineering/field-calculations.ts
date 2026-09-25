@@ -22,14 +22,22 @@ function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:Laborat
   const z=Math.max(0,depth),gwt=borehole.groundwaterDepth
   if(!borehole.lithology.length)return{verticalStress:undefined,effectiveStress:undefined,source:'Litoloji profili eksik; σ′v0 hesaplanmadı.'}
   const ordered=[...borehole.lithology].filter(x=>x.to>0&&x.from<x.to&&x.from<z).sort((a,b)=>a.from-b.from)
-  let cursor=0,sigmaV=0,complete=true
-  for(const layer of ordered){const top=Math.max(cursor,layer.from),bottom=Math.min(z,layer.to);if(bottom<=top)continue;if(top>cursor+1e-6){complete=false;break}
-    const gamma=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:labGammaInLayer(laboratories,borehole.id,top,bottom);const gammaSat=Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0?layer.saturatedUnitWeight!:gamma
-    if(gamma==null||gamma<=0){complete=false;break};const above=gwt===undefined?bottom-top:Math.max(0,Math.min(bottom,gwt)-top),below=(bottom-top)-above;sigmaV+=above*gamma+below*(gammaSat??gamma);cursor=bottom;if(cursor>=z-1e-6)break}
-  if(cursor<z-1e-6)complete=false
-  if(!complete)return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ/γsat profili eksik; CN uygulanmadı.'}
-  const porePressure=gwt!==undefined&&z>gwt?(z-gwt)*9.80665:0
-  return{verticalStress:sigmaV,effectiveStress:Math.max(0,sigmaV-porePressure),source:'Litoloji + laboratuvar γ'}
+  let cursor=0,sigmaV=0
+  for(const layer of ordered){
+    const top=Math.max(cursor,layer.from),bottom=Math.min(z,layer.to)
+    if(bottom<=top)continue
+    if(top>cursor+1e-6)return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ profili süreksiz; σ′v0 hesaplanmadı.'}
+    const gamma=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:labGammaInLayer(laboratories,borehole.id,top,bottom)
+    if(gamma==null||gamma<=0)return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ profili eksik; σ′v0 hesaplanmadı.'}
+    sigmaV+=(bottom-top)*gamma
+    cursor=bottom
+    if(cursor>=z-1e-6)break
+  }
+  if(cursor<z-1e-6)return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ profili eksik; σ′v0 hesaplanmadı.'}
+  if(gwt==null)return{verticalStress:sigmaV,effectiveStress:undefined,source:'γ profili tamam; YASS girilmediği için σ′v0 bilinmiyor.'}
+  if(!Number.isFinite(gwt)||gwt<0)return{verticalStress:sigmaV,effectiveStress:undefined,source:'YASS geçersiz; σ′v0 hesaplanmadı.'}
+  const porePressure=z>gwt?(z-gwt)*9.80665:0
+  return{verticalStress:sigmaV,effectiveStress:Math.max(0,sigmaV-porePressure),source:'Litoloji/LAB γ + ölçülen YASS'}
 }
 export type SptDerivedValues=Omit<SptEngineResult,'nField'>&{nField?:number;verticalStress?:number;effectiveStress?:number;stressSource?:string;overburdenCorrection?:number;overburdenCorrectionApplied:boolean;n60DilatancyCorrected?:number;cohesionless?:boolean}
 export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[]):SptDerivedValues{
