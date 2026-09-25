@@ -65,6 +65,7 @@ export interface LayerSettlementInput {
   e0?: number
   Cr?: number
   sigmaPc?: number
+  model?: 'mv'|'oedometer'|'elastic'
 }
 export interface LayerSettlementResult {
   immediate: number
@@ -107,8 +108,10 @@ export interface SchmertmannLayer { thickness: number; Es: number; Iz: number }
 export function schmertmannSettlement(q: number, layers: SchmertmannLayer[], C1?: number, C2?: number) {
   if (C1 == null || !Number.isFinite(C1) || C1 < 0) throw new Error('Schmertmann C1 açıkça verilmelidir.')
   if (C2 == null || !Number.isFinite(C2) || C2 < 0) throw new Error('Schmertmann C2 açıkça verilmelidir.')
-  const settlement = C1 * C2 * Math.max(0, q) * layers.reduce((sum, l) => {
-    return sum + Math.max(0, l.Iz) * Math.max(0, l.thickness) / Math.max(l.Es, 1e-9)
+  if(!Number.isFinite(q)||q<0)throw new Error('Schmertmann q geçerli ve negatif olmayan bir değer olmalıdır.')
+  const settlement = C1 * C2 * q * layers.reduce((sum, l) => {
+    if(!Number.isFinite(l.thickness)||l.thickness<0||!Number.isFinite(l.Es)||l.Es<=0||!Number.isFinite(l.Iz)||l.Iz<0)throw new Error('Schmertmann tabakalarında kalınlık, Es ve Iz geçerli olmalıdır.')
+    return sum + l.Iz * l.thickness / l.Es
   }, 0)
   return { settlement, formula: 's = C1·C2·q·Σ(Iz/Es)Δz', method: 'Schmertmann strain-integration framework' }
 }
