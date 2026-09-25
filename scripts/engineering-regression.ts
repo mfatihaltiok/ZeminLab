@@ -50,7 +50,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 {
   const result=liquefactionProfile({
     Mw:7.5,Sds:1,gwt:2,
-    soilGroup:'ZE',dts:'1',continuousOrThickLens:true,
+    soilGroup:'ZE',dts:'1',continuousOrThickLens:true,foundationDepth:2,
     layers:[{top:0,bottom:10,gamma:18,gammaSat:19,soil:'SA',finesContent:30,plasticityIndex:5}],
     spt:[{depth:5,nField:10,fineContent:30,plasticityIndex:5,waterContent:20,soil:'SA',energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10}]
   })
