@@ -25,7 +25,7 @@ export function ProjectInfoScreenV2(){
       unitSystem:next,
       soilParameters:{...soil,unitWeight:convG(soil.unitWeight),saturatedUnitWeight:convG(soil.saturatedUnitWeight),cohesion:convS(soil.cohesion),undrainedCohesion:convS(soil.undrainedCohesion)},
       foundationParameters:{...f,structuralWeight:convF(f.structuralWeight),verticalLoad:convF(f.verticalLoad),horizontalLoad:convF(f.horizontalLoad),vtX:convF(f.vtX),vtY:convF(f.vtY),momentX:convM(f.momentX),momentY:convM(f.momentY),passiveResistanceCharacteristic:convF(f.passiveResistanceCharacteristic)},
-      jetGrout:{...p.jetGrout,qSoil:convS(p.jetGrout.qSoil),qColumn:convS(p.jetGrout.qColumn),cSoil:convS(p.jetGrout.cSoil),cColumn:convS(p.jetGrout.cColumn),EsSoil:convM(p.jetGrout.EsSoil),EsColumn:convM(p.jetGrout.EsColumn)}
+      jetGrout:{...p.jetGrout}
     })
   }
   const setFoundation=(patch:Partial<typeof f>)=>setProject({foundationParameters:{...f,...patch}})
