@@ -93,9 +93,9 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(effectiveB<=0||effectiveL<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,effectiveB,effectiveL,foundationArea,ready:false,warnings:[...warnings,'Eksantrisite temel boyutunu tüketiyor; oturma için etkin temas alanı geçersiz.'],source:'FALUZMN ortak oturma motoru'}
   const appliedQ=verticalLoad/foundationArea
   const gwt=finite(input.groundwaterDepth)?input.groundwaterDepth!:NaN
-  if(!finite(gwt))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'YASS girilmeden efektif gerilme/oturma hesabı yapılamaz.'],source:'FALUZMN ortak oturma motoru'}
+  if(!finite(gwt))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,effectiveB,effectiveL,foundationArea,ready:false,warnings:[...warnings,'YASS girilmeden efektif gerilme/oturma hesabı yapılamaz.'],source:'FALUZMN ortak oturma motoru'}
   const baseStress=effectiveStressAtDepth(layers,Df,gwt)
-  if(!finite(baseStress.effective))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Df seviyesine kadar γ/γsat profili eksik veya geçersiz.'],source:'FALUZMN ortak oturma motoru'}
+  if(!finite(baseStress.effective))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,effectiveB,effectiveL,foundationArea,ready:false,warnings:[...warnings,'Df seviyesine kadar γ/γsat profili eksik veya geçersiz.'],source:'FALUZMN ortak oturma motoru'}
   const qNet=Math.max(0,appliedQ-baseStress.effective)
   const ratio=effectiveL/Math.max(effectiveB,1e-9)
   const influenceDepth=method==='burland-burbidge'?burlandInfluenceDepth(effectiveB,input.burlandNTrend??'unknown',input.burlandSoftLayerBottomDepth,input.Df):method==='schmertmann'?(input.foundationType==='surekli'?4*effectiveB:(ratio>=10?4*effectiveB:2*effectiveB)):method==='janbu'?Math.max(2*effectiveB,1):2*effectiveB
