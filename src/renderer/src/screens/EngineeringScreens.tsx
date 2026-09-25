@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { foundationChecks } from '../../core/calculations/engineering'
+import { foundationChecks } from '../../../core/engineering/foundation-sliding'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { useProjectInfo } from '../../core/state/project-store'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
@@ -76,7 +76,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
 export function Foundation(){
   const p=useProjectInfo(),f=p.foundationParameters,soil=p.soilParameters
   const N=forceToBase(f.structuralWeight,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
-  const ready=f.footingWidth>0&&f.footingLength>0&&N>=0&&f.baseFrictionTanDelta!=null&&Number.isFinite(f.baseFrictionTanDelta)&&f.baseFrictionTanDelta>=0&&f.baseFrictionTanDelta!=null&&Number.isFinite(f.baseFrictionTanDelta)&&f.baseFrictionTanDelta>=0
+  const ready=f.footingWidth>0&&f.footingLength>0&&N>=0&&f.baseFrictionTanDelta!=null&&Number.isFinite(f.baseFrictionTanDelta)&&f.baseFrictionTanDelta>=0
   const r=ready?foundationChecks({
     B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,
     deltaTan:f.baseFrictionTanDelta!,cu:soil.undrainedCohesion,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,

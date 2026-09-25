@@ -1,7 +1,8 @@
 import { useMemo, type ReactNode } from 'react'
 import { useProjectInfo } from '../../../core/state/project-store'
 import { forceToBase, forceFromBase, momentToBase, stressToBase, unitWeightToBase } from '../../../core/units/project-units'
-import { tbdyBearingCapacity, foundationChecks } from '../../../core/calculations/engineering'
+import { tbdyBearingCapacity } from '../../../core/engineering/calculation-engine'
+import { foundationChecks } from '../../../core/engineering/foundation-sliding'
 import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '../../../core/engineering/idealized-settlement-engine'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { deriveSptValues } from '../../../core/engineering/field-calculations'
@@ -36,7 +37,7 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
       c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,verticalLoad:N,horizontalLoad:H,momentX:Mx,momentY:My,
       groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:1.4,foundationType:f.foundationType,
       groundwaterDepth:soil.groundwaterDepth,undrainedCu:soil.undrainedCohesion,
-      layers:profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:unitWeightToBase(x.gamma??soil.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(x.gammaSat??x.gamma??soil.saturatedUnitWeight,p.unitSystem),cohesion:stressToBase(x.cohesion??soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle}))
+      layers:profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:x.gamma??unitWeightToBase(soil.unitWeight,p.unitSystem),gammaSat:x.gammaSat??x.gamma??unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem),cohesion:x.cohesion??stressToBase(soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle}))
     })}catch{return undefined}
   },[B,L,Df,N,H,Mx,My,soil,p,profile,f.foundationType])
 
@@ -79,8 +80,8 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
           boreholeDiameterMm:b.drillingDiameter,sampler:cfg.sampler,samplerCorrection:cfg.samplerCorrection,rodLengthM:cfg.rodLengthM}
       })
       return{borehole:b,result:rows.length?liquefactionProfile({
-        Mw:p.seismic.magnitude!,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(x=>({top:x.from,bottom:x.to,gamma:x.unitWeight??0,gammaSat:x.saturatedUnitWeight??x.unitWeight??0,soil:x.code,finesContent:x.finesContent,plasticityIndex:x.plasticityIndex})),
-        spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth
+        Mw:p.seismic.magnitude!,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(x=>({top:x.from,bottom:x.to,gamma:x.unitWeight!=null?unitWeightToBase(x.unitWeight,b.unitSystem):0,gammaSat:x.saturatedUnitWeight!=null?unitWeightToBase(x.saturatedUnitWeight,b.unitSystem):x.unitWeight!=null?unitWeightToBase(x.unitWeight,b.unitSystem):0,soil:x.code,finesContent:x.finesContent,plasticityIndex:x.plasticityIndex})),
+        spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth,siteSpecificResponseAnalysisCompleted:p.geophysical.siteSpecificResponseAnalysisCompleted
       }):undefined}
     })
   },[boreholes,labs,p.seismic.magnitude,p.seismic.dts,sds])
