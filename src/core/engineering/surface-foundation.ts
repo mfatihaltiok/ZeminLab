@@ -271,7 +271,11 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(foundationType==='radye')warnings.push('Radye temel için taşıma gücü yanında toplam ve farklı oturma ayrıca kontrol edilmelidir.')
 
   const undrainedCu=finite(i.undrainedCu)&&i.undrainedCu>=0?i.undrainedCu:undefined
-  const undrainedQk=undrainedCu==null?undefined:undrainedCu*5.14*Math.max(0,1-H/Math.max((Bp*Lp)*Math.max(undrainedCu,1e-12)*5.14,1e-12))+qBase
+  const undrainedShape=foundationType==='surekli'?1:1+(Bp/Lp)*(1/5.14)
+  const undrainedDepth=1+0.4*Math.atan(i.Df/Math.max(Bp,1e-12))
+  const undrainedInclination=undrainedCu!=null&&H>0&&undrainedCu>0?Math.max(0,1-H/Math.max((Bp*Lp)*undrainedCu*5.14,1e-12)):undrainedCu!=null?(H>0?0:1):1
+  const undrainedGround=groundFactors(groundSlope,0,1).gc,undrainedBase=baseFactors(baseSlope,0,1).bc
+  const undrainedQk=undrainedCu==null?undefined:undrainedCu*5.14*undrainedShape*undrainedDepth*undrainedInclination*undrainedGround*undrainedBase+qBase
 
   const steps:SurfaceFoundationStep[]=[
     {symbol:'ex/ey',title:'Yük eksantrislikleri',formula:'ex=My/N ; ey=Mx/N',value:Math.max(Math.abs(ex),Math.abs(ey)),unit:'m'},
