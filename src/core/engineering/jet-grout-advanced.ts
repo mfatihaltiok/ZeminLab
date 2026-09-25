@@ -38,7 +38,7 @@ export function jetGroutShearSafety(i: ShearSafetyInput): ShearSafetyResult {
   const A=i.area, tau=i.horizontalLoad/A, sigma=i.effectiveNormalStress!=null?i.effectiveNormalStress:i.verticalLoad/A
   if(!Number.isFinite(sigma)||sigma<0) throw new Error('Efektif normal gerilme geçerli ve negatif olmayan bir değer olmalıdır.')
   const phi = i.frictionAngle * Math.PI / 180, resistance = i.cohesion + sigma * Math.tan(phi)
-  return { shearStress: tau, shearResistance: resistance, FS: tau > 0 ? resistance / tau : 99, formula: 'FS = [c′ + σ′n·tanφ′] / τ, τ = H/A' }
+  return { shearStress: tau, shearResistance: resistance, FS: tau > 0 ? resistance / tau : Number.POSITIVE_INFINITY, formula: 'FS = [c′ + σ′n·tanφ′] / τ, τ = H/A' }
 }
 
 export interface JetGroutLayer {
@@ -86,6 +86,8 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
   if(!Number.isFinite(i.diameter)||i.diameter<=0||!Number.isFinite(i.resistanceFactor??1)||((i.resistanceFactor??1)<=0)) throw new Error('Jet Grout eksenel kapasite çapı ve direnç katsayısı geçerli olmalıdır.')
   const d = i.diameter, Ab = Math.PI * d * d / 4, perimeter = Math.PI * d
   let shaftCharacteristic = 0
+  const totalLayerThickness=i.layers.reduce((sum,layer)=>sum+(Number.isFinite(layer.thickness)?layer.thickness:0),0)
+  if(i.columnLength!=null&&(!Number.isFinite(i.columnLength)||i.columnLength<=0||Math.abs(i.columnLength-totalLayerThickness)>1e-6))throw new Error('Jet Grout kolon boyu ile şaft hesabındaki tabaka toplam kalınlığı uyuşmalıdır.')
   const layerTrace = i.layers.map((layer, index) => {
     if(!Number.isFinite(layer.thickness)||layer.thickness<0||!Number.isFinite(layer.gamma)||layer.gamma<=0||!Number.isFinite(layer.cohesion)||layer.cohesion<0||!Number.isFinite(layer.frictionAngle)||layer.frictionAngle<0||layer.frictionAngle>=89) throw new Error('Jet Grout tabakalarında H, γ, c ve φ açıkça geçerli girilmelidir.')
     if(layer.effectiveStressAtTop==null||!Number.isFinite(layer.effectiveStressAtTop)||layer.effectiveStressAtTop<0||layer.effectiveStressAtBottom==null||!Number.isFinite(layer.effectiveStressAtBottom)||layer.effectiveStressAtBottom<layer.effectiveStressAtTop) throw new Error('Jet Grout tabakalarında σ′ üst ve alt değerleri açıkça verilmelidir.')
@@ -113,8 +115,9 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
   if(i.columnStrength!=null&&(!Number.isFinite(i.columnStrength)||i.columnStrength<0))throw new Error('Jet Grout kolon dayanımı geçerli ve negatif olmayan bir değer olmalıdır.')
   const materialLimit = i.columnStrength != null ? i.columnStrength * Ab : Number.POSITIVE_INFINITY
   const columnCharacteristic = Math.min(materialLimit, shaftCharacteristic + tipCharacteristic)
-  if(!Number.isFinite(i.numberOfColumns)||i.numberOfColumns!<1||!Number.isFinite(i.groupRows)||i.groupRows!<1||!Number.isFinite(i.groupColumns)||i.groupColumns!<1||!Number.isFinite(i.groupSpacing)||i.groupSpacing!<d) throw new Error('Grup hesabı için kolon sayısı, satır/sütun sayısı ve aks aralığı açıkça girilmelidir.')
-  const n=Math.round(i.numberOfColumns!),rows=Math.round(i.groupRows!),cols=Math.round(i.groupColumns!),spacing=i.groupSpacing!
+  if(!Number.isInteger(i.numberOfColumns)||i.numberOfColumns!<1||!Number.isInteger(i.groupRows)||i.groupRows!<1||!Number.isInteger(i.groupColumns)||i.groupColumns!<1||!Number.isFinite(i.groupSpacing)||i.groupSpacing!<d) throw new Error('Grup hesabı için kolon sayısı, satır/sütun sayısı ve aks aralığı açıkça girilmelidir.')
+  const n=i.numberOfColumns!,rows=i.groupRows!,cols=i.groupColumns!,spacing=i.groupSpacing!
+  if(rows*cols!==n)throw new Error('Jet Grout grup geometrisinde satır×sütun kolon sayısı ile toplam kolon sayısı aynı olmalıdır.')
   const groupWidth = Math.max(d, (cols - 1) * spacing + d), groupLength = Math.max(d, (rows - 1) * spacing + d)
   const blockPerimeter = 2 * (groupWidth + groupLength)
   const blockArea = groupWidth * groupLength
