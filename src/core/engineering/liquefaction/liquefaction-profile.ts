@@ -64,8 +64,9 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
   const gammaW=input.gammaW??9.81
   if(!finite(gammaW)||gammaW<=0)throw new Error('Su birim hacim ağırlığı pozitif olmalıdır.')
   const CM=magnitudeCorrection(input.Mw),warnings:string[]=[]
-  const mandatoryByProject=mandatoryDts(input.dts)&&mandatorySoilGroup(input.soilGroup)&&input.continuousOrThickLens===true
-  if(!input.dts||!input.soilGroup||input.continuousOrThickLens!==true)warnings.push('DTS, TBDY zemin grubu veya 16.6.1 sürekli tabaka/kalın mercek doğrulaması eksik; sıvılaşma zorunluluğu kesinleştirilemedi.')
+  const scopeComplete=input.dts!==undefined&&input.soilGroup!==undefined&&input.continuousOrThickLens!==undefined
+  const mandatoryByProject=scopeComplete&&mandatoryDts(input.dts)&&mandatorySoilGroup(input.soilGroup)&&input.continuousOrThickLens===true
+  if(!scopeComplete)warnings.push('DTS, TBDY zemin grubu ve/veya 16.6.1 sürekli tabaka/kalın mercek doğrulaması eksik; sıvılaşma zorunluluğu kesinleştirilemedi.')
   if(input.soilGroup==='ZF')warnings.push('ZF için 16.5.1.3 sahaya özel zemin davranış analizi gerekir; bu ekran o analizi yerine geçmez.')
   const rows=input.spt.filter(x=>finite(x.depth)&&x.depth>=0).sort((a,b)=>a.depth-b.depth).map((record):LiquefactionProfileRow=>{
     const layer=input.layers.find(l=>record.depth>=l.top&&record.depth<l.bottom)
@@ -100,8 +101,12 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       trace.push({symbol:'Kapsam',title:'TBDY kapsam kontrolü',formula:'16.6.1–16.6.6',value:record.depth,note})
       return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
+    if(!scopeComplete){
+      trace.push({symbol:'Kapsam',title:'16.6.1 proje kapsam verisi',formula:'DTS + Zemin grubu + sürekli tabaka/kalın mercek',value:0,note:'Kapsam girdileri tamamlanmadan sıvılaşma zorunluluğu hakkında uygunluk sonucu verilmez.'})
+      return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
+    }
     if(!mandatoryAnalysis){
-      trace.push({symbol:'DTS/Zemin',title:'16.6.1 zorunluluğu',formula:'DTS=1/1a/2/2a + ZD/ZE/ZF + sürekli tabaka/kalın mercek',value:0,note:'Proje koşulları zorunlu sıvılaşma ekranını tetiklemedi.'})
+      trace.push({symbol:'DTS/Zemin',title:'16.6.1 zorunluluğu',formula:'DTS=1/1a/2/2a + ZD/ZE/ZF + sürekli tabaka/kalın mercek',value:0,note:'Tamamlanan proje kapsamı koşulları sıvılaşma zorunluluğunu tetiklemedi.'})
       return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     if(!researchDataComplete){
