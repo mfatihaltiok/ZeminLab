@@ -1,6 +1,6 @@
 import { updateProjectInfo, useProjectInfo } from '../../../core/state/project-store'
 import { classifyVs30, determineDts, calculateSdsSeismic, type SoilClassificationCode, type FoundationType, type UnitSystem, type BuildingUseClass } from '../../../core/models/project'
-import { projectUnits } from '../../../core/units/project-units'
+import { projectUnits, forceToBase, forceFromBase, stressToBase, stressFromBase, unitWeightToBase, unitWeightFromBase, modulusToBase, modulusFromBase } from '../../../core/units/project-units'
 import { Card, Field, Frame, Metric } from '../workspace/WorkspaceShell'
 
 const descriptions:Record<SoilClassificationCode,string>={
@@ -14,6 +14,19 @@ const num=(v:string)=>v===''?0:Number(v)
 export function ProjectInfoScreenV2(){
   const p=useProjectInfo(),f=p.foundationParameters,soil=p.soilParameters,units=projectUnits(p.unitSystem)
   const setProject=(patch:Partial<typeof p>)=>updateProjectInfo({...p,...patch})
+  const changeUnitSystem=(next:UnitSystem)=>{
+    if(next===p.unitSystem)return
+    const convF=(v:number|undefined)=>v==null||!Number.isFinite(v)?v:forceFromBase(forceToBase(v,p.unitSystem),next)
+    const convS=(v:number|undefined)=>v==null||!Number.isFinite(v)?v:stressFromBase(stressToBase(v,p.unitSystem),next)
+    const convG=(v:number|undefined)=>v==null||!Number.isFinite(v)?v:unitWeightFromBase(unitWeightToBase(v,p.unitSystem),next)
+    const convM=(v:number|undefined)=>v==null||!Number.isFinite(v)?v:modulusFromBase(modulusToBase(v,p.unitSystem),next)
+    setProject({
+      unitSystem:next,
+      soilParameters:{...soil,unitWeight:convG(soil.unitWeight),saturatedUnitWeight:convG(soil.saturatedUnitWeight),cohesion:convS(soil.cohesion),undrainedCohesion:convS(soil.undrainedCohesion)},
+      foundationParameters:{...f,structuralWeight:convF(f.structuralWeight),verticalLoad:convF(f.verticalLoad),horizontalLoad:convF(f.horizontalLoad),vtX:convF(f.vtX),vtY:convF(f.vtY),momentX:convM(f.momentX),momentY:convM(f.momentY),passiveResistanceCharacteristic:convF(f.passiveResistanceCharacteristic)},
+      jetGrout:{...p.jetGrout,qSoil:convS(p.jetGrout.qSoil),qColumn:convS(p.jetGrout.qColumn),cSoil:convS(p.jetGrout.cSoil),cColumn:convS(p.jetGrout.cColumn),EsSoil:convM(p.jetGrout.EsSoil),EsColumn:convM(p.jetGrout.EsColumn)}
+    })
+  }
   const setFoundation=(patch:Partial<typeof f>)=>setProject({foundationParameters:{...f,...patch}})
   const setSoil=(patch:Partial<typeof soil>)=>setProject({soilParameters:{...soil,...patch}})
   const setSeismic=(patch:Partial<typeof p.seismic>)=>setProject({seismic:{...p.seismic,...patch}})
@@ -41,7 +54,7 @@ export function ProjectInfoScreenV2(){
 
       <Card title="PROJE BİRİM SİSTEMİ">
         <div className="form-grid">
-          <label>Hesap birim sistemi<select value={p.unitSystem} onChange={e=>setProject({unitSystem:e.target.value as UnitSystem})}><option value="ton-m">Ton - m</option><option value="kN-m">kN - m</option></select></label>
+          <label>Hesap birim sistemi<select value={p.unitSystem} onChange={e=>changeUnitSystem(e.target.value as UnitSystem)}><option value="ton-m">Ton - m</option><option value="kN-m">kN - m</option></select></label>
           <div className="classification-note"><b>Aktif:</b> {units.force}, {units.stress}, {units.unitWeight}, {units.moment}</div>
         </div>
       </Card>
@@ -97,7 +110,7 @@ export function ProjectInfoScreenV2(){
 
       <Card title="TEMEL TABANI · KAYMA PARAMETRELERİ">
         <div className="form-grid">
-          <Field label="tanδ ≤ 0.60" value={f.baseFrictionTanDelta??0.6} onChange={v=>setFoundation({baseFrictionTanDelta:num(v)})}/>
+          <Field label="tanδ ≤ 0.60" value={f.baseFrictionTanDelta??''} onChange={v=>setFoundation({baseFrictionTanDelta:num(v)})}/>
           <Field label={"Karakteristik pasif direnç Rpk ("+units.force+")"} value={f.passiveResistanceCharacteristic??0} onChange={v=>setFoundation({passiveResistanceCharacteristic:num(v)})}/>
           <label>Pasif direnç kredisi<select value={f.usePassiveResistance?'yes':'no'} onChange={e=>setFoundation({usePassiveResistance:e.target.value==='yes'})}><option value="no">Kullanma</option><option value="yes">Kullan</option></select></label>
           <Field label={"Drenajsız Cu ("+units.stress+")"} value={soil.undrainedCohesion??''} onChange={v=>setSoil({undrainedCohesion:v===''?undefined:num(v)})}/>
