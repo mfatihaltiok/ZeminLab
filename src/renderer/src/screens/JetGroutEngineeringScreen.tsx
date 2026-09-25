@@ -1,49 +1,55 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { jetGroutEngineering, type JetGroutEngineeringResult } from '../../../core/engineering/jet-grout-advanced'
 import { Card, Field, Frame, Metric, Source } from '../workspace/WorkspaceShell'
-import { useProjectInfo } from '../../../core/state/project-store'
+import { updateProjectInfo, useProjectInfo } from '../../../core/state/project-store'
 import { forceToBase } from '../../../core/units/project-units'
 import { CalculationTrace } from '../components/CalculationTrace'
 
 export let latestJetGroutResult:JetGroutEngineeringResult|undefined
 
+const num=(value:string)=>value===''?undefined:Number(value)
+
 export function JetGroutEngineeringScreen(){
-  const p=useProjectInfo(),f=p.foundationParameters
+  const p=useProjectInfo(),f=p.foundationParameters,j=p.jetGrout
   const projectArea=Math.max(0,f.footingWidth*f.footingLength)
   const projectLoad=forceToBase(f.structuralWeight,p.unitSystem)
   const projectH=Math.hypot(forceToBase(f.vtX,p.unitSystem),forceToBase(f.vtY,p.unitSystem))
-  const [d,setD]=useState(''),[spacing,setSpacing]=useState(''),[soil,setSoil]=useState(''),[column,setColumn]=useState('')
-  const [soilEs,setSoilEs]=useState(''),[columnEs,setColumnEs]=useState(''),[soilC,setSoilC]=useState(''),[columnC,setColumnC]=useState('')
-  const [thickness,setThickness]=useState(''),[phi,setPhi]=useState(''),[c,setC]=useState(''),[angle,setAngle]=useState('')
-  const [layout,setLayout]=useState<'square'|'triangular'>('square')
+  const set=(key:keyof typeof j,value:number|undefined|string)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
+  const d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=j.qSoil?.toString()??'',column=j.qColumn?.toString()??''
+  const soilEs=j.EsSoil?.toString()??'',columnEs=j.EsColumn?.toString()??'',soilC=j.cSoil?.toString()??'',columnC=j.cColumn?.toString()??''
+  const thickness=j.foundationThickness?.toString()??'',phi=j.columnFrictionAngle?.toString()??'',c=j.interfaceCohesion?.toString()??'',angle=j.interfaceFrictionAngle?.toString()??''
+  const layout=j.layout??'square'
   const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)
-  const r=useMemo(()=>ready?jetGroutEngineering({
-    columnDiameter:Number(d),spacing:Number(spacing),layout,qSoil:Number(soil),qColumn:Number(column),
-    cSoil:Number(soilC)>0?Number(soilC):undefined,cColumn:Number(columnC)>0?Number(columnC):undefined,
-    EsSoil:Number(soilEs)>0?Number(soilEs):undefined,EsColumn:Number(columnEs)>0?Number(columnEs):undefined,
-    load:projectLoad>0?projectLoad:undefined,foundationArea:projectArea>0?projectArea:undefined,
-    foundationThickness:Number(thickness)>0?Number(thickness):undefined,
-    columnFrictionAngle:Number(phi)>0?Number(phi):undefined,cohesion:Number(c)>0?Number(c):undefined,
-    frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH
-  }):undefined,[ready,d,spacing,layout,soil,column,soilEs,columnEs,soilC,columnC,thickness,phi,c,angle,projectLoad,projectArea,projectH])
+  const r=useMemo(()=>{
+    if(!ready)return undefined
+    return jetGroutEngineering({
+      columnDiameter:Number(d),spacing:Number(spacing),layout,qSoil:Number(soil),qColumn:Number(column),
+      cSoil:Number(soilC)>0?Number(soilC):undefined,cColumn:Number(columnC)>0?Number(columnC):undefined,
+      EsSoil:Number(soilEs)>0?Number(soilEs):undefined,EsColumn:Number(columnEs)>0?Number(columnEs):undefined,
+      load:projectLoad>0?projectLoad:undefined,foundationArea:projectArea>0?projectArea:undefined,
+      foundationThickness:Number(thickness)>0?Number(thickness):undefined,
+      columnFrictionAngle:Number(phi)>0?Number(phi):undefined,cohesion:Number(c)>0?Number(c):undefined,
+      frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH
+    })
+  },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,phi,c,angle,projectLoad,projectArea,projectH])
   latestJetGroutResult=r
 
   return <Frame screen="jet-grout">
-    <Source>Erol &amp; Çekinmez Bayram (2018) kompozit yaklaşımı kullanılır. Priebe yalnızca taş kolon/vibro-replacement referansıdır. TBDY 2018 kontrolleri ayrı mühendislik motorlarından yürütülür.</Source>
+    <Source>Erol &amp; Çekinmez Bayram (2018) kompozit yaklaşımı kullanılır. Priebe yalnızca taş kolon/vibro-replacement referansıdır. TBDY 2018 geoteknik kontrolleri ayrı motorlardan yürütülür.</Source>
     <Card title="JET GROUT GİRDİLERİ"><div className="form-grid">
-      <Field label="Kolon çapı d (m)" value={d} onChange={setD}/>
-      <Field label="Aks aralığı s (m)" value={spacing} onChange={setSpacing}/>
-      <label>Yerleşim<select value={layout} onChange={e=>setLayout(e.target.value as 'square'|'triangular')}><option value="square">Kare</option><option value="triangular">Üçgen</option></select></label>
-      <Field label="Zemin qult (kPa)" value={soil} onChange={setSoil}/>
-      <Field label="Kolon qult (kPa)" value={column} onChange={setColumn}/>
-      <Field label="Zemin c′ (kPa)" value={soilC} onChange={setSoilC}/>
-      <Field label="Kolon c′ (kPa)" value={columnC} onChange={setColumnC}/>
-      <Field label="Zemin E (kPa)" value={soilEs} onChange={setSoilEs}/>
-      <Field label="Kolon E (kPa)" value={columnEs} onChange={setColumnEs}/>
-      <Field label="İyileştirme kalınlığı H (m)" value={thickness} onChange={setThickness}/>
-      <Field label="Kolon φ (°)" value={phi} onChange={setPhi}/>
-      <Field label="Arayüz c′ (kPa)" value={c} onChange={setC}/>
-      <Field label="Arayüz φ′ (°)" value={angle} onChange={setAngle}/>
+      <Field label="Kolon çapı d (m)" value={d} onChange={v=>set('columnDiameter',num(v))}/>
+      <Field label="Aks aralığı s (m)" value={spacing} onChange={v=>set('spacing',num(v))}/>
+      <label>Yerleşim<select value={layout} onChange={e=>set('layout',e.target.value as 'square'|'triangular')}><option value="square">Kare</option><option value="triangular">Üçgen</option></select></label>
+      <Field label="Zemin qult (kPa)" value={soil} onChange={v=>set('qSoil',num(v))}/>
+      <Field label="Kolon qult (kPa)" value={column} onChange={v=>set('qColumn',num(v))}/>
+      <Field label="Zemin c′ (kPa)" value={soilC} onChange={v=>set('cSoil',num(v))}/>
+      <Field label="Kolon c′ (kPa)" value={columnC} onChange={v=>set('cColumn',num(v))}/>
+      <Field label="Zemin E (kPa)" value={soilEs} onChange={v=>set('EsSoil',num(v))}/>
+      <Field label="Kolon E (kPa)" value={columnEs} onChange={v=>set('EsColumn',num(v))}/>
+      <Field label="İyileştirme kalınlığı H (m)" value={thickness} onChange={v=>set('foundationThickness',num(v))}/>
+      <Field label="Kolon φ (°)" value={phi} onChange={v=>set('columnFrictionAngle',num(v))}/>
+      <Field label="Arayüz c′ (kPa)" value={c} onChange={v=>set('interfaceCohesion',num(v))}/>
+      <Field label="Arayüz φ′ (°)" value={angle} onChange={v=>set('interfaceFrictionAngle',num(v))}/>
       <Metric label="Temel alanı" value={projectArea.toFixed(2)} unit="m²"/>
       <Metric label="G+Q" value={projectLoad.toFixed(2)} unit="kN"/>
       <Metric label="H" value={projectH.toFixed(2)} unit="kN"/>
