@@ -1,4 +1,5 @@
 import { calculateSurfaceFoundation } from './surface-foundation'
+import { calculateFoundationSliding } from './foundation-sliding'
 
 export type BearingMethod='Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
 export interface CalculationStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string;source?:string}
@@ -80,50 +81,8 @@ export function liquefaction(i:LiquefactionInput):CalculationResult<any>{
   ]}
 }
 
-export interface FoundationCheckInput{
-  B:number;L:number;N:number;Vx?:number;Vy?:number;V?:number;Mx:number;My:number;deltaTan?:number;cu?:number;area?:number
-  groundwaterDepth?:number;foundationDepth?:number;passiveResistanceCharacteristic?:number;usePassiveResistance?:boolean;gammaRh?:number;gammaRp?:number
-}
-export function foundationChecks(i:FoundationCheckInput){
-  if(i.B<=0||i.L<=0)throw new Error('Temel boyutları pozitif olmalıdır.')
-  const N=Math.max(0,i.N),ex=N!==0?i.My/N:0,ey=N!==0?i.Mx/N:0
-  const qAvg=N/(i.B*i.L)
-  const qMax=qAvg*(1+6*Math.abs(ex)/i.B+6*Math.abs(ey)/i.L)
-  const qMin=qAvg*(1-6*Math.abs(ex)/i.B-6*Math.abs(ey)/i.L)
-  const effectiveLength=Math.max(0,i.L-2*Math.abs(ey)),effectiveWidth=Math.max(0,i.B-2*Math.abs(ex))
-  const contactArea=i.area??effectiveWidth*effectiveLength
-  const rh=i.gammaRh??1.10,rp=i.gammaRp??1.40
-  const rawTan=i.deltaTan??.60,deltaTan=Math.min(.60,Math.max(0,rawTan))
-  const warnings:string[]=[]
-  let rth=0
-  const submerged=i.groundwaterDepth!=null&&i.foundationDepth!=null&&i.groundwaterDepth<=i.foundationDepth
-  if(submerged){
-    if(i.cu!=null&&i.cu>0)rth=contactArea*i.cu/rh
-    else warnings.push('Temel YASS altında/aynı kotta. TBDY 16.8.4.6 gereği deprem sürtünme direnci cu ile hesaplanmalı; cu girilmedi.')
-  }else{
-    rth=N*deltaTan/rh
-    if(rawTan>0.60)warnings.push('tanδ, TBDY Tablo 16.3 üst sınırı olan 0.60 ile sınırlandı.')
-  }
-  const rpk=Math.max(0,i.passiveResistanceCharacteristic??0)
-  const rpt=i.usePassiveResistance?rpk/rp:0
-  if(rpk>0&&!i.usePassiveResistance)warnings.push('Karakteristik pasif direnç girilmiş ancak pasif direnç kredilendirmesi kapalıdır.')
-  const designResistance=rth+.30*rpt
-  const vx=Math.abs(i.Vx??i.V??0),vy=Math.abs(i.Vy??0)
-  const utilizationX=designResistance>0?vx/designResistance:Infinity
-  const utilizationY=designResistance>0?vy/designResistance:Infinity
-  const safeX=designResistance>0&&vx<=designResistance,safeY=designResistance>0&&vy<=designResistance
-  if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
-  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; qmin<0 olabilir.')
-  const requiredData=submerged&&(i.cu==null||i.cu<=0)
-  return{
-    ex,ey,qAvg,qMax,qMin,contactArea,effectiveWidth,effectiveLength,
-    slidingFS:Math.abs(i.V??0)>0?designResistance/Math.abs(i.V!):Infinity,
-    slidingCapacityX:designResistance,slidingCapacityY:designResistance,
-    slidingUtilizationX:utilizationX,slidingUtilizationY:utilizationY,slidingSafeX:safeX,slidingSafeY:safeY,
-    slidingResistanceFactor:rh,passiveResistanceDesign:rpt,passiveResistanceCharacteristic:rpk,slidingTanDelta:deltaTan,
-    slidingMode:submerged?'undrained-cu':'drained-interface',evaluable:!requiredData,warnings
-  }
-}
+export type FoundationCheckInput = Parameters<typeof calculateFoundationSliding>[0]
+export function foundationChecks(i:FoundationCheckInput){return calculateFoundationSliding(i)}
 
 export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number}){
   const Ac=Math.PI*i.columnDiameter**2/4,ratio=Math.min(1,Ac/Math.max(i.spacing**2,1e-9)),composite=(1-ratio)*i.qultSoil+ratio*i.qultColumn*i.improvementFactor
