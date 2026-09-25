@@ -1,6 +1,6 @@
 import { updateProjectInfo, useProjectInfo } from '../../../core/state/project-store'
 import { classifyVs30, determineDts, calculateSdsSeismic, type SoilClassificationCode, type FoundationType, type UnitSystem, type BuildingUseClass } from '../../../core/models/project'
-import { projectUnits, forceToBase, forceFromBase, stressToBase, stressFromBase, unitWeightToBase, unitWeightFromBase, modulusToBase, modulusFromBase } from '../../../core/units/project-units'
+import { projectUnits, forceToBase, forceFromBase, stressToBase, stressFromBase, unitWeightToBase, unitWeightFromBase, modulusToBase, modulusFromBase, momentToBase, momentFromBase } from '../../../core/units/project-units'
 import { Card, Field, Frame, Metric } from '../workspace/WorkspaceShell'
 
 const descriptions:Record<SoilClassificationCode,string>={
@@ -10,6 +10,7 @@ const descriptions:Record<SoilClassificationCode,string>={
   ZD:'Orta sıkı-sıkı kum-çakıl / çok katı kil',ZE:'Gevşek kum-çakıl / yumuşak-katı kil',ZF:'Özel saha araştırması gerekir'
 }
 const num=(v:string)=>v===''?0:Number(v)
+const optNum=(v:string)=>v===''?undefined:Number(v)
 
 export function ProjectInfoScreenV2(){
   const p=useProjectInfo(),f=p.foundationParameters,soil=p.soilParameters,units=projectUnits(p.unitSystem)
@@ -19,7 +20,7 @@ export function ProjectInfoScreenV2(){
     const convF=(v:number|undefined)=>v==null||!Number.isFinite(v)?v:forceFromBase(forceToBase(v,p.unitSystem),next)
     const convS=(v:number|undefined)=>v==null||!Number.isFinite(v)?v:stressFromBase(stressToBase(v,p.unitSystem),next)
     const convG=(v:number|undefined)=>v==null||!Number.isFinite(v)?v:unitWeightFromBase(unitWeightToBase(v,p.unitSystem),next)
-    const convM=(v:number|undefined)=>v==null||!Number.isFinite(v)?v:modulusFromBase(modulusToBase(v,p.unitSystem),next)
+    const convM=(v:number|undefined)=>v==null||!Number.isFinite(v)?v:momentFromBase(momentToBase(v,p.unitSystem),next)
     setProject({
       unitSystem:next,
       soilParameters:{...soil,unitWeight:convG(soil.unitWeight),saturatedUnitWeight:convG(soil.saturatedUnitWeight),cohesion:convS(soil.cohesion),undrainedCohesion:convS(soil.undrainedCohesion)},
@@ -110,8 +111,8 @@ export function ProjectInfoScreenV2(){
 
       <Card title="TEMEL TABANI · KAYMA PARAMETRELERİ">
         <div className="form-grid">
-          <Field label="tanδ ≤ 0.60" value={f.baseFrictionTanDelta??''} onChange={v=>setFoundation({baseFrictionTanDelta:num(v)})}/>
-          <Field label={"Karakteristik pasif direnç Rpk ("+units.force+")"} value={f.passiveResistanceCharacteristic??0} onChange={v=>setFoundation({passiveResistanceCharacteristic:num(v)})}/>
+          <Field label="tanδ ≤ 0.60" value={f.baseFrictionTanDelta??''} onChange={v=>setFoundation({baseFrictionTanDelta:optNum(v)})}/>
+          <Field label={"Karakteristik pasif direnç Rpk ("+units.force+")"} value={f.passiveResistanceCharacteristic??''} onChange={v=>setFoundation({passiveResistanceCharacteristic:optNum(v)??0})}/>
           <label>Pasif direnç kredisi<select value={f.usePassiveResistance?'yes':'no'} onChange={e=>setFoundation({usePassiveResistance:e.target.value==='yes'})}><option value="no">Kullanma</option><option value="yes">Kullan</option></select></label>
           <Field label={"Drenajsız Cu ("+units.stress+")"} value={soil.undrainedCohesion??''} onChange={v=>setSoil({undrainedCohesion:v===''?undefined:num(v)})}/>
           <Field label="Klasik taşıma FS" value={f.safetyFactor||''} onChange={v=>setFoundation({safetyFactor:num(v)})}/><Metric label="γRv" value="1.40"/>
