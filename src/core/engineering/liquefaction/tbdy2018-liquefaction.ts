@@ -12,17 +12,17 @@ export function tbdy2018Liquefaction(i:TBDYLiquefactionInput):TBDYLiquefactionRe
   let alpha=0,beta=1
   if(f<=5){alpha=0;beta=1}else if(f<35){alpha=Math.exp(1.76-190/(f*f));beta=.99+Math.pow(f,1.5)/1000}else{alpha=5;beta=1.2}
   const N160f=alpha+beta*N160
-  const n=Math.max(N160f,.1)
-  const CRRM75=n>=34?2:1/(34-n)+n/135+50/(10*n+45)**2-.005
+  const n=N160f
+  const CRRM75=n>0&&n<34?1/(34-n)+n/135+50/(10*n+45)**2-.005:NaN
   const CM=Math.pow(10,2.24)/Math.pow(Math.max(i.Mw,.1),2.56)
-  const Rtau=CRRM75*CM*sv
+  const Rtau=Number.isFinite(CRRM75)?CRRM75*CM*sv:NaN
   const rd=z<=9.15?1-.00765*z:z<=23?1.174-.0267*z:z<=30?.744-.008*z:.5
   const tau=.65*i.totalStress*(.4*i.SDS)*rd
-  const FS=tau>0?Rtau/tau:Infinity
+  const FS=Number.isFinite(Rtau)&&tau>0?Rtau/tau:NaN
   if(i.effectiveStress<=0)warnings.push('Efektif düşey gerilme sıfır/negatif.')
   if(i.rawSPT<0)warnings.push('Ham SPT negatif olamaz.')
   if(i.finesContent<0||i.finesContent>100)warnings.push('İnce dane içeriği %0-%100 aralığına sınırlandı.')
-  if(N160f>=34)warnings.push('N1,60f ≥ 34; CRR bağıntısı sıvılaşma tetiklenmesi için kullanılmamalıdır.')
+  if(N160f<=0||N160f>=34)warnings.push('N1,60f CRR bağıntısının geçerli aralığında değil; tetiklenme hesabı üretilmedi.')
   return{N160,N160f,CN,alpha,beta,CRRM75,CM,Rtau,rd,tauEarthquake:tau,FS,steps:[
     {symbol:'CN',formula:'min(1.70,9.78/√σ′vo)',value:CN,source:'TBDY 2018 Ek 16B'},
     {symbol:'(N1)60',formula:'N·CN·CE·CB·CR·CS',value:N160,source:'TBDY 2018 Ek 16B'},
