@@ -29,7 +29,7 @@ export interface BoreholeRecord { id:BoreholeId; name:string; firstSptDepth:numb
 export interface LaboratoryRecord {
   id:string; boreholeId:BoreholeId; sampleId:string; depth:number; depthTo?:number; sampleType:'UD'|'SPT'|'Other'; soilCode?:string; soilDescription?:string;
   waterContent?:number; sieve10Passing?:number; sieve200Passing?:number; liquidLimit?:number; plasticLimit?:number; plasticityIndex?:number; consistencyDensity?:string;
-  pointLoadIs50?:number; unitWeight?:number; uniaxialRockStrength?:number; uuC?:number; uuPhi?:number;
+  pointLoadIs50?:number; unitWeight?:number; saturatedUnitWeight?:number; uniaxialRockStrength?:number; uuC?:number; uuPhi?:number;
   consolidationCc?:number; consolidationCs?:number; elasticModulus?:number; oedometricModulus?:number; poissonRatio?:number;
   hydrometer075?:number; hydrometer002?:number; density?:number; porosity?:number; voidRatio?:number;
   directShearC?:number; directShearPhi?:number; c?:number; phi?:number; finesContent?:number;
