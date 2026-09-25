@@ -8,7 +8,17 @@ const finite=(v:number|undefined)=>v!==undefined&&Number.isFinite(v)
 function boreholeFactor(diameter?:number){if(!finite(diameter))return undefined;if(diameter!<65||diameter!>200)throw new Error('TBDY Tablo 16B.1 dışındaki sondaj çapı için CB belirlenmelidir; 65–200 mm aralığında veri giriniz.');if(diameter!<=115)return 1;if(diameter!<=150)return 1.05;return 1.15}
 function samplerFactor(sampler?:SptSamplerType,correction?:number){if(sampler===undefined)return undefined;if(sampler==='without-liner'){if(!finite(correction)||correction!<1.10||correction!>1.30)throw new Error('İç tüpsüz numune alıcı için CS değeri açıkça 1.10–1.30 aralığında girilmelidir.');return correction!}if(correction!==undefined&&(!Number.isFinite(correction)||correction<=0))throw new Error('CS geçerli bir pozitif değer olmalıdır.');return correction??1}
 function rodFactor(length?:number){if(!finite(length))return undefined;if(length!<3)throw new Error('TBDY Tablo 16B.1 için rod boyu 3 m’den küçükse CR tanımlı değildir.');if(length!<4)return .75;if(length!<6)return .85;if(length!<10)return .95;return 1}
-export function isCohesionlessSoilCode(code?:string){if(!code)return false;const c=code.toUpperCase().replace(/İ/g,'I');if(/(^|[^A-Z])(CL|CH|CI[A-Z]*|ML|MH|SI[A-Z]*|KIL|SILT|CLAY|ORGANIK|TURBA)([^A-Z]|$)/.test(c))return false;return c.includes('SA')||c.includes('GR')||c.includes('SAND')||c.includes('KUM')||c==='SP'||c==='SW'||c==='SM'}
+export function isCohesionlessSoilCode(code?:string){
+  if(!code)return false
+  const raw=code.trim()
+  const c=raw.toUpperCase().replace(/İ/g,'I')
+  if(/KIL|CLAY|ORGANIK|TURBA/.test(c))return c.includes('SA')&&!/^SA/.test(c)?true:false
+  if(/SILT/.test(c))return false
+  if(/^(SA|GR|SP|SW|SM|GW|GP|GM|SV|G)/.test(c))return true
+  if(/(?:SA|GR|SP|SW|SM|GW|GP|GM)$/.test(c))return true
+  if(/(?:SA|GR)$/.test(c))return true
+  return c.includes('SAND')||c.includes('KUM')||c.includes('CAKIL')
+}
 export function fineContentCorrection(fines:number){if(!Number.isFinite(fines))throw new Error('İnce dane oranı geçerli olmalıdır.');const fc=Math.max(0,Math.min(100,fines));if(fc<=5)return{alpha:0,beta:1};if(fc<35)return{alpha:Math.exp(1.76-190/(fc*fc)),beta:.99+Math.pow(fc,1.5)/1000};return{alpha:5,beta:1.2}}
 export function calculateSpt(input:SptEngineInput):SptEngineResult{
   if(!Number.isFinite(input.nField)||input.nField<0)throw new Error('SPT N değeri geçerli olmalıdır.')
