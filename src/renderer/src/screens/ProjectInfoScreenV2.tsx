@@ -74,7 +74,7 @@ export function ProjectInfoScreenV2(){
           <Field label="Fs" value={p.seismic.fs??''} onChange={v=>setSeismic({fs:v===''?undefined:Number(v)})}/>
           <Field label="F1" value={p.seismic.f1??''} onChange={v=>setSeismic({f1:v===''?undefined:Number(v)})}/>
           <Field label="Sıvılaşma Mw" value={p.seismic.magnitude??''} onChange={v=>setSeismic({magnitude:v===''?undefined:Number(v)})}/>
-          <label>Bina Kullanım Sınıfı BKS<select value={p.seismic.bks??2} onChange={e=>setSeismic({bks:Number(e.target.value) as BuildingUseClass})}><option value="1">BKS=1</option><option value="2">BKS=2</option><option value="3">BKS=3</option></select></label>
+          <label>Bina Kullanım Sınıfı BKS<select value={p.seismic.bks??''} onChange={e=>setSeismic({bks:Number(e.target.value) as BuildingUseClass})}><option value="">Seçiniz</option><option value="1">BKS=1</option><option value="2">BKS=2</option><option value="3">BKS=3</option></select></label>
           <Metric label="SDS" value={sds!=null?sds.toFixed(3):'—'}/>
           <Metric label="DTS" value={dts??'—'}/>
         </div>
@@ -101,7 +101,7 @@ export function ProjectInfoScreenV2(){
           <Field label={"Karakteristik pasif direnç Rpk ("+units.force+")"} value={f.passiveResistanceCharacteristic??0} onChange={v=>setFoundation({passiveResistanceCharacteristic:num(v)})}/>
           <label>Pasif direnç kredisi<select value={f.usePassiveResistance?'yes':'no'} onChange={e=>setFoundation({usePassiveResistance:e.target.value==='yes'})}><option value="no">Kullanma</option><option value="yes">Kullan</option></select></label>
           <Field label={"Drenajsız Cu ("+units.stress+")"} value={soil.undrainedCohesion??''} onChange={v=>setSoil({undrainedCohesion:v===''?undefined:num(v)})}/>
-          <Metric label="γRv" value="1.40"/>
+          <Field label="Klasik taşıma FS" value={f.safetyFactor||''} onChange={v=>setFoundation({safetyFactor:num(v)})}/><Metric label="γRv" value="1.40"/>
           <Metric label="γRh" value="1.10"/>
           <Metric label="γRp" value="1.40"/>
         </div>
