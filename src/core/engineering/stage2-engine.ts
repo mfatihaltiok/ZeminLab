@@ -59,22 +59,22 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
     if(H>0&&ds>0){
       if(method==='elastic'||method==='2:1'){
         const E=layer.Es
-        if(E!=null&&Number.isFinite(E)&&E>0){const nu=Math.max(0,Math.min(.49,layer.nu??0));s=ds*H*(1-nu*nu)/E;type=method==='elastic'?'elastic':'2:1 + elastic'}else warnings.push(\`Katman \${index+1}: Es eksik.\`)
+        if(E!=null&&Number.isFinite(E)&&E>0){const nu=Math.max(0,Math.min(.49,layer.nu??0));s=ds*H*(1-nu*nu)/E;type=method==='elastic'?'elastic':'2:1 + elastic'}else warnings.push('Katman '+(index+1)+': Es eksik.')
       }else if(method==='janbu'){
         const M=layer.M??layer.Es
-        if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push(\`Katman \${index+1}: M eksik.\`)
+        if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push('Katman '+(index+1)+': M eksik.')
       }else if(method==='schmertmann'){
         const E=layer.Es
         const Iz=layer.Iz
         if(C1!=null&&C2!=null&&E!=null&&E>0&&Iz!=null)s=C1*C2*q*Iz*H/E,type='Schmertmann'
-        else warnings.push(\`Katman \${index+1}: Schmertmann için C1,C2,Es,Iz birlikte verilmelidir.\`)
+        else warnings.push('Katman '+(index+1)+': Schmertmann için C1,C2,Es,Iz birlikte verilmelidir.')
       }else{
         const sigma0=Math.max(layer.sigmaV0,1e-6),sigma1=sigma0+ds
         if(layer.mv!=null&&layer.mv>=0){s=H*layer.mv*ds;type='oedometer'}
         else if(layer.Cc!=null&&layer.e0!=null&&layer.e0>-1){
           const pc=Math.max(layer.sigmaPc??sigma0,sigma0),Cr=Math.max(0,layer.Cr??layer.Cc)
           s=sigma1<=pc?H*Cr/(1+layer.e0)*Math.log10(sigma1/sigma0):H*Cr/(1+layer.e0)*Math.log10(pc/sigma0)+H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/pc),type='oedometer'
-        }else warnings.push(\`Katman \${index+1}: mv veya Cc/e0 eksik.\`)
+        }else warnings.push('Katman '+(index+1)+': mv veya Cc/e0 eksik.')
       }
     }
     results.push({index,thickness:H,zmid,deltaSigma:ds,settlement:Math.max(0,s),type})
