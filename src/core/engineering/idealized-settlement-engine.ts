@@ -10,7 +10,7 @@ type SettlementLayerResult={
 }
 export interface IdealizedSettlementInput{
   profile:IdealizedSoilProfile;method:IdealizedSettlementMethod;B:number;L:number;Df:number;qGross:number;groundwaterDepth?:number
-  foundationType?:FoundationType;timeYears?:number
+  foundationType?:FoundationType;timeYears?:number;secondaryStartTimeYears?:number
 }
 export interface IdealizedSettlementResult{
   method:IdealizedSettlementMethod;layers:SettlementLayerResult[];totalImmediate:number;totalConsolidation:number;totalSecondary:number;totalSettlement:number
@@ -92,7 +92,9 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(profile.status!=='SABİTLENDİ')warnings.push('İdealize Zemin Profili SABİTLENDİ durumunda değil.')
   if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSecondary:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve yük girdileri geçerli olmalıdır.'],source:'ZeminLab idealize zemin profili oturma motoru'}
   const baseStress=effectiveStressAtDepth(layers,Df,gwt)
-  const coverageLimit=Df+Math.max(2*B,method==='schmertmann'?(L/B>=10?4*B:2*B):2*B)
+  const ratio=L/Math.max(B,1e-9)
+  const influenceDepth=method==='burland-burbidge'?1.4*Math.pow(B/.3,.75)*.3:method==='schmertmann'?(ratio>=10?4*B:2*B):method==='janbu'?Math.max(B,1):2*B
+  const coverageLimit=Df+influenceDepth
   let coverageCursor=Df
   let coverageOk=true
   for(const layer of layers){
@@ -106,15 +108,15 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(!coverageOk)warnings.push('Temel altındaki oturma etki derinliğinde profil sürekliliği veya γ verisi eksik; eksik tabaka sıfır gerilme ile geçiştirilmez.')
   const qNet=Math.max(0,qGross-baseStress.effective)
   if(qNet<=0)warnings.push('Temel seviyesinde net ilave basınç sıfır/negatif; oturma hesabı yük artışı açısından sınırlıdır.')
-  const ratio=L/Math.max(B,1e-9)
-  const influenceDepth=method==='burland-burbidge'?1.4*Math.pow(B/.3,.75)*.3:method==='schmertmann'?(ratio>=10?4*B:2*B):method==='janbu'?Math.max(B,1):2*B
   let totalImmediate=0,totalConsolidation=0,totalSecondary=0
   const results:SettlementLayerResult[]=[]
   for(const layer of layers){
     if(layer.bottomDepth<=Df)continue
     const top=Math.max(layer.topDepth,Df),bottom=layer.bottomDepth
     if(bottom<=top)continue
-    const thickness=bottom-top,zTop=top-Df,zBottom=bottom-Df,zMid=(zTop+zBottom)/2,midDepth=Df+zMid
+    const effectiveTop=Math.max(top,Df),effectiveBottom=Math.min(bottom,Df+influenceDepth)
+    if(effectiveBottom<=effectiveTop)continue
+    const thickness=effectiveBottom-effectiveTop,zTop=effectiveTop-Df,zBottom=effectiveBottom-Df,zMid=(zTop+zBottom)/2,midDepth=Df+zMid
     const midStress=effectiveStressAtDepth(layers,midDepth,gwt),deltaSigma=Math.max(0,stressIncrement(qNet,B,L,zMid)),finalEffective=midStress.effective+deltaSigma,cohesive=isCohesive(layer)
     let immediate=0,consolidation=0,secondary=0,status:'HESAPLANDI'|'VERİ EKSİK'='HESAPLANDI',methodName='',note=''
     if(method==='burland-burbidge'){
@@ -152,9 +154,12 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       if(finite(M)&&M>0)immediate=C1*C2*C3*qNet*Iz*thickness/M*1000
       else{status='VERİ EKSİK';note='Schmertmann için E modülü gerekir.'}
     }
-    if(finite(layer.secondaryCompressionIndex)&&layer.secondaryCompressionIndex!>=0&&finite(input.timeYears)&&input.timeYears!>1){
-      const e0=finite(layer.initialVoidRatio)&&layer.initialVoidRatio!>-1?layer.initialVoidRatio!:0
-      secondary=Math.max(0,thickness*layer.secondaryCompressionIndex!*Math.log10(input.timeYears!)/(1+e0)*1000)
+    if(finite(layer.secondaryCompressionIndex)&&layer.secondaryCompressionIndex!>=0&&finite(input.timeYears)&&input.timeYears!>0){
+      const start=finite(input.secondaryStartTimeYears)&&input.secondaryStartTimeYears!>0?input.secondaryStartTimeYears!:1
+      if(input.timeYears!>start){
+        const e0=finite(layer.initialVoidRatio)&&layer.initialVoidRatio!>-1?layer.initialVoidRatio!:0
+        secondary=Math.max(0,thickness*layer.secondaryCompressionIndex!*Math.log10(input.timeYears!/start)/(1+e0)*1000)
+      }
     }
     totalImmediate+=immediate
     totalConsolidation+=consolidation
@@ -165,5 +170,6 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(method==='schmertmann'&&input.timeYears==null)warnings.push('Schmertmann C2=1 alındı; zaman bilgisi girilmediği için creep düzeltmesi yapılmadı.')
   if(method==='janbu')warnings.push('Janbu burada M-integrasyonu olarak uygulanır; tam gerilme-bağımlı Janbu parametre seti mevcut değilse sonuç ön tasarım olarak değerlendirilmelidir.')
   if(method==='burland-burbidge')warnings.push('Burland-Burbidge bağıntısı özellikle kum/granüler zemin için ampirik bir yöntemdir; kohezyonlu tabakalarda ayrı konsolidasyon hesabı yapılır.')
+  if(finite(input.timeYears)&&input.timeYears!>0&&input.secondaryStartTimeYears==null&&results.some(x=>x.secondarySettlement>0))warnings.push('İkincil oturma için başlangıç zamanı girilmedi; t1=1 yıl referansı kullanıldı. Proje verisi varsa secondaryStartTimeYears girilmelidir.')
   return{method,layers:results,totalImmediate,totalConsolidation,totalSecondary,totalSettlement:totalImmediate+totalConsolidation+totalSecondary,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,ready:results.length>0&&coverageOk&&!results.some(x=>x.status==='VERİ EKSİK'),warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978), 2:1 ve Janbu M-integrasyonu; yöntem ve parametre kaynakları raporlanır.'}
 }
