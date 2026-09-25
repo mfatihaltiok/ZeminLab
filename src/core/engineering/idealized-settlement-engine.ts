@@ -87,7 +87,9 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(profile.status!=='SABİTLENDİ')warnings.push('İdealize Zemin Profili SABİTLENDİ durumunda değil.')
   if(profile.parameterUnitSystem!=='kN-m')warnings.push('Profil mühendislik birimleri kN-m taban sisteminde değil; sonuç üretilmedi.')
   if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve pozitif yük girdileri geçerli olmalıdır.'],source:'FALUZMN ortak oturma motoru'}
-  const gwt=finite(input.groundwaterDepth)?input.groundwaterDepth!:-1,baseStress=effectiveStressAtDepth(layers,Df,gwt)
+  const gwt=finite(input.groundwaterDepth)?input.groundwaterDepth!:NaN
+  if(!finite(gwt))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'YASS girilmeden efektif gerilme/oturma hesabı yapılamaz.'],source:'FALUZMN ortak oturma motoru'}
+  const baseStress=effectiveStressAtDepth(layers,Df,gwt)
   if(!finite(baseStress.effective))return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Df seviyesine kadar γ/γsat profili eksik veya geçersiz.'],source:'FALUZMN ortak oturma motoru'}
   const qNet=Math.max(0,qGross-baseStress.effective)
   const ratio=L/Math.max(B,1e-9)
