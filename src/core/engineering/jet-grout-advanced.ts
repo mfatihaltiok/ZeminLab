@@ -28,10 +28,10 @@ export function virtualRaftSettlement(i: VirtualRaftInput): VirtualRaftResult {
   return { q, untreatedSettlement, treatedSettlement, reductionRatio, reductionPercent: Math.max(0, 1 - reductionRatio) * 100, formula: 's = q·H·(1−ν²)/E; treated/untreated equivalent-layer comparison' }
 }
 
-export interface ShearSafetyInput { verticalLoad: number; horizontalLoad: number; area: number; cohesion: number; frictionAngle: number; effectiveNormalStress?: number }
+export interface ShearSafetyInput { verticalLoad: number; horizontalLoad: number; area: number; cohesion: number; frictionAngle: number; effectiveNormalStress: number }
 export interface ShearSafetyResult { shearStress: number; shearResistance: number; FS: number; formula: string }
 export function jetGroutShearSafety(i: ShearSafetyInput): ShearSafetyResult {
-  const A = Math.max(i.area, 1e-9), tau = Math.max(0, i.horizontalLoad) / A, sigma = i.effectiveNormalStress != null ? Math.max(0, i.effectiveNormalStress) : Math.max(0, i.verticalLoad) / A
+  const A = Math.max(i.area, 1e-9), tau = Math.max(0, i.horizontalLoad) / A, sigma = Math.max(0, i.effectiveNormalStress)
   const phi = Math.max(0, i.frictionAngle) * Math.PI / 180, resistance = Math.max(0, i.cohesion) + sigma * Math.tan(phi)
   return { shearStress: tau, shearResistance: resistance, FS: tau > 0 ? resistance / tau : 99, formula: 'FS = [c′ + σ′n·tanφ′] / τ, τ = H/A' }
 }
@@ -141,7 +141,7 @@ export function jetGroutEngineering(i: JetGroutEngineeringInput): JetGroutEngine
   const beta = base.areaReplacementRatio > 0 ? base.columnLoadShare / base.areaReplacementRatio : 1
   const virtualRaft = i.load != null && i.foundationArea != null && i.foundationArea > 0 && i.EsSoil != null && i.EsColumn != null && i.foundationThickness != null && i.soilPoissonRatio != null
     ? virtualRaftSettlement({ load: i.load, area: i.foundationArea, treatedThickness: i.foundationThickness, untreatedModulus: i.EsSoil, treatedModulus: base.compositeModulus ?? i.EsColumn, poissonRatio: i.soilPoissonRatio }) : undefined
-  const shearSafety = i.verticalLoad != null && i.horizontalLoad != null && i.foundationArea != null && i.foundationArea > 0 && i.cohesion != null && i.frictionAngle != null
+  const shearSafety = i.verticalLoad != null && i.horizontalLoad != null && i.foundationArea != null && i.foundationArea > 0 && i.cohesion != null && i.frictionAngle != null && i.shearNormalStress != null
     ? jetGroutShearSafety({ verticalLoad: i.verticalLoad, horizontalLoad: i.horizontalLoad, area: i.foundationArea, cohesion: i.cohesion, frictionAngle: i.frictionAngle, effectiveNormalStress: i.shearNormalStress }) : undefined
   const priebe = i.columnFrictionAngle != null && i.soilPoissonRatio != null ? priebeScreening({ areaReplacementRatio: base.areaReplacementRatio, columnFrictionAngle: i.columnFrictionAngle, soilPoissonRatio: i.soilPoissonRatio, columnModulus: i.EsColumn, soilModulus: i.EsSoil }) : undefined
   const axial = i.axial ? jetGroutAxialCapacity(i.axial) : undefined
