@@ -18,9 +18,10 @@ export interface StressSpreadResult {
 
 /** 2:1 vertical stress spread below a rectangular loaded area. */
 export function stressSpread21(i: StressSpreadInput): StressSpreadResult {
-  const B = Math.max(i.B, 1e-9)
-  const L = Math.max(i.L, 1e-9)
-  const z = Math.max(i.z, 0)
+  if(!Number.isFinite(i.q)||i.q<0||!Number.isFinite(i.B)||i.B<=0||!Number.isFinite(i.L)||i.L<=0||!Number.isFinite(i.z)||i.z<0) throw new Error('2:1 gerilme yayılımı için q≥0, B>0, L>0 ve z≥0 gerekir.')
+  const B = i.B
+  const L = i.L
+  const z = i.z
   const area = (B + z) * (L + z)
   return {
     deltaSigma: Math.max(0, i.q) * B * L / area,
@@ -77,7 +78,8 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
   let consolidation = 0
   const details: LayerSettlementResult['layers'] = []
   for (const l of layers) {
-    const H = Math.max(0, l.thickness), ds = Math.max(0, l.deltaSigma)
+    if(!Number.isFinite(l.thickness)||l.thickness<0||!Number.isFinite(l.deltaSigma)||l.deltaSigma<0||!Number.isFinite(l.sigma0)||l.sigma0<0) throw new Error('Tabaka oturması için kalınlık, σ′0 ve Δσ geçerli ve negatif olmayan değerler olmalıdır.')
+    const H = l.thickness, ds = l.deltaSigma
     let s=0, type:'elastic'|'oedometer'='elastic'
     if(H<=0||ds<=0){details.push({settlement:0,type});continue}
     if(l.model==='mv'){
@@ -164,8 +166,9 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
   const cellArea = layout === 'triangular' ? Math.sqrt(3) * s * s / 2 : s * s
   const ar = Ac / cellArea
   if (ar >= 1) throw new Error('Jet Grout alan değiştirme oranı 1.0 veya üzeri olamaz.')
-  const qSoil = Math.max(0, i.qSoil)
-  const qColumn = Math.max(0, i.qColumn)
+  if(!Number.isFinite(i.qSoil)||i.qSoil<0||!Number.isFinite(i.qColumn)||i.qColumn<0) throw new Error('Zemin ve Jet Grout karakteristik kapasitesi negatif olamaz.')
+  const qSoil = i.qSoil
+  const qColumn = i.qColumn
   const compositeCapacity = ar * qColumn + (1 - ar) * qSoil
   const compositeModulus = i.EsSoil != null && i.EsColumn != null && i.EsSoil > 0 && i.EsColumn > 0
     ? ar * i.EsColumn + (1 - ar) * i.EsSoil
