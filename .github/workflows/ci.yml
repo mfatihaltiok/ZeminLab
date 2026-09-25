@@ -21,5 +21,7 @@ jobs:
         run: npm ci
       - name: Typecheck
         run: npm run typecheck
+      - name: Engineering regression tests
+        run: npm run test:engineering
       - name: Build desktop application
         run: npm run build
