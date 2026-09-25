@@ -16,11 +16,15 @@ export interface Stage2BearingInput{
 }
 
 export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
-  const V=Math.max(0,i.loadV??0),H=Math.abs(i.loadH??0),design=i.design,warnings:string[]=[]
+  if(!Number.isFinite(i.B)||i.B<=0||!Number.isFinite(i.L)||i.L<=0||!Number.isFinite(i.Df)||i.Df<0||!Number.isFinite(i.gamma)||i.gamma<=0||!Number.isFinite(i.c)||i.c<0||!Number.isFinite(i.phi)||i.phi<0||i.phi>=90) throw new Error('Stage2 taşıma gücü temel/zemin girdileri geçersiz.')
+  if(i.loadV!=null&&(!Number.isFinite(i.loadV)||i.loadV<0))throw new Error('loadV geçerli ve negatif olmayan bir değer olmalıdır.')
+  if(i.loadH!=null&&!Number.isFinite(i.loadH))throw new Error('loadH geçerli olmalıdır.')
+  const V=i.loadV??0,H=Math.abs(i.loadH??0),design=i.design,warnings:string[]=[]
   if(!design) throw new Error('Stage2 uyumluluk API için design açıkça belirtilmelidir.')
   if(design==='tbdy-2018'){
+    if(i.waterTableDepth!=null&&i.gammaSat==null) throw new Error('YASS tanımlıysa γsat açıkça girilmelidir; γnat otomatik γsat kabul edilmez.')
     const r=calculateSurfaceFoundation({
-      B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma,gamma2:i.gammaSat??i.gamma,c:i.c,phi:i.phi,
+      B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma,gamma2:i.gammaSat,c:i.c,phi:i.phi,
       verticalLoad:V,horizontalLoad:H,momentX:i.momentX??0,momentY:i.momentY??0,
       groundSlope:i.soilSlope??0,baseSlope:i.baseSlope??0,resistanceFactor:1.4,method:'TBDY-2018',
       groundwaterDepth:i.waterTableDepth,undrainedCu:i.undrainedCu,
@@ -48,17 +52,19 @@ export interface Stage2SettlementInput{
 }
 
 export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
-  const B=Math.max(i.B,0),L=Math.max(i.L??0,0),q=Math.max(i.q,0),method=i.method
+  if(!Number.isFinite(i.B)||i.B<=0||!Number.isFinite(i.L)||i.L<=0||!Number.isFinite(i.q)||i.q<0) throw new Error('Stage2 oturma B, L ve q girdileri geçerli olmalıdır.')
+  if(!i.layers.length) throw new Error('Stage2 oturma için en az bir zemin tabakası gerekir.')
+  const B=i.B,L=i.L,q=i.q,qNet=i.qNet??i.q,method=i.method
+  if(!Number.isFinite(qNet)||qNet<0)throw new Error('qNet girildiyse geçerli ve negatif olmayan bir değer olmalıdır.')
   if(!method) throw new Error('Stage2 oturma uyumluluk API için method açıkça belirtilmelidir.')
   const warnings:string[]=[]
-  if(B<=0||L<=0)warnings.push('B ve L pozitif olmalıdır.')
-  if(!i.layers.length)warnings.push('Katman tanımlanmadı.')
   if(method==='schmertmann'&&i.schmertmannC1==null)warnings.push('Schmertmann C1 verilmedi; 1.0 kullanılmadı, sonuç yalnız verilen katsayılarla üretilebilir.')
   const C1=i.schmertmannC1,C2=i.schmertmannC2
   const results:any[]=[],missing=false
   for(const [index,layer] of i.layers.entries()){
-    const H=Math.max(0,layer.thickness),zmid=Math.max(0,H/2),ds=method==='2:1'?q*B*L/Math.max((B+zmid)*(L+zmid),1e-9):Math.max(0,layer.deltaSigma)
+    const H=Math.max(0,layer.thickness),zmid=Math.max(0,H/2),ds=method==='2:1'?qNet*B*L/((B+zmid)*(L+zmid)):layer.deltaSigma
     let s=0,type='none'
+    if(!Number.isFinite(layer.thickness)||layer.thickness<0||!Number.isFinite(ds)||ds<0) throw new Error('Stage2 oturma tabaka kalınlığı ve Δσ geçerli olmalıdır.')
     if(H>0&&ds>0){
       if(method==='elastic'||method==='2:1'){
         const E=layer.Es
@@ -70,7 +76,7 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
       }else if(method==='schmertmann'){
         const E=layer.Es
         const Iz=layer.Iz
-        if(C1!=null&&C2!=null&&E!=null&&E>0&&Iz!=null)s=C1*C2*q*Iz*H/E,type='Schmertmann'
+        if(C1!=null&&C2!=null&&E!=null&&E>0&&Iz!=null)s=C1*C2*qNet*Iz*H/E,type='Schmertmann'
         else warnings.push('Katman '+(index+1)+': Schmertmann için C1,C2,Es,Iz birlikte verilmelidir.')
       }else{
         const sigma0=Math.max(layer.sigmaV0,1e-6),sigma1=sigma0+ds
