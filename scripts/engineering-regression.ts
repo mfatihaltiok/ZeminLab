@@ -41,6 +41,36 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(sloped.gq<1)
 }
 
+
+{
+  const eccentric=calculateSurfaceFoundation({
+    B:2,L:4,Df:1,gamma1:18,gamma2:19,c:10,phi:30,verticalLoad:1000,
+    momentX:100,momentY:40,resistanceFactor:1.4,method:'TBDY-2018'
+  })
+  approx(eccentric.qAvg,125)
+  approx(eccentric.qMax,147.5)
+  approx(eccentric.qMin,102.5)
+  assert.equal(eccentric.contactState,'FULL')
+  assert.equal(eccentric.coreContact,true)
+}
+
+{
+  const layered=calculateSurfaceFoundation({
+    B:2,L:2,Df:0,gamma1:18,gamma2:19,c:10,phi:30,verticalLoad:500,
+    resistanceFactor:1.4,method:'TBDY-2018',
+    layers:[
+      {topDepth:0,bottomDepth:2,gamma:18,gammaSat:19,cohesion:10,phi:30,name:'L1'},
+      {topDepth:2,bottomDepth:4,gamma:19,gammaSat:20,cohesion:30,phi:20,name:'L2'}
+    ]
+  })
+  approx(layered.representativeC,20)
+  assert.ok(layered.representativePhi>20&&layered.representativePhi<30)
+  assert.equal(layered.finalDesignEligible,true)
+  assert.equal(layered.layeredScreeningOnly,true)
+  assert.ok(layered.warnings.some(w=>w.includes('eşdeğer parametreler')))
+}
+
+
 {
   const withoutPassive=foundationChecks({B:2,L:2,N:1000,V:600,Vx:600,Vy:0,Mx:0,My:0,deltaTan:.6,passiveResistanceCharacteristic:500,usePassiveResistance:false})
   const withPassive=foundationChecks({B:2,L:2,N:1000,V:600,Vx:600,Vy:0,Mx:0,My:0,deltaTan:.6,passiveResistanceCharacteristic:500,usePassiveResistance:true})
@@ -50,6 +80,28 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(resultant.horizontalResultant,500)
   approx(resultant.slidingFS,resultant.slidingCapacityResultant/500)
 }
+
+
+{
+  const missingCu=foundationChecks({
+    B:2,L:2,N:1000,Vx:500,Vy:0,Mx:0,My:0,
+    groundwaterDepth:0,foundationDepth:1,seismic:true
+  })
+  assert.equal(missingCu.slidingMode,'data-missing')
+  assert.equal(missingCu.evaluable,false)
+  assert.equal(missingCu.slidingCapacityResultant,0)
+}
+
+{
+  const seismicCu=foundationChecks({
+    B:2,L:2,N:1000,Vx:500,Vy:0,Mx:0,My:0,
+    groundwaterDepth:0,foundationDepth:1,seismic:true,cu:100
+  })
+  approx(seismicCu.slidingCapacityResultant,4*100/1.1)
+  assert.equal(seismicCu.slidingMode,'undrained-cu')
+  assert.equal(seismicCu.evaluable,true)
+}
+
 
 {
   const result=liquefactionProfile({
