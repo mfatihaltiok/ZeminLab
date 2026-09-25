@@ -44,7 +44,7 @@ export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number
 export function stressSpread2to1(i:{q:number;B:number;L:number;z:number}){return stressSpread21(i)}
 export function subgradeReaction(i:SubgradeReactionInput){return calculateSubgradeReaction(i)}
 export function layerSettlement(layers:LayerSettlementInput[]){return layerSettlementEngine(layers)}
-export function schmertmann(q:number,layers:SchmertmannLayer[],C1=1,C2=1){return schmertmannSettlement(q,layers,C1,C2)}
+export function schmertmann(q:number,layers:SchmertmannLayer[],C1?:number,C2?:number){return schmertmannSettlement(q,layers,C1,C2)}
 export function jetGroutAdvanced(i:Parameters<typeof jetGroutAdvancedEngine>[0]){return jetGroutAdvancedEngine(i)}
 
 export const SOURCE_NOTES={
