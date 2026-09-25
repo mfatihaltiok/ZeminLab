@@ -38,6 +38,13 @@ function validateBoreholes(boreholes: BoreholeRecord[], unitSystem: UnitSystem):
       if (s.testType !== 'SPT' && s.testType !== 'UD') throw new Error(b.name + ': geçersiz deney tipi.')
       if (s.source !== 'manual' && s.source !== 'imported') throw new Error(b.name + ': geçersiz SPT veri kaynağı.')
       for (const [k, v] of Object.entries({ n1: s.n1, n2: s.n2, n3: s.n3 })) if (v !== undefined) number(v, 'SPT ' + k, 0)
+      if (s.correction) {
+        const cc = s.correction
+        for (const [k,v] of Object.entries(cc)) if (typeof v === 'number') number(v,'SPT '+k)
+        if (cc.energyRatio !== undefined && cc.energyRatio > 100) throw new Error('SPT enerji oranı %100''den büyük olamaz.')
+        if (cc.applyOverburdenCorrection !== undefined && typeof cc.applyOverburdenCorrection !== 'boolean') throw new Error('SPT CN ayarı bozuk.')
+        if (cc.applyDilatancyCorrection !== undefined && typeof cc.applyDilatancyCorrection !== 'boolean') throw new Error('SPT dilatansi ayarı bozuk.')
+      }
     }
     for (const l of b.lithology) {
       text(l.id, 'Litoloji ID'); number(l.from, 'Litoloji üst derinliği', 0); number(l.to, 'Litoloji alt derinliği', 0)
@@ -58,7 +65,9 @@ function validateLabs(labs: LaboratoryRecord[], boreholeIds: Set<string>, unitSy
     if (l.sampleType !== 'UD' && l.sampleType !== 'SPT' && l.sampleType !== 'Other') throw new Error('Laboratuvar ' + l.id + ': geçersiz numune tipi.')
     if (l.source !== 'manual' && l.source !== 'imported') throw new Error('Laboratuvar ' + l.id + ': geçersiz veri kaynağı.')
     l.unitSystem = l.unitSystem === 'kN-m' || l.unitSystem === 'ton-m' ? l.unitSystem : unitSystem
-  }
+    const numericFields = ['waterContent','sieve10Passing','sieve200Passing','liquidLimit','plasticLimit','plasticityIndex','pointLoadIs50','unitWeight','uniaxialRockStrength','uuC','uuPhi','consolidationCc','consolidationCs','elasticModulus','poissonRatio','hydrometer075','hydrometer002','directShearC','directShearPhi','density','porosity','voidRatio','c','phi','finesContent'] as const
+    for (const key of numericFields) if (l[key] !== undefined) number(l[key], 'Laboratuvar ' + l.id + ' ' + key)
+      }
   return ids
 }
 

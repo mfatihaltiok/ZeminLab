@@ -1,20 +1,13 @@
 import { useMemo, useState } from 'react'
 import { foundationChecks } from '../../../core/engineering/foundation-sliding'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
-import { useProjectInfo } from '../../core/state/project-store'
-import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
-import { forceToBase, momentToBase, unitWeightToBase } from '../../core/units/project-units'
+import { useProjectInfo } from '../../../core/state/project-store'
+import type { BoreholeRecord, LaboratoryRecord } from '../../../core/models/field-data'
+import { forceToBase, momentToBase, unitWeightToBase } from '../../../core/units/project-units'
 import { Card, Frame, Metric, Source, type ScreenId } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
 
-export const SOURCE_NOTES={
-  investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',
-  liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',
-  bearing:'TBDY 2018 Bölüm 16.8.2–16.8.3.',
-  settlement:'TBDY 2018 Bölüm 16.7.3.4 ve 16.8.3.4.',
-  foundation:'TBDY 2018 16.7.3.3 ve 16.8.4; γRv=1.40, γRh=1.10, γRp=1.40.',
-  jetGroutAdvanced:'Jet Grout kompozit yaklaşımı; proje deneyleri ve kalite kontrol ile doğrulanmalıdır.'
-}
+import { SOURCE_NOTES } from '../../../core/engineering/source-notes'
 
 export function Dashboard({onNavigate}:{onNavigate:(id:ScreenId)=>void}){
   const p=useProjectInfo()

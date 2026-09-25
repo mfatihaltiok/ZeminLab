@@ -1,4 +1,4 @@
-import type { FoundationType, UnitSystem } from '../models/project'
+import { ENGINEERING_CONSTANTS, type FoundationType, type UnitSystem } from '../models/project'
 
 export type SurfaceFoundationMethod='TBDY-2018'|'Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
 export interface SurfaceFoundationLayer{topDepth:number;bottomDepth:number;gamma:number;gammaSat?:number;cohesion:number;phi:number;name?:string}
@@ -16,7 +16,7 @@ export interface SurfaceFoundationResult{
   layerChecks:Array<{top:number;bottom:number;c:number;phi:number;gamma:number;qk:number;controlling:boolean}>;warnings:string[];method:SurfaceFoundationMethod;foundationType:FoundationType;source:string;steps:SurfaceFoundationStep[]
   value:{Nq:number;Nc:number;Ngamma:number;sc:number;sq:number;sg:number;dc:number;dq:number;dg:number;ic:number;iq:number;ig:number;gc:number;gq:number;gg:number;bc:number;bq:number;bg:number;surcharge:number;gammaBelow:number;ex:number;ey:number;Be:number;Le:number;effectiveArea:number;qk:number;qt:number;qo:number;utilization:number;adequate:boolean;effectiveDepth:number}
 }
-const gammaW=9.80665
+const gammaW=ENGINEERING_CONSTANTS.gammaW
 const rad=(deg:number)=>deg*Math.PI/180
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 const clamp=(x:number,min:number,max:number)=>Math.max(min,Math.min(max,x))
@@ -110,6 +110,7 @@ function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influen
 export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoundationResult{
   if(i.B<=0||i.L<=0||i.Df<0)throw new Error('Temel B ve L pozitif, Df negatif olmayan değer olmalıdır.')
   if(i.gamma1<=0)throw new Error('γ doğal birim hacim ağırlığı pozitif olmalıdır.')
+  if(method==='TBDY-2018'&&i.resistanceFactor!=null&&(!finite(i.resistanceFactor)||i.resistanceFactor<1))throw new Error('γRv geçerli ve 1.0 veya büyük olmalıdır.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=0))throw new Error('YASS tanımlandıysa γsat pozitif olmalıdır.')
   if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük negatif olamaz.')
   const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad,H=Math.abs(i.horizontalLoad??0)
@@ -125,7 +126,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const f=factors(i.phi,method),water=groundwater(i.Df,Bp,i.gamma1,i.gamma2,i.groundwaterDepth)
   const mf=methodFactors(method,Bp,Lp,i.Df,f.phi,f.Nq,f.Nc,H,N,i.c,groundSlope,baseSlope)
   const qk=i.c*f.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge*f.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+0.5*water.gammaBelow*Bp*f.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
-  const resistanceFactor=method==='TBDY-2018'?i.resistanceFactor??1.4:1
+  const resistanceFactor=method==='TBDY-2018'?i.resistanceFactor??ENGINEERING_CONSTANTS.TBDY_GAMMA_RV:1
   const qt=qk/Math.max(resistanceFactor,1e-9),qo=effectiveArea>0?N/effectiveArea:0
   const utilization=qt>0?qo/qt:Infinity
   const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,mf,method)
@@ -135,7 +136,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
     warnings.push('Tabakalı zemin kontrolü: etkin derinlikteki tabakalar ayrı ek kontrol olarak raporlandı. Bu ekran kontrolü ana homojen zemin qk değerini değiştirmez; nihai tabakalı zemin hesabının yerini tutmaz.')
   }
   const controlling=qk,designQt=controlling/Math.max(resistanceFactor,1e-9),adequate=qo<=designQt&&Be>0&&Le>0&&checks.length===0
-  if(method==='TBDY-2018'&&Math.abs((i.resistanceFactor??1.4)-1.4)>1e-9)warnings.push('TBDY 2018 Tablo 16.2 yüzeysel temel için γRv=1.40 kullanılmalıdır.')
+  if(method==='TBDY-2018'&&Math.abs((i.resistanceFactor??ENGINEERING_CONSTANTS.TBDY_GAMMA_RV)-ENGINEERING_CONSTANTS.TBDY_GAMMA_RV)>1e-9)warnings.push('TBDY 2018 Tablo 16.2 yüzeysel temel için γRv=1.40 kullanılmalıdır.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: γ′ ve ağırlıklı γ kullanıldı.')
   if(groundSlope>0)warnings.push('Arazi eğimi katsayıları Vesic tipi genel kabul görmüş bağıntılarla uygulanmıştır; β<φ′ koşulu kontrol edildi.')
   if(baseSlope>0)warnings.push('Temel tabanı eğimi katsayıları Vesic tipi genel kabul görmüş bağıntılarla uygulanmıştır.')
@@ -157,7 +158,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   ]
   const resultBase={
     Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,...mf,surcharge:water.surcharge,gammaBelow:water.gammaBelow,ex,ey,Be,Le,effectiveArea,qk:controlling,qt:designQt,qo,utilization:qo/Math.max(designQt,1e-9),adequate,effectiveDepth:2*Bp,
-    representativeC:i.c,representativePhi:f.phi,representativeGamma:water.gammaBelow,ultimateClassical:qk,allowableClassical:qk/Math.max(i.safetyFactor??3,1e-9),
+    representativeC:i.c,representativePhi:f.phi,representativeGamma:water.gammaBelow,ultimateClassical:qk,allowableClassical:i.safetyFactor!=null&&i.safetyFactor>0?qk/i.safetyFactor:undefined,
     undrainedQk:i.undrainedCu!=null?i.undrainedCu*5.14*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge:undefined,
     layeredScreeningOnly:checks.length>0,finalDesignEligible:checks.length===0,layerChecks:checks,warnings,method,foundationType
   }

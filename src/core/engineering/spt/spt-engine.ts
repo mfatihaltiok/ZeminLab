@@ -17,8 +17,6 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const csInfo=samplerFactor(input);if(csInfo.value===undefined)missing.push(csInfo.source)
   const crInfo=rodFactor(input.rodLengthM);if(crInfo.value===undefined)missing.push(crInfo.source)
   if(er.value!==undefined&&input.energyRatio===undefined)warnings.push(er.source)
-  if(cbInfo.value!==undefined)warnings.push(cbInfo.source)
-  if(crInfo.value!==undefined)warnings.push(crInfo.source)
   const ce=er.value===undefined?0:er.value/60,cb=cbInfo.value??0,cs=csInfo.value??0,cr=crInfo.value??0
   const correctionReady=missing.length===0
   const n60=correctionReady?input.nField*ce*cb*cs*cr:0

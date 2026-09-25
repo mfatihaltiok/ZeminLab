@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
-import { tbdyBearingCapacity, SOURCE_NOTES, type BearingMethod } from '../../../core/calculations/engineering'
+import { tbdyBearingCapacity, type BearingMethod } from '../../../core/engineering/calculation-engine'
+import { SOURCE_NOTES } from '../../../core/engineering/source-notes'
+import { ENGINEERING_CONSTANTS } from '../../../core/models/project'
 import { bearingCapacity as bearingCapacityEngine } from '../../../core/engineering/calculation-engine'
 import { useProjectInfo } from '../../../core/state/project-store'
 import type { IdealizedSoilProfile } from '../../../core/models/idealized-soil-profile'
@@ -26,7 +28,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
     try{
       return {result:tbdyBearingCapacity({
         B,L,Df,gamma1,gamma2,c,phi,verticalLoad:N,horizontalLoad:H,momentX:Mx,momentY:My,
-        groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:1.4,
+        groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:ENGINEERING_CONSTANTS.TBDY_GAMMA_RV,
         foundationType:f.foundationType,groundwaterDepth:soil.groundwaterDepth,layers:layered,undrainedCu:soil.undrainedCohesion
       }),error:null}
     }catch(e){return{result:null,error:e instanceof Error?e.message:String(e)}}
@@ -46,7 +48,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
       <Metric label="G+Q" value={force(N).toFixed(2)} unit={units.force}/>
       <Metric label="H" value={force(H).toFixed(2)} unit={units.force}/>
       <Metric label="Mx / My" value={Mx.toFixed(2)+' / '+My.toFixed(2)} unit={units.moment}/>
-      <Metric label="Klasik FS" value={FS.toFixed(2)}/><Metric label="γRv" value="1.40"/>
+      <Metric label="Klasik FS" value={FS.toFixed(2)}/><Metric label="γRv" value={ENGINEERING_CONSTANTS.TBDY_GAMMA_RV.toFixed(2)}/>
     </div></Card>
     <Card title="KLASİK YÖNTEMLER"><Table headers={['Yöntem','qult','qallow gross','qallow net']} rows={generic.map(x=>[x.method,x.result.ultimate.toFixed(2)+' kPa',x.result.allowableGross.toFixed(2)+' kPa',x.result.allowableNet.toFixed(2)+' kPa'])}/><div className="engineering-note">Bu dört sütun klasik izin verilebilir taşıma gücüdür; TBDY tasarım dayanımı değildir.</div></Card>
     <div className="metric-strip"><Metric label="TBDY qk" value={stress(r.qk).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="TBDY qt" value={stress(r.qt).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="q0" value={stress(r.qo).toFixed(2)} unit={units.stress}/><Metric label="B′ / L′" value={r.Be.toFixed(3)+' / '+r.Le.toFixed(3)} unit="m"/><Metric label="Kullanım" value={(r.utilization*100).toFixed(1)} unit="%"/><Metric label="Kontrol" value={r.layeredScreeningOnly?'ÖN KONTROL':p.geophysical.soilGroup==='ZF'&&!p.geophysical.siteSpecificResponseAnalysisCompleted?'ÖZEL SAHA ANALİZİ GEREKLİ':r.adequate?'UYGUN':'YETERSİZ'}/></div>

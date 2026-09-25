@@ -1,7 +1,7 @@
 import type { BoreholeRecord, LaboratoryRecord, LithologyLayer, SptRecord } from '../models/field-data'
 import type { IdealizedParameterSource, IdealizedSoilLayer, IdealizedSoilProfile } from '../models/idealized-soil-profile'
 import { calculateSpt } from '../engineering/spt/spt-engine'
-import { laboratoryValueToBase } from '../units/project-units'
+import { laboratoryValueToBase, unitWeightToBase } from '../units/project-units'
 
 export interface IdealizedProfileInput {
   boreholes: BoreholeRecord[]
@@ -52,10 +52,7 @@ function buildSources(lithology: LithologyLayer[], spt: Array<SptRecord & { bore
   if (labs.some(x => x.consolidationCc != null)) sources.compressionIndexCc = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.consolidationCs != null)) sources.recompressionIndexCr = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.voidRatio != null)) sources.initialVoidRatio = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.elasticModulus != null)) {
-    sources.oedometricModulus = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-    sources.constrainedModulus = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  }
+  if (labs.some(x => x.elasticModulus != null)) sources.elasticModulus = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.poissonRatio != null)) sources.poissonRatio = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (spt.length) sources.representativeSptN = { type: 'SPT_KORELASYONU', boreholeIds: spt.map(x => x.boreholeId), note: 'SPT sayımı saha kaydından alınır; otomatik olarak dayanım veya sıkışabilirlik parametresine dönüştürülmez.' }
   return sources
@@ -99,8 +96,8 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
   const descriptions = lithology.map(x => x.description).filter(Boolean).concat(labs.map(x => x.soilDescription).filter(Boolean) as string[])
   const codes = lithology.map(x => x.code).filter(Boolean).concat(labs.map(x => x.soilCode).filter(Boolean) as string[])
   const nValues = spt.map(x => x.n2 != null && x.n3 != null ? x.n2 + x.n3 : undefined).filter((x): x is number => x != null)
-  const gamma = median(lithology.map(x => x.unitWeight).filter((x): x is number => x != null).map(x => x).concat(labs.map(x => laboratoryValueToBase('unitWeight',x.unitWeight,x.unitSystem)).filter((x): x is number => x != null)))
-  const gammaSat = median(lithology.map(x => x.saturatedUnitWeight).filter((x): x is number => x != null))
+  const gamma = median(boreholes.flatMap(b => b.lithology.filter(x => overlap(x.from,x.to,top,bottom)).map(x => x.unitWeight!=null?unitWeightToBase(x.unitWeight,b.unitSystem):undefined).filter((x): x is number => x != null)).concat(labs.map(x => laboratoryValueToBase('unitWeight',x.unitWeight,x.unitSystem)).filter((x): x is number => x != null)))
+  const gammaSat = median(boreholes.flatMap(b => b.lithology.filter(x => overlap(x.from,x.to,top,bottom)).map(x => x.saturatedUnitWeight!=null?unitWeightToBase(x.saturatedUnitWeight,b.unitSystem):undefined).filter((x): x is number => x != null)))
   const firstDefined = (values: Array<number | undefined>) => values.find(x => x != null)
   const labMedian = (values: Array<number | undefined>) => median(values.filter((x): x is number => x != null))
   const cLab = labMedian(labs.map(x => laboratoryValueToBase('cohesion',x.directShearC ?? x.c,x.unitSystem)))
@@ -116,7 +113,7 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
     soilName: mode(descriptions) ?? 'Tanımlanmamış zemin', soilCode: mode(codes) ?? '',
     boreholeIds: [...new Set([...lithology.flatMap(() => boreholes.filter(b => b.lithology.some(x => overlap(x.from, x.to, top, bottom))).map(b => b.id)), ...spt.map(x => x.boreholeId), ...labs.map(x => x.boreholeId)])],
     sptRecordIds: spt.map(x => x.id), laboratoryRecordIds: labs.map(x => x.id),
-    representativeSptN: median(nValues), representativeN60: correctedN60, gamma: median(lithology.map(x => x.unitWeight).filter((x): x is number => x != null)), gammaSat,
+    representativeSptN: median(nValues), representativeN60: correctedN60, gamma, gammaSat,
     waterContent: labMedian(labs.map(x => x.waterContent)), liquidLimit: labMedian(labs.map(x => x.liquidLimit)),
     plasticLimit: labMedian(labs.map(x => x.plasticLimit)), plasticityIndex: labMedian(labs.map(x => x.plasticityIndex)),
     finesContent: labMedian(labs.map(x => x.finesContent ?? x.sieve200Passing)),
