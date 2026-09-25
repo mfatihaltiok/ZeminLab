@@ -1,5 +1,5 @@
-import type { BoreholeRecord, LaboratoryRecord, LithologyLayer, SptRecord } from '../models/field-data'
-import type { IdealizedParameterSource, IdealizedSoilLayer, IdealizedSoilProfile } from '../models/idealized-soil-profile'
+import type { BoreholeRecord, LaboratoryRecord } from '../models/field-data'
+import { type IdealizedSoilProfile, type IdealizedSoilLayer } from '../models/idealized-soil-profile'
 
 export interface IdealizedProfileInput {
   boreholes: BoreholeRecord[]
@@ -8,133 +8,43 @@ export interface IdealizedProfileInput {
   previous?: IdealizedSoilProfile
 }
 
-type DepthPoint = { depth: number; kind: 'lithology' | 'spt' | 'lab' }
-
-const median = (values: number[]): number | undefined => {
-  if (!values.length) return undefined
-  const a = [...values].sort((x, y) => x - y)
-  const m = Math.floor(a.length / 2)
-  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2
-}
-
-const mode = (values: string[]): string | undefined => {
-  if (!values.length) return undefined
-  const counts = new Map<string, number>()
-  values.forEach(v => counts.set(v, (counts.get(v) ?? 0) + 1))
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
-}
-
-const overlap = (from: number, to: number, top: number, bottom: number) => from < bottom && to > top
-
-function intervalLithology(boreholes: BoreholeRecord[], top: number, bottom: number): LithologyLayer[] {
-  return boreholes.flatMap(b => b.lithology.filter(x => overlap(x.from, x.to, top, bottom)))
-}
-
-function intervalSpt(boreholes: BoreholeRecord[], top: number, bottom: number): Array<SptRecord & { boreholeId: string }> {
-  return boreholes.flatMap(b => b.spt.filter(x => x.depth >= top && x.depth < bottom).map(x => ({ ...x, boreholeId: b.id })))
-}
-
-function buildSources(lithology: LithologyLayer[], spt: Array<SptRecord & { boreholeId: string }>, labs: LaboratoryRecord[]): Record<string, IdealizedParameterSource> {
-  const sources: Record<string, IdealizedParameterSource> = {}
-  if (lithology.some(x => x.unitWeight != null)) sources.gamma = { type: 'LİTOLOJİ' }
-  if (lithology.some(x => x.saturatedUnitWeight != null)) sources.gammaSat = { type: 'LİTOLOJİ' }
-  if (labs.some(x => x.unitWeight != null)) sources.gamma = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.waterContent != null)) sources.waterContent = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.liquidLimit != null)) sources.liquidLimit = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.plasticLimit != null)) sources.plasticLimit = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.plasticityIndex != null)) sources.plasticityIndex = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.finesContent != null)) sources.finesContent = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.c != null || x.directShearC != null || x.uuC != null)) sources.cohesion = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.phi != null || x.directShearPhi != null || x.uuPhi != null)) sources.frictionAngle = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.consolidationCc != null)) sources.compressionIndexCc = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.consolidationCs != null)) sources.recompressionIndexCr = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.voidRatio != null)) sources.initialVoidRatio = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.elasticModulus != null)) {
-    sources.oedometricModulus = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-    sources.constrainedModulus = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  }
-  if (labs.some(x => x.poissonRatio != null)) sources.poissonRatio = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (spt.length) sources.representativeSptN = { type: 'SPT_KORELASYONU', boreholeIds: spt.map(x => x.boreholeId), note: 'SPT sayımı saha kaydından alınır; otomatik olarak dayanım veya sıkışabilirlik parametresine dönüştürülmez.' }
-  return sources
-}
-
-function collectCandidateCuts(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[], maxDepth: number): number[] {
-  const points: DepthPoint[] = []
-  boreholes.forEach(b => b.lithology.forEach(x => {
-    if (x.from > 0 && x.from < maxDepth) points.push({ depth: x.from, kind: 'lithology' })
-    if (x.to > 0 && x.to < maxDepth) points.push({ depth: x.to, kind: 'lithology' })
-  }))
-  boreholes.forEach(b => b.spt.forEach(x => { if (x.depth > 0 && x.depth < maxDepth) points.push({ depth: x.depth, kind: 'spt' }) }))
-  laboratories.forEach(x => { if (x.depth > 0 && x.depth < maxDepth) points.push({ depth: x.depth, kind: 'lab' }) })
-  const grouped = new Map<number, DepthPoint[]>()
-  points.forEach(p => { const key = Math.round(p.depth * 100) / 100; grouped.set(key, [...(grouped.get(key) ?? []), p]) })
-  return [...grouped.entries()].sort((a, b) => a[0] - b[0]).sort((a, b) => {
-    const priority = (x: DepthPoint[]) => Math.max(...x.map(p => p.kind === 'lithology' ? 3 : p.kind === 'lab' ? 2 : 1))
-    return priority(b[1]) - priority(a[1])
-  }).map(([depth]) => depth)
-}
-
-function chooseCuts(candidates: number[], maxDepth: number, target: number): number[] {
-  if (target <= 1) return [0, maxDepth]
-  const usable = [...new Set(candidates.filter(x => x > 0 && x < maxDepth))].sort((a, b) => a - b)
-  if (!usable.length) return Array.from({ length: target + 1 }, (_, i) => Math.round((maxDepth * i / target) * 100) / 100)
-  if (usable.length <= target - 1) return [0, ...usable, maxDepth]
-  const selected = new Set<number>()
-  const spacing = maxDepth / target
-  for (let i = 1; i < target; i += 1) {
-    const targetDepth = spacing * i
-    const candidate = usable.reduce((best, x) => Math.abs(x - targetDepth) < Math.abs(best - targetDepth) ? x : best, usable[0])
-    selected.add(candidate)
-  }
-  return [0, ...selected].sort((a, b) => a - b).concat(maxDepth).filter((x, i, arr) => i === 0 || x !== arr[i - 1])
-}
-
-function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[], top: number, bottom: number, order: number): IdealizedSoilLayer {
-  const lithology = intervalLithology(boreholes, top, bottom)
-  const spt = intervalSpt(boreholes, top, bottom)
-  const labs = laboratories.filter(x => x.depth >= top && x.depth < bottom)
-  const descriptions = lithology.map(x => x.description).filter(Boolean).concat(labs.map(x => x.soilDescription).filter(Boolean) as string[])
-  const codes = lithology.map(x => x.code).filter(Boolean).concat(labs.map(x => x.soilCode).filter(Boolean) as string[])
-  const nValues = spt.map(x => x.n2 != null && x.n3 != null ? x.n2 + x.n3 : undefined).filter((x): x is number => x != null)
-  const gamma = median(lithology.map(x => x.unitWeight).filter((x): x is number => x != null).concat(labs.map(x => x.unitWeight).filter((x): x is number => x != null)))
-  const gammaSat = median(lithology.map(x => x.saturatedUnitWeight).filter((x): x is number => x != null))
-  const firstDefined = (values: Array<number | undefined>) => values.find(x => x != null)
-  const labMedian = (values: Array<number | undefined>) => median(values.filter((x): x is number => x != null))
-  const cLab = labMedian(labs.map(x => x.directShearC ?? x.c ?? x.uuC))
-  const phiLab = labMedian(labs.map(x => x.directShearPhi ?? x.phi ?? x.uuPhi))
-  const sources = buildSources(lithology, spt, labs)
-
-  if (gamma != null && sources.gamma?.type === 'LİTOLOJİ' && labs.some(x => x.unitWeight != null)) sources.gamma = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-
-  return {
-    id: crypto.randomUUID(), order, topDepth: top, bottomDepth: bottom,
-    soilName: mode(descriptions) ?? 'Tanımlanmamış zemin', soilCode: mode(codes) ?? '',
-    boreholeIds: [...new Set([...lithology.flatMap(() => boreholes.filter(b => b.lithology.some(x => overlap(x.from, x.to, top, bottom))).map(b => b.id)), ...spt.map(x => x.boreholeId), ...labs.map(x => x.boreholeId)])],
-    sptRecordIds: spt.map(x => x.id), laboratoryRecordIds: labs.map(x => x.id),
-    representativeSptN: median(nValues), gamma, gammaSat,
-    waterContent: labMedian(labs.map(x => x.waterContent)), liquidLimit: labMedian(labs.map(x => x.liquidLimit)),
-    plasticLimit: labMedian(labs.map(x => x.plasticLimit)), plasticityIndex: labMedian(labs.map(x => x.plasticityIndex)),
-    finesContent: labMedian(labs.map(x => x.finesContent ?? x.sieve200Passing)),
-    cohesion: cLab ?? firstDefined(lithology.map(x => x.cohesion)), frictionAngle: phiLab ?? firstDefined(lithology.map(x => x.frictionAngle)),
-    compressionIndexCc: labMedian(labs.map(x => x.consolidationCc)), recompressionIndexCr: labMedian(labs.map(x => x.consolidationCs)),
-    initialVoidRatio: labMedian(labs.map(x => x.voidRatio)),
-    constrainedModulus: labMedian(labs.map(x => x.elasticModulus)), oedometricModulus: labMedian(labs.map(x => x.elasticModulus)),
-    poissonRatio: labMedian(labs.map(x => x.poissonRatio)), parameterSources: sources, userOverride: false,
-  }
-}
-
+/**
+ * Legacy draft generator.
+ * It deliberately does not infer c′/φ′, Cu, Es, M, Cc, Cr, e0 or N60.
+ * The production workflow is manual in IdealizedSoilProfileScreen.
+ */
 export function generateIdealizedSoilProfile(input: IdealizedProfileInput): IdealizedSoilProfile {
-  const { boreholes, laboratories, previous } = input
-  const targetLayerCount = Math.max(1, Math.min(20, Math.round(input.targetLayerCount)))
-  const maxDepth = Math.max(...boreholes.map(x => x.totalDepth), 1)
-  const candidates = collectCandidateCuts(boreholes, laboratories, maxDepth)
-  const cuts = chooseCuts(candidates, maxDepth, targetLayerCount)
-  const layers = cuts.slice(0, -1).map((top, i) => makeLayer(boreholes, laboratories, top, cuts[i + 1], i + 1))
-  return {
-    id: previous?.id ?? crypto.randomUUID(), version: previous?.version ?? 1, status: 'TASLAK', targetLayerCount,
-    generatedAt: new Date().toISOString(), sourceBoreholeIds: [...new Set(boreholes.map(x => x.id))],
-    sourceLaboratoryIds: [...new Set(laboratories.map(x => x.id))], layers,
-    methodology: 'TBDY 2018 ve yürürlükteki Türk mevzuatı esas alınır. Otomatik katmanlama; litoloji sınırları, SPT derinlikleri ve laboratuvar numune derinliklerini aday sınırlar olarak kullanır. SPT, dayanım veya sıkışabilirlik parametrelerine otomatik korelasyonla dönüştürülmez. Nihai mühendislik kararı kullanıcıya aittir.',
-    notes: 'Otomatik profil bir mühendislik taslağıdır. Kullanıcı sınırları ve parametreleri değiştirdiğinde ilgili katman userOverride olarak işaretlenir.',
+  if(!input.boreholes.length)throw new Error('İdealize profil için en az bir sondaj gerekir.')
+  const maxDepth=Math.max(...input.boreholes.map(b=>b.totalDepth).filter(Number.isFinite),1)
+  const target=Math.max(1,Math.min(20,Math.round(input.targetLayerCount)))
+  const cuts=new Set<number>([0,maxDepth])
+  input.boreholes.forEach(b=>b.lithology.forEach(l=>{if(Number.isFinite(l.from)&&l.from>0&&l.from<maxDepth)cuts.add(l.from);if(Number.isFinite(l.to)&&l.to>0&&l.to<maxDepth)cuts.add(l.to)}))
+  const ordered=[...cuts].sort((a,b)=>a-b)
+  let selected=ordered
+  if(ordered.length>target+1){const step=maxDepth/target;selected=[0,...Array.from({length:target-1},(_,i)=>i+1).map(i=>{const wanted=step*i;return ordered.reduce((best,x)=>Math.abs(x-wanted)<Math.abs(best-wanted)?x:best,ordered[0])}),maxDepth].sort((a,b)=>a-b).filter((x,i,a)=>i===0||x!==a[i-1])}
+  const layers:IdealizedSoilLayer[]=selected.slice(0,-1).map((top,i)=>{
+    const bottom=selected[i+1]
+    const sourceBorehole=input.boreholes.find(b=>b.lithology.some(l=>l.from<bottom&&l.to>top))
+    const sourceLithology=sourceBorehole?.lithology.find(l=>l.from<bottom&&l.to>top)
+    const linkedLabs=input.laboratories.filter(l=>l.depth>=top&&l.depth<bottom)
+    const firstLab=linkedLabs.find(l=>Number.isFinite(l.unitWeight))
+    const parameterSources:IdealizedSoilLayer['parameterSources']={}
+    if(sourceLithology?.unitWeight!=null)parameterSources.gamma={type:'LİTOLOJİ',boreholeIds:sourceBorehole?[sourceBorehole.id]:[]}
+    if(sourceLithology?.saturatedUnitWeight!=null)parameterSources.gammaSat={type:'LİTOLOJİ',boreholeIds:sourceBorehole?[sourceBorehole.id]:[]}
+    if(firstLab?.unitWeight!=null&&!parameterSources.gamma)parameterSources.gamma={type:'LABORATUVAR',sampleIds:[firstLab.id]}
+    return{
+      id:crypto.randomUUID(),order:i+1,topDepth:top,bottomDepth:bottom,thickness:bottom-top,
+      soilName:sourceLithology?.description??'Zemin seçilmedi',soilCode:sourceLithology?.code??'',
+      boreholeIds:sourceBorehole?[sourceBorehole.id]:[],sptRecordIds:[],laboratoryRecordIds:linkedLabs.map(l=>l.id),
+      gamma:sourceLithology?.unitWeight??firstLab?.unitWeight,gammaSat:sourceLithology?.saturatedUnitWeight,
+      parameterSources,userOverride:false
+    }
+  })
+  return{
+    id:input.previous?.id??crypto.randomUUID(),version:2,status:'TASLAK',targetLayerCount:layers.length,
+    generatedAt:new Date().toISOString(),sourceBoreholeIds:[...new Set(input.boreholes.map(b=>b.id))],sourceLaboratoryIds:[...new Set(input.laboratories.map(l=>l.id))],
+    layers,parameterUnitSystem:'kN-m',
+    methodology:'LEGACY DRAFT: yalnız geometri/litoloji taslağı üretir. c′/φ′, Cu, Es, M, Cc, Cr, e0 ve N60 otomatik türetilmez. Üretim hesabı manuel Idealize Zemin Profili akışından yapılmalıdır.',
+    notes:'Bu servis uyumluluk amacıyla korunur; yeni kod tarafından hesap motoru olarak kullanılmamalıdır.'
   }
 }
