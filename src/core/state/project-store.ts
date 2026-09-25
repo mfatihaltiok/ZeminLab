@@ -13,7 +13,7 @@ const nonNegative=(x:unknown)=>finite(x)&&x>=0
 function convertLabRecord(l:LaboratoryRecord,system:ProjectInfo['unitSystem']):LaboratoryRecord{
   const convert=(value:unknown,fn:(v:number,s:ProjectInfo['unitSystem'])=>number)=>finite(value as number)?fn(value as number,system):undefined
   return {...l,
-    unitWeight:convert(l.unitWeight,unitWeightToBase),pointLoadIs50:convert(l.pointLoadIs50,stressToBase),uniaxialRockStrength:convert(l.uniaxialRockStrength,stressToBase),
+    unitWeight:convert(l.unitWeight,unitWeightToBase),saturatedUnitWeight:convert(l.saturatedUnitWeight,unitWeightToBase),pointLoadIs50:convert(l.pointLoadIs50,stressToBase),uniaxialRockStrength:convert(l.uniaxialRockStrength,stressToBase),
     uuC:convert(l.uuC,stressToBase),directShearC:convert(l.directShearC,stressToBase),c:convert(l.c,stressToBase),
     elasticModulus:convert(l.elasticModulus,modulusToBase),oedometricModulus:convert(l.oedometricModulus,modulusToBase),
     engineeringUnitSystem:'kN-m'
