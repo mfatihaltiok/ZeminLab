@@ -53,7 +53,7 @@ export function ProjectInfoScreenV2(){
             setProject({geophysical:{...p.geophysical,vs30:vs,soilGroup:classifyVs30(vs),soilGroupSource:'VS30'}})
           }}/>
           <label>TBDY zemin grubu
-            <select value={p.geophysical.soilGroup??vs30Group??''} onChange={e=>setProject({geophysical:{...p.geophysical,soilGroup:e.target.value as NonNullable<typeof p.geophysical.soilGroup>,soilGroupSource:e.target.value==='ZF'?'SITE_SPECIFIC':'USER'}})}>
+            <select value={p.geophysical.soilGroup??vs30Group??''} onChange={e=>{const group=e.target.value as typeof p.geophysical.soilGroup;setProject({geophysical:{...p.geophysical,soilGroup:group||undefined,soilGroupSource:group==='ZF'?'SITE_SPECIFIC':'USER'}})}}>
               <option value="">Vs30 bekleniyor</option><option value="ZA">ZA</option><option value="ZB">ZB</option><option value="ZC">ZC</option><option value="ZD">ZD</option><option value="ZE">ZE</option><option value="ZF">ZF</option>
             </select>
           </label>
@@ -74,7 +74,7 @@ export function ProjectInfoScreenV2(){
           <Field label="Fs" value={p.seismic.fs??''} onChange={v=>setSeismic({fs:v===''?undefined:Number(v)})}/>
           <Field label="F1" value={p.seismic.f1??''} onChange={v=>setSeismic({f1:v===''?undefined:Number(v)})}/>
           <Field label="Sıvılaşma Mw" value={p.seismic.magnitude??''} onChange={v=>setSeismic({magnitude:v===''?undefined:Number(v)})}/>
-          <label>Bina Kullanım Sınıfı BKS<select value={p.seismic.bks??''} onChange={e=>setSeismic({bks:Number(e.target.value) as BuildingUseClass})}><option value="">Seçiniz</option><option value="1">BKS=1</option><option value="2">BKS=2</option><option value="3">BKS=3</option></select></label>
+          <label>Bina Kullanım Sınıfı BKS<select value={p.seismic.bks??''} onChange={e=>setSeismic({bks:e.target.value===''?undefined:Number(e.target.value) as BuildingUseClass})}><option value="">Seçiniz</option><option value="1">BKS=1</option><option value="2">BKS=2</option><option value="3">BKS=3</option></select></label>
           <Metric label="SDS" value={sds!=null?sds.toFixed(3):'—'}/>
           <Metric label="DTS" value={dts??'—'}/>
         </div>
