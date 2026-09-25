@@ -96,7 +96,7 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
   const descriptions = lithology.map(x => x.description).filter(Boolean).concat(labs.map(x => x.soilDescription).filter(Boolean) as string[])
   const codes = lithology.map(x => x.code).filter(Boolean).concat(labs.map(x => x.soilCode).filter(Boolean) as string[])
   const nValues = spt.map(x => x.n2 != null && x.n3 != null ? x.n2 + x.n3 : undefined).filter((x): x is number => x != null)
-  const gamma = median(lithology.map(x => x.unitWeight!=null?unitWeightToBase(x.unitWeight,x.unitSystem):undefined).filter((x): x is number => x != null)).concat(labs.map(x => laboratoryValueToBase('unitWeight',x.unitWeight,x.unitSystem)).filter((x): x is number => x != null)))
+  const gamma = median(lithology.map(x => x.unitWeight!=null?unitWeightToBase(x.unitWeight,x.unitSystem):undefined).filter((x): x is number => x != null).concat(labs.map(x => laboratoryValueToBase('unitWeight',x.unitWeight,x.unitSystem)).filter((x): x is number => x != null)))
   const gammaSat = median(lithology.map(x => x.saturatedUnitWeight!=null?unitWeightToBase(x.saturatedUnitWeight,x.unitSystem):undefined).filter((x): x is number => x != null)))
   const firstDefined = (values: Array<number | undefined>) => values.find(x => x != null)
   const labMedian = (values: Array<number | undefined>) => median(values.filter((x): x is number => x != null))
