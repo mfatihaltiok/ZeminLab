@@ -24,3 +24,7 @@ export const momentFromBase=(value:number,system:UnitSystem)=>forceFromBase(valu
 export function projectUnits(system:UnitSystem){return system==='ton-m'?PROJECT_UNIT_LABELS.ton:PROJECT_UNIT_LABELS.kN}
 export function isBaseUnitSystem(system:UnitSystem){return system==='kN-m'}
 export function requireFinite(value:number,name:string){if(!Number.isFinite(value))throw new Error(`${name} geçerli bir sayı olmalıdır.`);return value}
+
+export type LaboratoryEngineeringField='unitWeight'|'cohesion'|'uuC'|'elasticModulus'
+export function laboratoryValueToBase(field:LaboratoryEngineeringField,value:number|undefined,system:UnitSystem){if(value===undefined||!Number.isFinite(value))return undefined;return field==='unitWeight'||field==='cohesion'||field==='uuC'||field==='elasticModulus'?forceToBase(value,system):value}
+export function laboratoryValueFromBase(field:LaboratoryEngineeringField,value:number|undefined,system:UnitSystem){if(value===undefined||!Number.isFinite(value))return undefined;return field==='unitWeight'||field==='cohesion'||field==='uuC'||field==='elasticModulus'?forceFromBase(value,system):value}

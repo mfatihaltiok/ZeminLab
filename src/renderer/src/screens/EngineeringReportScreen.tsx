@@ -1,7 +1,10 @@
 import { useMemo, type ReactNode } from 'react'
 import { useProjectInfo } from '../../../core/state/project-store'
 import { forceToBase, forceFromBase, momentToBase, stressToBase, unitWeightToBase } from '../../../core/units/project-units'
-import { tbdyBearingCapacity, foundationChecks } from '../../../core/calculations/engineering'
+import { tbdyBearingCapacity } from '../../../core/engineering/calculation-engine'
+import { ENGINEERING_CONSTANTS } from '../../../core/models/project'
+import { SOURCE_NOTES } from '../../../core/engineering/source-notes'
+import { foundationChecks } from '../../../core/engineering/foundation-sliding'
 import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '../../../core/engineering/idealized-settlement-engine'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { deriveSptValues } from '../../../core/engineering/field-calculations'
@@ -30,13 +33,14 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
   const N=forceToBase(f.structuralWeight,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),H=Math.hypot(Vx,Vy),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
   const sds=p.seismic.sds
   const bearing=useMemo(()=>{
+    if(p.geophysical.soilGroup==='ZF'&&p.geophysical.siteSpecificResponseAnalysisCompleted!==true)return undefined
     if(!(B>0&&L>0&&Df>=0&&N>=0&&soil.unitWeight>0))return undefined
     try{return tbdyBearingCapacity({
       B,L,Df,gamma1:unitWeightToBase(soil.unitWeight,p.unitSystem),gamma2:unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem),
-      c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,verticalLoad:N,horizontalLoad:H,momentX:Mx,momentY:My,
-      groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:1.4,foundationType:f.foundationType,
+      c:stressToBase(soil.cohesion,p.unitSystem),phi:soil.frictionAngle,verticalLoad:N,horizontalLoad:H,soilPoissonRatio:p.jetGrout.soilPoissonRatio,shearNormalStress:p.jetGrout.interfaceNormalStress,momentX:Mx,momentY:My,
+      groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:ENGINEERING_CONSTANTS.TBDY_GAMMA_RV,foundationType:f.foundationType,
       groundwaterDepth:soil.groundwaterDepth,undrainedCu:soil.undrainedCohesion,
-      layers:profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:unitWeightToBase(x.gamma??soil.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(x.gammaSat??x.gamma??soil.saturatedUnitWeight,p.unitSystem),cohesion:stressToBase(x.cohesion??soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle}))
+      layers:profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:x.gamma??unitWeightToBase(soil.unitWeight,p.unitSystem),gammaSat:x.gammaSat??x.gamma??unitWeightToBase(soil.saturatedUnitWeight,p.unitSystem),cohesion:x.cohesion??stressToBase(soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle}))
     })}catch{return undefined}
   },[B,L,Df,N,H,Mx,My,soil,p,profile,f.foundationType])
 
@@ -44,22 +48,22 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
   const settlements=useMemo(()=>{
     if(!profile||profile.status!=='SABİTLENDİ'||!(B>0&&L>0&&Df>=0&&N>0))return []
     return settlementMethods.map(method=>{
-      const result=calculateIdealizedSettlement({profile,method,B,L,Df,qGross:N/(B*L),groundwaterDepth:soil.groundwaterDepth??(boreholes.length===1?boreholes[0].groundwaterDepth:undefined)})
-      return{method,result}
+      const result=calculateIdealizedSettlement({profile,method,B,L,Df,foundationType:f.foundationType,qGross:N/(B*L),groundwaterDepth:soil.groundwaterDepth??(boreholes.length===1?boreholes[0].groundwaterDepth:undefined)})
+      return{method,result:result as typeof result}
     })
-  },[profile,B,L,Df,N,boreholes])
+  },[profile,B,L,Df,N,f.foundationType,soil.groundwaterDepth,boreholes])
   const jetGrout=useMemo(()=>{
     const j=p.jetGrout
     if(!(j.columnDiameter&&j.columnDiameter>0&&j.spacing&&j.spacing>0&&j.qSoil&&j.qSoil>0&&j.qColumn&&j.qColumn>0))return undefined
     return jetGroutEngineering({
       columnDiameter:j.columnDiameter,spacing:j.spacing,layout:j.layout??'square',
       qSoil:j.qSoil,qColumn:j.qColumn,cSoil:j.cSoil,cColumn:j.cColumn,EsSoil:j.EsSoil,EsColumn:j.EsColumn,
-      load:N>0?N:undefined,foundationArea:B>0&&L>0?B*L:undefined,foundationThickness:j.foundationThickness,
+      load:N>0?N:undefined,foundationArea:B>0&&L>0?B*L:undefined,foundationThickness:j.foundationThickness,soilPoissonRatio:j.soilPoissonRatio,shearNormalStress:j.interfaceNormalStress,
       columnFrictionAngle:j.columnFrictionAngle,cohesion:j.interfaceCohesion,frictionAngle:j.interfaceFrictionAngle,
       verticalLoad:N,horizontalLoad:H
     })
   },[p.jetGrout,N,B,L,H])
-  const foundation=useMemo(()=>B>0&&L>0?foundationChecks({
+  const foundation=useMemo(()=>B>0&&L>0&&f.baseFrictionTanDelta!=null&&Number.isFinite(f.baseFrictionTanDelta)&&f.baseFrictionTanDelta>=0?foundationChecks({
     B,L,N,Vx,Vy,Mx,My,deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion,
     area:undefined,groundwaterDepth:soil.groundwaterDepth,foundationDepth:Df,
     passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance
@@ -79,11 +83,11 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
           boreholeDiameterMm:b.drillingDiameter,sampler:cfg.sampler,samplerCorrection:cfg.samplerCorrection,rodLengthM:cfg.rodLengthM}
       })
       return{borehole:b,result:rows.length?liquefactionProfile({
-        Mw:p.seismic.magnitude!,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(x=>({top:x.from,bottom:x.to,gamma:x.unitWeight??0,gammaSat:x.saturatedUnitWeight??x.unitWeight??0,soil:x.code,finesContent:x.finesContent,plasticityIndex:x.plasticityIndex})),
-        spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth
+        Mw:p.seismic.magnitude!,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(x=>({top:x.from,bottom:x.to,gamma:x.unitWeight!=null?unitWeightToBase(x.unitWeight,b.unitSystem):0,gammaSat:x.saturatedUnitWeight!=null?unitWeightToBase(x.saturatedUnitWeight,b.unitSystem):x.unitWeight!=null?unitWeightToBase(x.unitWeight,b.unitSystem):0,soil:x.code,finesContent:x.finesContent,plasticityIndex:x.plasticityIndex})),
+        spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth,siteSpecificResponseAnalysisCompleted:p.geophysical.siteSpecificResponseAnalysisCompleted
       }):undefined}
     })
-  },[boreholes,labs,p.seismic.magnitude,p.seismic.dts,sds])
+  },[boreholes,labs,p.seismic.magnitude,p.seismic.dts,p.geophysical.soilGroup,p.geophysical.siteSpecificResponseAnalysisCompleted,p.soilParameters.liquefactionContinuousOrThickLens,p.foundationParameters.footingDepth,sds])
 
   const sptRows=boreholes.flatMap(b=>b.spt.filter(x=>x.testType==='SPT'&&Number.isFinite(x.n2)&&Number.isFinite(x.n3)).map(x=>({borehole:b,record:x,derived:deriveSptValues(b,x,labs)})))
   const exportCsv=()=>{
@@ -110,7 +114,7 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
 
       <Section title="SPT düzeltmeleri">
         <Table head={['Sondaj','z (m)','N','Ce','Cb','Cs','Cr','N60','CN','(N1)60']}>
-          {sptRows.map(x=><tr key={x.record.id}><td>{x.borehole.name}</td><td>{fmt(x.record.depth)}</td><td>{fmt(x.derived.nField,0)}</td><td>{fmt(x.derived.ce)}</td><td>{fmt(x.derived.cb)}</td><td>{fmt(x.derived.cs)}</td><td>{fmt(x.derived.cr)}</td><td>{fmt(x.derived.n60)}</td><td>{fmt(x.derived.cn)}</td><td>{fmt(x.derived.n1_60)}</td></tr>)}
+          {sptRows.map(x=><tr key={x.record.id}><td>{x.borehole.name}</td><td>{fmt(x.record.depth)}</td><td>{fmt(x.derived.nField,0)}</td><td>{fmt(x.derived.ce)}</td><td>{fmt(x.derived.cb)}</td><td>{fmt(x.derived.cs)}</td><td>{fmt(x.derived.cr)}</td><td>{x.derived.correctionReady?fmt(x.derived.n60):'—'}</td><td>{x.derived.normalizationReady?fmt(x.derived.cn):'—'}</td><td>{x.derived.correctionReady&&x.derived.normalizationReady?fmt(x.derived.n1_60):'—'}</td></tr>)}
         </Table>
         {info('Kaynak','TBDY 2018 Ek 16B.2; merkezi SPT motoru kullanılır.')}
       </Section>

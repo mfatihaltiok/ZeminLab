@@ -1,41 +1,30 @@
 # FALUZMN
 
-FALUZMN is a Windows-first geotechnical engineering desktop application built with Electron, React and TypeScript.
+Windows-first geotechnical engineering desktop application built with Electron, React and TypeScript.
 
 ## v1.0
 
-v1.0 adds the professional output/integration layer:
-
-- A4 PDF report export infrastructure
-- Erol 2014 and Erol 2018 local source-pack indexing
-- PaddleOCR PP-OCRv5 + Docling document-intelligence installation and offline runner
-- OCR provider settings with encrypted API-key storage
-- Electron internet/connectivity health check
-- Excel export utility
-- DXF soil-profile export utility
+- A4 PDF report export
+- Erol 2014 / Erol 2018 local source-pack indexing
+- Excel and DXF export utilities
 - neutral SAP2000 interchange and OpenSees Tcl export adapters
+- centralized SPT, bearing-capacity, settlement, liquefaction, foundation-sliding and Jet Grout calculation services
 
-### Belge istihbaratı\n\nFALUZMN uses two deterministic local layers: **PaddleOCR PP-OCRv5** for text recognition and **Docling 2.128.0** for document layout and table structure. Values are not inferred from fixed page coordinates. Ambiguous/conflicting candidates are rejected and the user must review OCR candidates before import. The runtime is CPU-first and prepared for offline operation. Docling's layout and TableFormer artifacts are prefetched into the application package.\n\nPaddleOCR itself can run locally, so the application does **not** require an API key for offline OCR. A remote OCR endpoint/API-key field may still be present for deployments that use a hosted OCR service. The key is stored encrypted through Electron's `safeStorage` when the operating system supports it.
+### Hesap ve veri yaklaşımı
 
-### v1.0 setup
+FALUZMN project files use the `.falu` extension. Field records retain their own unit system, while calculation engines consume explicit base-SI values. Missing engineering parameters are not silently substituted into final calculations.
 
-From PowerShell:
-
-```powershell
-.\tools\setup_stage3.ps1
-```
-
-This creates a project-local Python runtime, installs PaddleOCR document parsing dependencies, downloads the two publisher source PDFs into the local source-pack, and indexes figure-bearing pages. The source PDFs themselves are not committed to GitHub.
+OCR, image scanning and document-intelligence based numeric extraction are intentionally not part of FALUZMN. Laboratory, SPT and borehole values are entered and reviewed by the engineer.
 
 ### Development
 
-```bash
+```powershell
 npm install
 npm run dev
 ```
 
-### Build Windows setup
+### Windows build
 
-```bash
+```powershell
 npm run build:win
 ```

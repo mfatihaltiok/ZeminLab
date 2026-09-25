@@ -1,5 +1,7 @@
 import type { BoreholeRecord, LaboratoryRecord, LithologyLayer, SptRecord } from '../models/field-data'
 import type { IdealizedParameterSource, IdealizedSoilLayer, IdealizedSoilProfile } from '../models/idealized-soil-profile'
+import { calculateSpt } from '../engineering/spt/spt-engine'
+import { laboratoryValueToBase, unitWeightToBase } from '../units/project-units'
 
 export interface IdealizedProfileInput {
   boreholes: BoreholeRecord[]
@@ -26,8 +28,8 @@ const mode = (values: string[]): string | undefined => {
 
 const overlap = (from: number, to: number, top: number, bottom: number) => from < bottom && to > top
 
-function intervalLithology(boreholes: BoreholeRecord[], top: number, bottom: number): LithologyLayer[] {
-  return boreholes.flatMap(b => b.lithology.filter(x => overlap(x.from, x.to, top, bottom)))
+function intervalLithology(boreholes: BoreholeRecord[], top: number, bottom: number): Array<LithologyLayer & { boreholeId:string; unitSystem:'ton-m'|'kN-m' }> {
+  return boreholes.flatMap(b => b.lithology.filter(x => overlap(x.from, x.to, top, bottom)).map(x => ({...x,boreholeId:b.id,unitSystem:b.unitSystem})))
 }
 
 function intervalSpt(boreholes: BoreholeRecord[], top: number, bottom: number): Array<SptRecord & { boreholeId: string }> {
@@ -44,15 +46,13 @@ function buildSources(lithology: LithologyLayer[], spt: Array<SptRecord & { bore
   if (labs.some(x => x.plasticLimit != null)) sources.plasticLimit = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.plasticityIndex != null)) sources.plasticityIndex = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.finesContent != null)) sources.finesContent = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.c != null || x.directShearC != null || x.uuC != null)) sources.cohesion = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.phi != null || x.directShearPhi != null || x.uuPhi != null)) sources.frictionAngle = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
+  if (labs.some(x => x.c != null || x.directShearC != null)) sources.cohesion = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
+  if (labs.some(x => x.uuC != null)) sources.undrainedCohesion = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
+  if (labs.some(x => x.phi != null || x.directShearPhi != null)) sources.frictionAngle = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.consolidationCc != null)) sources.compressionIndexCc = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.consolidationCs != null)) sources.recompressionIndexCr = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.voidRatio != null)) sources.initialVoidRatio = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (labs.some(x => x.elasticModulus != null)) {
-    sources.oedometricModulus = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-    sources.constrainedModulus = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  }
+  if (labs.some(x => x.elasticModulus != null)) sources.elasticModulus = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (labs.some(x => x.poissonRatio != null)) sources.poissonRatio = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
   if (spt.length) sources.representativeSptN = { type: 'SPT_KORELASYONU', boreholeIds: spt.map(x => x.boreholeId), note: 'SPT sayımı saha kaydından alınır; otomatik olarak dayanım veya sıkışabilirlik parametresine dönüştürülmez.' }
   return sources
@@ -96,12 +96,14 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
   const descriptions = lithology.map(x => x.description).filter(Boolean).concat(labs.map(x => x.soilDescription).filter(Boolean) as string[])
   const codes = lithology.map(x => x.code).filter(Boolean).concat(labs.map(x => x.soilCode).filter(Boolean) as string[])
   const nValues = spt.map(x => x.n2 != null && x.n3 != null ? x.n2 + x.n3 : undefined).filter((x): x is number => x != null)
-  const gamma = median(lithology.map(x => x.unitWeight).filter((x): x is number => x != null).concat(labs.map(x => x.unitWeight).filter((x): x is number => x != null)))
-  const gammaSat = median(lithology.map(x => x.saturatedUnitWeight).filter((x): x is number => x != null))
+  const gamma = median(lithology.map(x => x.unitWeight!=null?unitWeightToBase(x.unitWeight,x.unitSystem):undefined).filter((x): x is number => x != null).concat(labs.map(x => laboratoryValueToBase('unitWeight',x.unitWeight,x.unitSystem)).filter((x): x is number => x != null)))
+  const gammaSat = median(lithology.map(x => x.saturatedUnitWeight!=null?unitWeightToBase(x.saturatedUnitWeight,x.unitSystem):undefined).filter((x): x is number => x != null)))
   const firstDefined = (values: Array<number | undefined>) => values.find(x => x != null)
   const labMedian = (values: Array<number | undefined>) => median(values.filter((x): x is number => x != null))
-  const cLab = labMedian(labs.map(x => x.directShearC ?? x.c ?? x.uuC))
-  const phiLab = labMedian(labs.map(x => x.directShearPhi ?? x.phi ?? x.uuPhi))
+  const cLab = labMedian(labs.map(x => laboratoryValueToBase('cohesion',x.directShearC ?? x.c,x.unitSystem)))
+  const cuLab = labMedian(labs.map(x => laboratoryValueToBase('uuC',x.uuC,x.unitSystem)))
+  const phiLab = labMedian(labs.map(x => x.directShearPhi ?? x.phi))
+  const correctedN60 = median(spt.map(x => { const n=x.n2!=null&&x.n3!=null?x.n2+x.n3:undefined; if(n==null)return undefined; try { const r=calculateSpt({nField:n,energyRatio:x.correction?.energyRatio,hammerType:x.correction?.hammerType,boreholeDiameterMm:boreholes.find(b=>b.id===x.boreholeId)?.drillingDiameter,sampler:x.correction?.sampler,samplerCorrection:x.correction?.samplerCorrection,rodLengthM:x.correction?.rodLengthM,applyOverburden:false}); return r.correctionReady?r.n60:undefined } catch { return undefined } }).filter((x):x is number=>x!=null))
   const sources = buildSources(lithology, spt, labs)
 
   if (gamma != null && sources.gamma?.type === 'LİTOLOJİ' && labs.some(x => x.unitWeight != null)) sources.gamma = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
@@ -111,14 +113,14 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
     soilName: mode(descriptions) ?? 'Tanımlanmamış zemin', soilCode: mode(codes) ?? '',
     boreholeIds: [...new Set([...lithology.flatMap(() => boreholes.filter(b => b.lithology.some(x => overlap(x.from, x.to, top, bottom))).map(b => b.id)), ...spt.map(x => x.boreholeId), ...labs.map(x => x.boreholeId)])],
     sptRecordIds: spt.map(x => x.id), laboratoryRecordIds: labs.map(x => x.id),
-    representativeSptN: median(nValues), gamma, gammaSat,
+    representativeSptN: median(nValues), representativeN60: correctedN60, gamma, gammaSat,
     waterContent: labMedian(labs.map(x => x.waterContent)), liquidLimit: labMedian(labs.map(x => x.liquidLimit)),
     plasticLimit: labMedian(labs.map(x => x.plasticLimit)), plasticityIndex: labMedian(labs.map(x => x.plasticityIndex)),
     finesContent: labMedian(labs.map(x => x.finesContent ?? x.sieve200Passing)),
-    cohesion: cLab ?? firstDefined(lithology.map(x => x.cohesion)), frictionAngle: phiLab ?? firstDefined(lithology.map(x => x.frictionAngle)),
+    cohesion: cLab ?? firstDefined(lithology.map(x => x.cohesion)), frictionAngle: phiLab ?? firstDefined(lithology.map(x => x.frictionAngle)), undrainedCohesion: cuLab,
     compressionIndexCc: labMedian(labs.map(x => x.consolidationCc)), recompressionIndexCr: labMedian(labs.map(x => x.consolidationCs)),
     initialVoidRatio: labMedian(labs.map(x => x.voidRatio)),
-    constrainedModulus: labMedian(labs.map(x => x.elasticModulus)), oedometricModulus: labMedian(labs.map(x => x.elasticModulus)),
+    elasticModulus: labMedian(labs.map(x => laboratoryValueToBase('elasticModulus',x.elasticModulus,x.unitSystem))),
     poissonRatio: labMedian(labs.map(x => x.poissonRatio)), parameterSources: sources, userOverride: false,
   }
 }

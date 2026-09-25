@@ -1,5 +1,6 @@
 import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../models/field-data'
 import { calculateSpt, type SptEngineResult } from './spt/spt-engine'
+import { unitWeightToBase } from '../units/project-units'
 
 export type PlasticityClass='CIL'|'CIM'|'CIH'|'SiL'|'SiM'|'SiH'
 export interface SoilClassificationResult{code:PlasticityClass;description:string;plasticityGroup:'Düşük'|'Orta'|'Yüksek';isClay:boolean;aLinePi:number}
@@ -26,7 +27,7 @@ function linkedLabForSpt(laboratories:LaboratoryRecord[],boreholeId:string,sptId
   return laboratories.find(x=>x.id==='LAB-'+boreholeId+'-'+sptId)??laboratories.find(x=>x.boreholeId===boreholeId&&Math.abs(x.depth-depth)<0.01)
 }
 function labGammaInLayer(laboratories:LaboratoryRecord[],boreholeId:string,top:number,bottom:number){
-  const values=laboratories.filter(x=>x.boreholeId===boreholeId&&x.depth>=top&&x.depth<bottom&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0).map(x=>x.unitWeight!)
+  const values=laboratories.filter(x=>x.boreholeId===boreholeId&&x.depth>=top&&x.depth<bottom&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0).map(x=>unitWeightToBase(x.unitWeight!,x.unitSystem))
   if(!values.length)return undefined
   const ordered=[...values].sort((x,y)=>x-y),m=Math.floor(ordered.length/2)
   return ordered.length%2?ordered[m]:(ordered[m-1]+ordered[m])/2
@@ -40,8 +41,8 @@ function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:Laborat
     const top=Math.max(cursor,layer.from),bottom=Math.min(z,layer.to)
     if(bottom<=top)continue
     if(top>cursor+1e-6){complete=false;break}
-    const gamma=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:labGammaInLayer(laboratories,borehole.id,top,bottom)
-    const gammaSat=Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0?layer.saturatedUnitWeight!:gamma
+    const gamma=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?unitWeightToBase(layer.unitWeight!,borehole.unitSystem):labGammaInLayer(laboratories,borehole.id,top,bottom)
+    const gammaSat=Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0?unitWeightToBase(layer.saturatedUnitWeight!,borehole.unitSystem):gamma
     if(gamma==null||gamma<=0){complete=false;break}
     const above=gwt===undefined?bottom-top:Math.max(0,Math.min(bottom,gwt)-top)
     const below=(bottom-top)-above
@@ -57,7 +58,7 @@ function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:Laborat
 
 export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[]):SptDerivedValues{
   const nField=fieldN(record)
-  if(nField===undefined)return{nField,ce:1,cb:1,cs:1,cr:1,cn:1,n60:0,n1_60:0,dilatancyApplied:false,trace:[],overburdenCorrection:1,overburdenCorrectionApplied:false,warnings:[]}
+  if(nField===undefined)return{nField,ce:0,cb:0,cs:0,cr:0,cn:1,n60:0,n1_60:0,dilatancyApplied:false,correctionReady:false,normalizationReady:false,missingCorrections:['SPT n2 ve n3 eksik'],trace:[],overburdenCorrection:1,overburdenCorrectionApplied:false,warnings:['Ham SPT N30 eksik; düzeltme hesabı yapılmadı.']}
   const stress=stressAtDepth(borehole,record.depth,laboratories)
   const cfg=record.correction??{}
   const lab=linkedLabForSpt(laboratories,borehole.id,record.id,record.depth)
@@ -73,9 +74,9 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
     rodLengthM:cfg.rodLengthM,
     effectiveStress:stress.effectiveStress,
     fineContent,
-    applyOverburden:cfg.applyOverburdenCorrection??true,
+    applyOverburden:cfg.applyOverburdenCorrection,
     applyDilatancy:cfg.applyDilatancyCorrection??false
   })
-  return{...result,verticalStress:stress.verticalStress,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:stress.effectiveStress!=null,n60DilatancyCorrected:result.n1_60_dilatancy}
+  return{...result,verticalStress:stress.verticalStress,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:result.correctionReady&&cfg.applyOverburdenCorrection===true&&stress.effectiveStress!=null,n60DilatancyCorrected:result.n1_60_dilatancy}
 }
 export function classifyLaboratoryRecord(record:LaboratoryRecord):SoilClassificationResult|null{return classifyFineSoil(record.liquidLimit,laboratoryPlasticityIndex(record))}

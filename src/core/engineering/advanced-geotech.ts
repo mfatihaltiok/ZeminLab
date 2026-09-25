@@ -84,13 +84,14 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
       details.push({ settlement: 0, type })
       continue
     }
-    if (l.mv != null && l.mv >= 0) {
+    if (l.mv != null && Number.isFinite(l.mv) && l.mv >= 0) {
       s = H * l.mv * ds
       consolidation += s
       type = 'oedometer'
     } else if (l.Cc != null && l.e0 != null && l.sigma0 > 0 && l.Cc >= 0 && l.e0 > -1) {
       const sigma1 = l.sigma0 + ds
       const spc = l.sigmaPc ?? l.sigma0
+      if (spc > l.sigma0 && l.Cr == null) { details.push({ settlement: 0, type: 'oedometer' }); continue }
       const Cr = Math.max(0, l.Cr ?? l.Cc)
       if (spc > l.sigma0 && sigma1 > l.sigma0) {
         const sigmaA = Math.min(sigma1, spc)
@@ -114,8 +115,9 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
 }
 
 export interface SchmertmannLayer { thickness: number; Es: number; Iz: number }
-export function schmertmannSettlement(q: number, layers: SchmertmannLayer[], C1 = 1, C2 = 1) {
-  const settlement = Math.max(0, C1) * Math.max(0, C2) * Math.max(0, q) * layers.reduce((sum, l) => {
+export function schmertmannSettlement(q: number, layers: SchmertmannLayer[], C1: number, C2: number) {
+  if (!Number.isFinite(C1) || !Number.isFinite(C2) || C1 <= 0 || C2 <= 0) throw new Error('Schmertmann için C1 ve C2 açıkça verilmelidir ve pozitif olmalıdır.')
+  const settlement = C1 * C2 * Math.max(0, q) * layers.reduce((sum, l) => {
     return sum + Math.max(0, l.Iz) * Math.max(0, l.thickness) / Math.max(l.Es, 1e-9)
   }, 0)
   return { settlement, formula: 's = C1·C2·q·Σ(Iz/Es)Δz', method: 'Schmertmann strain-integration framework' }

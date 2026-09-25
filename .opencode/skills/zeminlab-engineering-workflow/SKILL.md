@@ -1,6 +1,6 @@
 ---
 name: zeminlab-engineering-workflow
-description: ZeminLab için zorunlu mühendislik yazılımı geliştirme, uyumluluk doğrulama, kontrollü değişiklik, gerçek runtime testi ve CI doğrulama iş akışı. Kod, bağımlılık, API, OCR/PDF/Excel/Vision araçları, mühendislik hesapları, UI ve GitHub değişikliklerinde kullanılır.
+description: ZeminLab için zorunlu mühendislik yazılımı geliştirme, uyumluluk doğrulama, kontrollü değişiklik, gerçek runtime testi ve CI doğrulama iş akışı. Kod, bağımlılık, PDF/Excel/DXF araçları, mühendislik hesapları, UI ve GitHub değişikliklerinde kullanılır. OCR/image scanning/document-intelligence geliştirmeleri artık FALUZMN kapsamında değildir.
 compatibility: OpenCode + ZeminLab Electron/Vite/React/TypeScript projesi
 metadata:
   project: ZeminLab
@@ -194,25 +194,7 @@ Bir API yalnızca import edilebiliyor diye entegrasyon başarılı kabul edilmez
 
 # 8. OCR özel prosedürü
 
-ZeminLab OCR sistemi yerel/offline çalışmalıdır.
-
-OCR değişikliklerinde aşağıdaki zincir test edilir:
-
-1. Python runtime mevcut mu?
-2. PaddleOCR sürümü doğru mu?
-3. `PaddleOCRVL` import edilebiliyor mu?
-4. Constructor gerçek sürümde destekleniyor mu?
-5. Yerel model klasörleri mevcut mu?
-6. Offline/model source check ayarları doğru mu?
-7. Örnek PNG/JPG gerçekten okunabiliyor mu?
-8. Runner JSON üretebiliyor mu?
-9. Electron IPC runner'ı çağırabiliyor mu?
-10. UI sonucu gösterebiliyor mu?
-11. Paketlenmiş uygulamada aynı dosya yolları çalışıyor mu?
-
-OCR için yalnızca CI sonucu yeterli değildir.
-
-Runtime/model dosyaları Git'e dahil değilse CI'nin bunları test etmediği açıkça belirtilir.
+OCR, görüntü tarama ve document-intelligence tabanlı sayısal çıkarım FALUZMN v1.0 kapsamı dışındadır. Bu nedenle bu skill bu özellikler için yeni entegrasyon veya bakım prosedürü sağlamaz. Eski kaynak dosyaları/araçları repoda bırakılmamalı; ürün kodundan ve bağımlılıklardan tamamen çıkarılmalıdır.
 
 ---
 

@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '../../core/engineering/idealized-settlement-engine'
-import { subgradeReaction } from '../../core/calculations/engineering'
-import type { IdealizedSoilProfile } from '../../core/models/idealized-soil-profile'
-import type { BoreholeRecord } from '../../core/models/field-data'
-import { forceToBase, forceFromBase, stressFromBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
-import type { SubgradeReactionMethod, SubgradeSoilType } from '../../core/engineering/subgrade-reaction'
-import { useProjectInfo } from '../../core/state/project-store'
+import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '../../../core/engineering/idealized-settlement-engine'
+import { subgradeReaction } from '../../../core/calculations/engineering'
+import type { IdealizedSoilProfile } from '../../../core/models/idealized-soil-profile'
+import type { BoreholeRecord } from '../../../core/models/field-data'
+import { forceToBase, forceFromBase, stressFromBase, PROJECT_UNIT_LABELS } from '../../../core/units/project-units'
+import type { SubgradeReactionMethod, SubgradeSoilType } from '../../../core/engineering/subgrade-reaction'
+import { useProjectInfo } from '../../../core/state/project-store'
 import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
 
@@ -62,6 +62,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
   const [kv1Input, setKv1Input] = useState('')
   const [ksSoilType, setKsSoilType] = useState<SubgradeSoilType>('cohesive')
   const [selected, setSelected] = useState(boreholes[0]?.id ?? '')
+  const [influenceDepthInput, setInfluenceDepthInput] = useState('')
   const b = boreholes.find(x => x.id === selected) ?? boreholes[0]
   const f = p.foundationParameters
   const qGross = finite(f.structuralWeight) && finite(f.footingWidth) && finite(f.footingLength)
@@ -78,8 +79,10 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       Df: f.footingDepth,
       qGross,
       groundwaterDepth: b?.groundwaterDepth,
+      foundationType: f.foundationType,
+      influenceDepth: influenceDepthInput === '' ? undefined : Number(influenceDepthInput),
     })
-  }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth])
+  }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, f.foundationType, qGross, b?.groundwaterDepth, influenceDepthInput])
 
   latestIdealizedSettlementResult = result
 
@@ -92,9 +95,10 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       return subgradeReaction({ ...common, q: qGross, settlement: result.totalSettlement / 1000 })
     }
     if (ksMethod === 'elastic') {
-      const Es = surfaceLayer?.constrainedModulus ?? surfaceLayer?.oedometricModulus
-      if (!Es || Es <= 0) return undefined
-      return subgradeReaction({ ...common, Es, nu: surfaceLayer?.poissonRatio ?? 0.30 })
+      const Es = surfaceLayer?.elasticModulus
+      const nu = surfaceLayer?.poissonRatio
+      if (!Es || Es <= 0 || nu == null) return undefined
+      return subgradeReaction({ ...common, Es, nu })
     }
     const kv1Project = Number(kv1Input)
     if (!Number.isFinite(kv1Project) || kv1Project <= 0) return undefined
@@ -146,6 +150,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
           <Metric label="L" value={f.footingLength || '—'} unit="m" />
           <Metric label="Df" value={f.footingDepth || '—'} unit="m" />
           <Metric label="q" value={qGross ? stressFromBase(qGross, p.unitSystem) : '—'} unit={PROJECT_UNIT_LABELS.stress} />
+          {(method === 'elasticity' || method === '2to1-layer' || method === 'janbu') && <label>Etki derinliği zI (m)<input type="number" min="0" step="0.10" value={influenceDepthInput} onChange={e=>setInfluenceDepthInput(e.target.value)} placeholder="Açıkça giriniz" /></label>}
         </div>
       </Card>
 
@@ -164,7 +169,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
             <Metric label="Toplam" value={result.totalSettlement.toFixed(2)} unit="mm" tone="primary" />
             <Metric label="σ′v0 @ Df" value={result.foundationEffectiveStress.toFixed(2)} unit="kPa" />
             <Metric label="qnet" value={result.netFoundationPressure.toFixed(2)} unit="kPa" />
-            <Metric label="zI" value={result.influenceDepth.toFixed(2)} unit="m" />
+            <Metric label="zI" value={result.influenceDepth.toFixed(2)} unit="m" /><Metric label="Durum" value={result.ready?'HAZIR':'VERİ EKSİK'} />
             {ks && <Metric label="ks" value={ks.ks.toFixed(2)} unit="kN/m³" />}
           </div>
 
@@ -235,9 +240,9 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
 
           <CalculationTrace title="Oturma hesap zinciri" source={result.source} rows={[
             { symbol: 'σ′v0', title: 'Temel tabanındaki efektif gerilme', formula: 'ΣγH − u', value: result.foundationEffectiveStress, unit: 'kPa' },
-            { symbol: 'qnet', title: 'Net temel gerilmesi', formula: 'max(0.1q, q − σ′v0)', value: result.netFoundationPressure, unit: 'kPa' },
-            { symbol: 'zI', title: 'Etki derinliği', formula: method === 'burland-burbidge' ? 'B^0.76 (B ≤ 30 m)' : 'Profil/gerilme yayılımı sınırı', value: result.influenceDepth, unit: 'm' },
-            { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: method === 'burland-burbidge' ? 'Σ[fS·fL·Ic·qnet·B^0.7]' : method === 'elasticity' ? 'Σ[(Δσ′/E)·H·(1−ν²)]' : method === '2to1-layer' ? 'Σ[Δσ₂:₁·H/E]' : method === 'janbu' ? 'Σ[Δσ′·H/M]' : 'Σ[C1·C2·q·Iz/Es·Δz]', value: result.totalImmediate, unit: 'mm' },
+            { symbol: 'qnet', title: 'Net temel gerilmesi', formula: 'max(0, q − σ′v0)', value: result.netFoundationPressure, unit: 'kPa' },
+            { symbol: 'zI', title: 'Etki derinliği', formula: method === 'burland-burbidge' ? '1.4·(B/0.3)^0.75·0.3' : method === 'schmertmann' ? '2B (strip ise 4B) veya kullanıcı zI' : 'Kullanıcı tarafından açıkça girilen zI', value: result.influenceDepth, unit: 'm' },
+            { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: method === 'burland-burbidge' ? 'Burland-Burbidge toplam zon bağıntısı' : method === 'elasticity' ? 'Σ[(Δσ′/E)·H]' : method === '2to1-layer' ? 'Σ[Δσ₂:₁·H/E]' : method === 'janbu' ? 'Σ[Δσ′·H/M]' : 'Σ[C1·C2·q·Iz/Es·Δz]', value: result.totalImmediate, unit: 'mm' },
             { symbol: 's꜀', title: 'Toplam konsolidasyon', formula: 'Σ[Cc/(1+e₀)·H·log10(σ′vf/σ′v0)]', value: result.totalConsolidation, unit: 'mm' },
             { symbol: 'sₜ', title: 'Toplam oturma', formula: 'sₜ = sᵢ + s꜀', value: result.totalSettlement, unit: 'mm' },
             ...(ks ? [{ symbol: 'ks', title: 'Winkler yatak katsayısı', formula: ks.formula, value: ks.ks, unit: 'kN/m³' }] : [])

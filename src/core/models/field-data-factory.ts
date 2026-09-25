@@ -1,8 +1,9 @@
 import type { BoreholeRecord, SptRecord } from './field-data'
 import { DEFAULT_BOREHOLE_LOG_SETTINGS } from './field-data'
+import type { UnitSystem } from './project'
 
 /** Creates a genuinely empty borehole. The first SPT depth remains the project rule at 1.50 m. */
-export function createEmptyBorehole(index: number): BoreholeRecord {
+export function createEmptyBorehole(index: number, unitSystem: UnitSystem = 'ton-m'): BoreholeRecord {
   return {
     id: crypto.randomUUID(),
     name: `SK-${String(index).padStart(2, '0')}`,
@@ -11,7 +12,8 @@ export function createEmptyBorehole(index: number): BoreholeRecord {
     lithology: [],
     spt: [],
     logObservations: [],
-    logSettings: { ...DEFAULT_BOREHOLE_LOG_SETTINGS }
+    logSettings: { ...DEFAULT_BOREHOLE_LOG_SETTINGS },
+    unitSystem
   }
 }
 

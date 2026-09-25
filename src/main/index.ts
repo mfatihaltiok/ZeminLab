@@ -7,8 +7,7 @@ import icon from '../../resources/icon.png?asset'
 const projectSaveFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
 const projectOpenFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
 const pdfFilter=[{name:'PDF Belgesi',extensions:['pdf']}]
-const PROJECT_SCHEMA_VERSION=1
-const FIELD_CACHE_SCHEMA_VERSION=1
+import { PROJECT_SCHEMA_VERSION, migrateProjectData } from '../core/models/project-file'
 
 function createWindow():void{
   const mainWindow=new BrowserWindow({
@@ -27,7 +26,8 @@ app.whenReady().then(()=>{
   app.on('browser-window-created',(_,window)=>optimizer.watchWindowShortcuts(window))
 
   const writeProjectFile=async(filePath:string,payload:unknown)=>{
-    const envelope={format:'FALUZMN',version:PROJECT_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:payload}
+    const normalized=migrateProjectData(payload,PROJECT_SCHEMA_VERSION)
+    const envelope={format:'FALUZMN',version:PROJECT_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:normalized}
     await fs.writeFile(filePath,JSON.stringify(envelope,null,2),'utf8')
     return filePath
   }
@@ -59,36 +59,11 @@ app.whenReady().then(()=>{
     const envelope=JSON.parse(raw) as {format?:string;version?:number;data?:unknown}
     if(envelope.format!=='FALUZMN'||typeof envelope.version!=='number'||envelope.data===undefined)throw new Error('Geçersiz veya desteklenmeyen FALUZMN proje dosyası.')
     if(envelope.version>PROJECT_SCHEMA_VERSION)throw new Error(`Bu proje dosyası daha yeni bir FALUZMN sürümüne ait (v${envelope.version}).`)
-    return{filePath,data:envelope.data,version:envelope.version}
+    const data=migrateProjectData(envelope.data,envelope.version)
+    return{filePath,data,version:PROJECT_SCHEMA_VERSION}
   })
 
-  const writeFieldCache=async(kind:'boreholes'|'laboratories',data:unknown)=>{
-    const cachePath=join(app.getPath('userData'),`FALUZMN-${kind}.cache.json`)
-    const envelope={format:'FALUZMN-FIELD-CACHE',version:FIELD_CACHE_SCHEMA_VERSION,savedAt:new Date().toISOString(),kind,data}
-    await fs.mkdir(app.getPath('userData'),{recursive:true})
-    await fs.writeFile(cachePath,JSON.stringify(envelope,null,2),'utf8')
-    return {cachePath,savedAt:envelope.savedAt}
-  }
-
-  ipcMain.handle('field-cache:save-boreholes',async(_event,payload:unknown)=>writeFieldCache('boreholes',payload))
-  ipcMain.handle('field-cache:save-laboratories',async(_event,payload:unknown)=>writeFieldCache('laboratories',payload))
-
-  ipcMain.handle('field-cache:load',async()=>{
-    const readCache=async(kind:'boreholes'|'laboratories')=>{
-      const cachePath=join(app.getPath('userData'),`FALUZMN-${kind}.cache.json`)
-      try{
-        const raw=await fs.readFile(cachePath,'utf8')
-        const envelope=JSON.parse(raw) as {format?:string;version?:number;kind?:string;data?:unknown;savedAt?:string}
-        if(envelope.format!=='FALUZMN-FIELD-CACHE'||envelope.version!==FIELD_CACHE_SCHEMA_VERSION||envelope.kind!==kind)return null
-        return {data:envelope.data,savedAt:envelope.savedAt}
-      }catch{return null}
-    }
-    const [boreholes,laboratories]=await Promise.all([readCache('boreholes'),readCache('laboratories')])
-    if(!boreholes&&!laboratories)return null
-    return {boreholes:boreholes?.data,laboratories:laboratories?.data,savedAt:boreholes?.savedAt??laboratories?.savedAt}
-  })
-
-  ipcMain.handle('report:print',async event=>{
+    ipcMain.handle('report:print',async event=>{
     const window=BrowserWindow.fromWebContents(event.sender)
     if(!window)return false
     return await new Promise<boolean>(resolve=>window.webContents.print({printBackground:true,silent:false},success=>resolve(success)))
