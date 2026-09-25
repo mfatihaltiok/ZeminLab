@@ -19,6 +19,7 @@ export interface LiquefactionProfileRow{
   crrM75?:number;CM?:number;tauResistance?:number;rd:number;tauEarthquake?:number;FS?:number
   saturated:boolean;potentiallyLiquefiable:boolean;mandatoryAnalysis:boolean;triggerRequired:boolean;postLiquefactionRequired:boolean
   status:'ANALİZ GEREKLİ'|'ANALİZ GEREKMİYOR'|'TETİKLENME DEĞERLENDİRMESİ'|'VERİ EKSİK'
+  conclusion:'SIVILAŞMA RİSKİ VAR'|'SIVILAŞMA RİSKİ YOK'|'DEĞERLENDİRİLMEDİ'|'VERİ EKSİK'
   liquefactionCheck:'evaluate'|'not-evaluable';trace:SptTraceStep[]
 }
 export interface LiquefactionProfileResult{
@@ -92,12 +93,12 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha:fc.alpha,beta:fc.beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionRequired}
     if(stress.covered<Math.max(0,record.depth)-1e-9){
       trace.push({symbol:'Kapsama',title:'Katman kapsamı',formula:'ΣΔz=z',value:stress.covered,unit:'m',note:'SPT derinliğine kadar sürekli γ profili yok.'})
-      return{...base,status:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
+      return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
     }
     if(!saturated||!within20||!potentiallyLiquefiable||exemption){
       const note=!saturated?'YASS üzerinde':!within20?'20 m dışında':!potentiallyLiquefiable?'16.6.4 potansiyel zemin tanımına girmiyor':'DTS=4 istisnası'
       trace.push({symbol:'Kapsam',title:'TBDY kapsam kontrolü',formula:'16.6.1–16.6.6',value:record.depth,note})
-      return{...base,status:'ANALİZ GEREKMİYOR',liquefactionCheck:'not-evaluable',trace}
+      return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     if(!mandatoryAnalysis){
       trace.push({symbol:'DTS/Zemin',title:'16.6.1 zorunluluğu',formula:'DTS=1/1a/2/2a ve ZD/ZE/ZF',value:0,note:'Proje koşulları zorunlu sıvılaşma ekranını tetiklemedi.'})
@@ -109,11 +110,11 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     }
     if(npt.n1_60>=30){
       trace.push({symbol:'(N1)60',title:'Tetiklenme eşiği',formula:'(N1)60<30',value:npt.n1_60,note:'16.6.5 gereği tetiklenme değerlendirmesi yapılmaz.'})
-      return{...base,status:'ANALİZ GEREKLİ',liquefactionCheck:'not-evaluable',trace}
+      return{...base,status:'ANALİZ GEREKLİ',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     if(n1_60f>=34){
       trace.push({symbol:'(N1)60f',title:'CRR aralığı',formula:'(N1)60f<34',value:n1_60f,note:'Ek 16B CRR bağıntısı için geçerli aralık dışı.'})
-      return{...base,status:'TETİKLENME DEĞERLENDİRMESİ',liquefactionCheck:'not-evaluable',trace}
+      return{...base,status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     const crrM75=1/(34-n1_60f)+n1_60f/135+50/Math.pow(10*n1_60f+45,2)-1/200
     const tauResistance=crrM75*CM*stress.sigmaVPrime
@@ -127,7 +128,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       {symbol:'τdeprem',title:'Deprem kayma gerilmesi',formula:'0.65·(0.4SDS)·σv0·rd',value:tauEarthquake,unit:'kPa'},
       {symbol:'FS',title:'Sıvılaşmaya karşı güvenlik',formula:'Rτ/τdeprem',value:FS,note:'TBDY 16.6.9: FS≥1.10'}
     )
-    return{...base,crrM75,CM,tauResistance,tauEarthquake,FS,status:'TETİKLENME DEĞERLENDİRMESİ',liquefactionCheck:'evaluate',trace}
+    return{...base,crrM75,CM,tauResistance,tauEarthquake,FS,status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:FS<1.10?'SIVILAŞMA RİSKİ VAR':'SIVILAŞMA RİSKİ YOK',liquefactionCheck:'evaluate',trace}
   })
   if(!input.spt.length)warnings.push('SPT kaydı bulunmadığı için profil hesabı üretilemedi.')
   if(!input.layers.length)warnings.push('Zemin katmanı yok; düşey gerilme hesabı yapılamaz.')
