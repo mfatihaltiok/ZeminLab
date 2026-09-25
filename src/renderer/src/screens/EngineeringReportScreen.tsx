@@ -44,7 +44,7 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
   const settlements=useMemo(()=>{
     if(!profile||profile.status!=='SABİTLENDİ'||!(B>0&&L>0&&Df>=0&&N>0))return []
     return settlementMethods.map(method=>{
-      const result=calculateIdealizedSettlement({profile,method,B,L,Df,qGross:N/(B*L),groundwaterDepth:boreholes[0]?.groundwaterDepth})
+      const result=calculateIdealizedSettlement({profile,method,B,L,Df,qGross:N/(B*L),groundwaterDepth:soil.groundwaterDepth??(boreholes.length===1?boreholes[0].groundwaterDepth:undefined)})
       return{method,result}
     })
   },[profile,B,L,Df,N,boreholes])
@@ -94,7 +94,7 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
           <div><b>Temel</b><span>{B.toFixed(3)} × {L.toFixed(3)} m · Df={Df.toFixed(3)} m</span></div><div><b>G+Q</b><span>{fmt(forceFromBase(N,p.unitSystem))} {p.unitSystem==='ton-m'?'tonf':'kN'}</span></div>
           <div><b>Vtx / Vty</b><span>{fmt(f.vtX)} / {fmt(f.vtY)}</span></div><div><b>Mx / My</b><span>{fmt(f.momentX)} / {fmt(f.momentY)}</span></div>
         </div>
-        {info('TBDY kapsamı','Zemin grubu, DTS, YASS ve temel yükleri ayrı veri kaynakları olarak izlenir.')}
+        {info('TBDY kapsamı','Zemin grubu, DTS, YASS ve temel yükleri ayrı veri kaynakları olarak izlenir.')}{p.geophysical.soilGroup==='ZF'&&!p.geophysical.siteSpecificResponseAnalysisCompleted&&info('ZF uyarısı','TBDY 16.5.1.3 gereği sahaya özel zemin davranış analizi tamamlanmadan bu rapor nihai ZF tasarım girdisi olarak kabul edilmemelidir.')}
       </Section>
 
       <Section title="SPT düzeltmeleri">
