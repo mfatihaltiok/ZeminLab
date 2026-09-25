@@ -1,147 +1,99 @@
-import { calculateSpt, fineContentCorrection, type SptEngineInput, type SptTraceStep } from '../spt/spt-engine'
-import type { EarthquakeDesignClass } from '../../models/project'
+import { useMemo, useState } from 'react'
+import { foundationChecks } from '../../core/calculations/engineering'
+import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
+import { useProjectInfo } from '../../core/state/project-store'
+import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
+import { forceToBase, momentToBase } from '../../core/units/project-units'
+import { Card, Frame, Metric, Source, type ScreenId } from '../workspace/WorkspaceShell'
+import { CalculationTrace } from '../components/CalculationTrace'
 
-export type LiquefactionSoilGroup='ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF'
-export interface LiquefactionSoilLayer{
-  top:number;bottom:number;gamma:number;gammaSat:number;soil?:string;finesContent?:number;plasticityIndex?:number;clayContent?:number
-}
-export interface LiquefactionSptRecord{
-  depth:number;nField:number;fineContent?:number;energyRatio?:number;hammerType?:SptEngineInput['hammerType'];boreholeDiameterMm?:number
-  sampler?:SptEngineInput['sampler'];samplerCorrection?:number;rodLengthM?:number;plasticityIndex?:number;waterContent?:number;clayContent?:number;soil?:string
-}
-export interface LiquefactionProfileInput{
-  Mw:number;Sds:number;gwt:number;layers:LiquefactionSoilLayer[];spt:LiquefactionSptRecord[];gammaW?:number;applyDilatancy?:boolean
-  dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup;continuousOrThickLens?:boolean;foundationDepth?:number;siteSpecificResponseAnalysisCompleted?:boolean
-}
-export interface LiquefactionProfileRow{
-  depth:number;soil?:string;fineContent?:number;plasticityIndex?:number;clayContent?:number;waterContent?:number
-  sigmaV:number;porePressure:number;sigmaVPrime:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number;alpha:number;beta:number;n1_60f:number
-  crrM75?:number;CM?:number;tauResistance?:number;rd:number;tauEarthquake?:number;FS?:number
-  saturated:boolean;potentiallyLiquefiable:boolean;mandatoryAnalysis:boolean;triggerRequired:boolean;postLiquefactionRequired:boolean
-  status:'ANALİZ GEREKLİ'|'ANALİZ GEREKMİYOR'|'TETİKLENME DEĞERLENDİRMESİ'|'VERİ EKSİK'
-  conclusion:'SIVILAŞMA RİSKİ VAR'|'SIVILAŞMA RİSKİ YOK'|'DEĞERLENDİRİLMEDİ'|'VERİ EKSİK'
-  liquefactionCheck:'evaluate'|'not-evaluable';trace:SptTraceStep[]
-}
-export interface LiquefactionProfileResult{
-  rows:LiquefactionProfileRow[];method:string;source:string;warnings:string[]
-  mandatoryByProject:boolean;postLiquefactionRequired:boolean
+export const SOURCE_NOTES={
+  investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',
+  liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',
+  bearing:'TBDY 2018 Bölüm 16.8.2–16.8.3.',
+  settlement:'TBDY 2018 Bölüm 16.7.3.4 ve 16.8.3.4.',
+  foundation:'TBDY 2018 16.7.3.3 ve 16.8.4; γRv=1.40, γRh=1.10, γRp=1.40.',
+  jetGroutAdvanced:'Jet Grout kompozit yaklaşımı; proje deneyleri ve kalite kontrol ile doğrulanmalıdır.'
 }
 
-const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
-const clamp=(x:number,a:number,b:number)=>Math.min(b,Math.max(a,x))
-function stressAtDepth(depth:number,layers:LiquefactionSoilLayer[],gwt:number,gammaW:number){
-  let sigmaV=0,covered=0
-  for(const layer of [...layers].filter(x=>x.bottom>x.top).sort((a,b)=>a.top-b.top)){
-    const z0=Math.max(0,layer.top),z1=Math.min(depth,layer.bottom)
-    if(z1<=z0)continue
-    covered+=z1-z0
-    const dry=Math.max(0,Math.min(z1,gwt)-z0),sat=Math.max(0,z1-Math.max(z0,gwt))
-    sigmaV+=dry*Math.max(0,layer.gamma)+sat*Math.max(0,layer.gammaSat)
-  }
-  const u=Math.max(0,depth-gwt)*gammaW
-  return{sigmaV,porePressure:u,sigmaVPrime:Math.max(.01,sigmaV-u),covered}
+export function Dashboard({onNavigate}:{onNavigate:(id:ScreenId)=>void}){
+  const p=useProjectInfo()
+  const items:[string,string,ScreenId][]=[
+    ['01','Proje bilgileri','project-info'],['02','Sondaj / SPT / Laboratuvar','field'],['03','Sondaj logları','borehole-log'],['04','Zemin profili','profile'],
+    ['05','Taşıma gücü','bearing-capacity'],['06','Oturma','settlement'],['07','Sıvılaşma','liquefaction'],['08','Temel tasarımı','foundation'],['09','Jet Grout','jet-grout'],['10','Mühendislik raporu','report']
+  ]
+  return <Frame screen="dashboard">
+    <div className="dashboard-grid">
+      <Card title="PROJE DURUMU"><div className="form-grid"><Metric label="Proje" value={p.title||'Yeni Proje'}/><Metric label="Birim" value={p.unitSystem}/><Metric label="Vs30" value={p.geophysical.vs30??'—'}/><Metric label="Zemin grubu" value={p.geophysical.soilGroup??'—'}/><Metric label="DTS" value={p.seismic.dts??'—'}/></div></Card>
+      <Card title="MÜHENDİSLİK İŞ AKIŞI"><div className="workflow">{items.map(([n,label,id])=><button key={id} onClick={()=>onNavigate(id)}><b>{n}</b><span>{label}</span></button>)}</div></Card>
+    </div>
+  </Frame>
 }
-function rdAtDepth(z:number){
-  const d=Math.max(z,0)
-  if(d<=9.15)return 1-.00765*d
-  if(d<=23)return 1.174-.0267*d
-  if(d<=30)return .744-.008*d
-  return .50
-}
-function magnitudeCorrection(Mw:number){return Math.pow(10,2.24)/Math.pow(Math.max(Mw,.01),2.56)}
-function soilIsPotential(code:string,pi:number|undefined){
-  const c=code.trim().toUpperCase().replace(/İ/g,'I')
-  if(pi!=null&&pi>=12)return false
-  return c==='SA'||c==='GRSA'||c==='SISA'||c==='CLSA'||c==='SM'||c==='SI'||c==='ML'||c==='SP'||c==='SW'||c.includes('KUM')||c.includes('SAND')
-}
-function mandatoryDts(dts:EarthquakeDesignClass|undefined){return dts==='1'||dts==='1a'||dts==='2'||dts==='2a'}
-function mandatorySoilGroup(group:LiquefactionSoilGroup|undefined){return group==='ZD'||group==='ZE'||group==='ZF'}
 
-export function liquefactionProfile(input:LiquefactionProfileInput):LiquefactionProfileResult{
-  if(!finite(input.Mw)||input.Mw<=0)throw new Error('Mw geçerli olmalıdır.')
-  if(!finite(input.Sds)||input.Sds<0)throw new Error('SDS geçerli olmalıdır.')
-  if(!finite(input.gwt)||input.gwt<0)throw new Error('Sıvılaşma değerlendirmesi için geçerli YASS gerekir.')
-  const gammaW=input.gammaW??9.81
-  if(!finite(gammaW)||gammaW<=0)throw new Error('Su birim hacim ağırlığı pozitif olmalıdır.')
-  const CM=magnitudeCorrection(input.Mw),warnings:string[]=[]
-  const scopeComplete=input.dts!==undefined&&input.soilGroup!==undefined&&input.continuousOrThickLens!==undefined
-  const zfBlocked=input.soilGroup==='ZF'&&input.siteSpecificResponseAnalysisCompleted!==true
-  const mandatoryByProject=scopeComplete&&!zfBlocked&&mandatoryDts(input.dts)&&mandatorySoilGroup(input.soilGroup)&&input.continuousOrThickLens===true
-  if(!scopeComplete)warnings.push('DTS, TBDY zemin grubu ve/veya 16.6.1 sürekli tabaka/kalın mercek doğrulaması eksik; sıvılaşma zorunluluğu kesinleştirilemedi.')
-  if(input.soilGroup==='ZF')warnings.push(input.siteSpecificResponseAnalysisCompleted===true?'ZF saha özel zemin davranış analizi tamamlandı; sıvılaşma zinciri bu kayda göre çalıştırıldı.':'ZF için 16.5.1.3 sahaya özel zemin davranış analizi tamamlanmadan sıvılaşma sonucu üretilmez.')
-  const rows=input.spt.filter(x=>finite(x.depth)&&x.depth>=0).sort((a,b)=>a.depth-b.depth).map((record):LiquefactionProfileRow=>{
-    const layer=input.layers.find(l=>record.depth>=l.top&&record.depth<l.bottom)
-    const stress=stressAtDepth(record.depth,input.layers,input.gwt,gammaW)
-    const fineContent=record.fineContent??layer?.finesContent,pi=record.plasticityIndex??layer?.plasticityIndex
-    const clayContent=record.clayContent??layer?.clayContent,soil=record.soil??layer?.soil
-    const waterContent=record.waterContent
-    const npt=calculateSpt({
-      nField:record.nField,energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,
-      sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM,effectiveStress:stress.sigmaVPrime,fineContent,
-      applyOverburden:true,applyDilatancy:false
+export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[];labs?:LaboratoryRecord[]}){
+  const p=useProjectInfo()
+  const [selected,setSelected]=useState(boreholes[0]?.id??'')
+  const b=boreholes.find(x=>x.id===selected)??boreholes[0]
+  const sds=p.seismic.sds
+  const validSpt=useMemo(()=>b?[...b.spt].filter(x=>x.testType==='SPT'&&Number.isFinite(x.n2)&&Number.isFinite(x.n3)).sort((a,c)=>a.depth-c.depth):[],[b])
+  const profileInput=useMemo(()=>{
+    if(!b||b.groundwaterDepth==null||sds==null||p.seismic.magnitude==null||validSpt.length===0)return undefined
+    const rows:LiquefactionSptRecord[]=validSpt.map(record=>{
+      const lab=labs.filter(x=>x.boreholeId===b.id).filter(x=>record.depth>=x.depth&&record.depth<=(x.depthTo??x.depth+.5)).sort((x,y)=>Math.abs(x.depth-record.depth)-Math.abs(y.depth-record.depth))[0]
+      const layer=b.lithology.find(x=>record.depth>=x.from&&record.depth<x.to)
+      const cfg=record.correction??{}
+      return{
+        depth:record.depth,nField:record.n2!+record.n3!,soil:record.soilCode??layer?.code,
+        fineContent:cfg.fineContent??lab?.finesContent??lab?.sieve200Passing??layer?.finesContent,
+        plasticityIndex:lab?.plasticityIndex??(lab?.liquidLimit!=null&&lab?.plasticLimit!=null?lab.liquidLimit-lab.plasticLimit:undefined)??layer?.plasticityIndex,
+        clayContent:lab?.hydrometer002,
+        waterContent:lab?.waterContent,
+        energyRatio:cfg.energyRatio,hammerType:cfg.hammerType,boreholeDiameterMm:b.drillingDiameter,
+        sampler:cfg.sampler,samplerCorrection:cfg.samplerCorrection,rodLengthM:cfg.rodLengthM
+      }
     })
-    const fines=clamp(fineContent??0,0,100),fc=fineContentCorrection(fines),n1_60f=fc.alpha+fc.beta*npt.n1_60
-    const saturated=record.depth>input.gwt+1e-9,within20=record.depth<=20+1e-9,belowFoundation=record.depth>=(input.foundationDepth??0)+1e-9,potentiallyLiquefiable=saturated&&within20&&belowFoundation&&soilIsPotential(soil??'',pi)
-    const exceptionA=input.dts==='4'&&clayContent!=null&&pi!=null&&clayContent>20&&pi>10,exceptionB=input.dts==='4'&&fineContent!=null&&fineContent>35&&npt.n1_60>20,exemption=exceptionA||exceptionB
-    const mandatoryAnalysis=potentiallyLiquefiable&&mandatoryByProject&&!exemption
-    const researchDataComplete=fineContent!=null&&pi!=null&&waterContent!=null
-    const triggerRequired=mandatoryAnalysis&&researchDataComplete&&npt.n1_60<30
-    const postLiquefactionRequired=triggerRequired
-    const trace:SptTraceStep[]=[...npt.trace,
-      {symbol:'α',title:'İnce dane katsayısı',formula:'α=f(IDI)',value:fc.alpha,note:'IDI='+fines.toFixed(2)+' %'},
-      {symbol:'β',title:'İnce dane katsayısı',formula:'β=0.99+IDI^1.5/1000',value:fc.beta},
-      {symbol:'(N1)60f',title:'İnce dane düzeltilmiş SPT',formula:'(N1)60f=α+β(N1)60',value:n1_60f}
-    ]
-    const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha:fc.alpha,beta:fc.beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionRequired}
-    if(zfBlocked){
-      trace.push({symbol:'ZF',title:'Saha özel zemin davranış analizi',formula:'16.5.1.3',value:0,note:'ZF seçildi ancak saha özel zemin davranış analizi tamamlanmadı.'})
-      return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
-    }
-    if(stress.covered<Math.max(0,record.depth)-1e-9){
-      trace.push({symbol:'Kapsama',title:'Katman kapsamı',formula:'ΣΔz=z',value:stress.covered,unit:'m',note:'SPT derinliğine kadar sürekli γ profili yok.'})
-      return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
-    }
-    if(!saturated||!within20||!potentiallyLiquefiable||exemption){
-      const note=!saturated?'YASS üzerinde':!within20?'20 m dışında':!belowFoundation?'Temel tabanı üzerinde':!potentiallyLiquefiable?'16.6.4 potansiyel zemin tanımına girmiyor':'DTS=4 istisnası'
-      trace.push({symbol:'Kapsam',title:'TBDY kapsam kontrolü',formula:'16.6.1–16.6.6',value:record.depth,note})
-      return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
-    }
-    if(!scopeComplete){
-      trace.push({symbol:'Kapsam',title:'16.6.1 proje kapsam verisi',formula:'DTS + Zemin grubu + sürekli tabaka/kalın mercek',value:0,note:'Kapsam girdileri tamamlanmadan sıvılaşma zorunluluğu hakkında uygunluk sonucu verilmez.'})
-      return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
-    }
-    if(!mandatoryAnalysis){
-      trace.push({symbol:'DTS/Zemin',title:'16.6.1 zorunluluğu',formula:'DTS=1/1a/2/2a + ZD/ZE/ZF + sürekli tabaka/kalın mercek',value:0,note:'Tamamlanan proje kapsamı koşulları sıvılaşma zorunluluğunu tetiklemedi.'})
-      return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
-    }
-    if(!researchDataComplete){
-      trace.push({symbol:'Veri',title:'Zemin araştırması veri seti',formula:'SPT + dane dağılımı + w + Atterberg',value:0,note:'16.6.3 asgari veri seti tamamlanmadan nihai SPT sıvılaşma sonucu üretilmez.'})
-      return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
-    }
-    if(npt.n1_60>=30){
-      trace.push({symbol:'(N1)60',title:'Tetiklenme eşiği',formula:'(N1)60<30',value:npt.n1_60,note:'16.6.5 gereği tetiklenme değerlendirmesi yapılmaz.'})
-      return{...base,status:'ANALİZ GEREKLİ',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
-    }
-    if(n1_60f>=34){
-      trace.push({symbol:'(N1)60f',title:'CRR aralığı',formula:'(N1)60f<34',value:n1_60f,note:'Ek 16B CRR bağıntısı için geçerli aralık dışı.'})
-      return{...base,status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
-    }
-    const crrM75=1/(34-n1_60f)+n1_60f/135+50/Math.pow(10*n1_60f+45,2)-1/200
-    const tauResistance=crrM75*CM*stress.sigmaVPrime
-    const tauEarthquake=.65*(.4*input.Sds)*stress.sigmaV*rdAtDepth(record.depth)
-    const FS=tauEarthquake>0?tauResistance/tauEarthquake:Infinity
-    trace.push(
-      {symbol:'CRR7.5',title:'Çevrimsel dayanım oranı',formula:'Ek 16B',value:crrM75},
-      {symbol:'CM',title:'Deprem büyüklüğü düzeltmesi',formula:'CM=10^2.24/Mw^2.56',value:CM},
-      {symbol:'Rτ',title:'Sıvılaşma direnci',formula:'Rτ=CRR7.5·CM·σ′v0',value:tauResistance,unit:'kPa'},
-      {symbol:'rd',title:'Gerilme azaltma katsayısı',formula:'Ek 16B',value:rdAtDepth(record.depth)},
-      {symbol:'τdeprem',title:'Deprem kayma gerilmesi',formula:'0.65·(0.4SDS)·σv0·rd',value:tauEarthquake,unit:'kPa'},
-      {symbol:'FS',title:'Sıvılaşmaya karşı güvenlik',formula:'Rτ/τdeprem',value:FS,note:'TBDY 16.6.9: FS≥1.10'}
-    )
-    return{...base,crrM75,CM,tauResistance,tauEarthquake,FS,status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:FS<1.10?'SIVILAŞMA RİSKİ VAR':'SIVILAŞMA RİSKİ YOK',liquefactionCheck:'evaluate',trace}
-  })
-  if(!input.spt.length)warnings.push('SPT kaydı bulunmadığı için profil hesabı üretilemedi.')
-  if(!input.layers.length)warnings.push('Zemin katmanı yok; düşey gerilme hesabı yapılamaz.')
-  if(rows.some(x=>x.triggerRequired))warnings.push('16.6.7/16.6.9: sıvılaşma sonrası dayanım/rijitlik kaybı, taşıma gücü kaybı, oturma ve yanal yayılma ayrıca değerlendirilmelidir.')
-  return{rows,method:'TBDY 2018 Bölüm 16.6 + Ek 16B SPT tabanlı sıvılaşma değerlendirmesi',source:'TBDY 2018 16.6.1–16.6.10 ve Ek 16B.2–16B.4',warnings,mandatoryByProject,postLiquefactionRequired:rows.some(x=>x.postLiquefactionRequired)}
+    return liquefactionProfile({
+      Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:l.unitWeight??0,gammaSat:l.saturatedUnitWeight??l.unitWeight??0,soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex})),
+      spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth
+    })
+  },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,validSpt])
+
+  return <Frame screen="liquefaction">
+    <Source>{SOURCE_NOTES.liquefaction} 16.6.1 kapsam koşulları, 16.6.2–16.6.6 tetiklenme koşulları ve Ek 16B hesabı aynı sonuç zincirinde gösterilir.</Source>
+    {!b?<Card title="SONDAJ GEREKLİ"><div className="inline-empty">Sıvılaşma için sondaj ve SPT verisi gerekir.</div></Card>:
+      <><Card title="HESAP KAPSAMI"><div className="form-grid"><label>Sondaj<select value={b.id} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><Metric label="DTS" value={p.seismic.dts??'—'}/><Metric label="SDS" value={sds?.toFixed(3)??'—'}/><Metric label="Mw" value={p.seismic.magnitude??'—'}/><Metric label="YASS" value={b.groundwaterDepth??'—'}/><Metric label="SPT" value={validSpt.length}/></div></Card>
+        {!profileInput?
+          <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">YASS, SDS, Mw ve geçerli SPT kayıtları birlikte bulunmalıdır. YASS bilinmiyorsa 16.6.2 kapsamında sıvılaşma değerlendirmesi başlatılmaz.</div></Card>:
+          <><div className="metric-strip"><Metric label="TBDY zorunluluğu" value={profileInput.mandatoryByProject?'EVET':'DTS/zemin koşuluna bağlı'}/><Metric label="Post-liquefaction" value={profileInput.postLiquefactionRequired?'GEREKLİ':'Tetiklenmedi'}/></div>
+            {profileInput.warnings.length>0&&<Card title="TBDY UYARILARI"><div className="inline-empty">{profileInput.warnings.join(' ')}</div></Card>}
+            <Card title="SPT · SIVILAŞMA DERİNLİK TABLOSU"><div className="table-wrap"><table><thead><tr><th>z</th><th>Zemin</th><th>FC%</th><th>PI</th><th>σ′v</th><th>N60</th><th>(N1)60</th><th>(N1)60f</th><th>CRR7.5</th><th>CSR</th><th>FS</th><th>Sonuç</th></tr></thead><tbody>{profileInput.rows.map((row,i)=><tr key={i}><td>{row.depth.toFixed(2)}</td><td>{row.soil??'—'}</td><td>{row.fineContent?.toFixed(1)??'—'}</td><td>{row.plasticityIndex?.toFixed(1)??'—'}</td><td>{row.sigmaVPrime.toFixed(2)}</td><td>{row.n60.toFixed(2)}</td><td>{row.n1_60.toFixed(2)}</td><td>{row.n1_60f.toFixed(2)}</td><td>{row.crrM75?.toFixed(4)??'—'}</td><td>{row.tauEarthquake?.toFixed(2)??'—'}</td><td>{row.FS?.toFixed(3)??'—'}</td><td>{row.conclusion}</td></tr>)}</tbody></table></div></Card>
+            {profileInput.rows.length>0&&<CalculationTrace title="İlk SPT hesap izi" source={profileInput.source} rows={profileInput.rows[0].trace}/>}
+          </>}
+      </>}
+  </Frame>
+}
+
+export function Foundation(){
+  const p=useProjectInfo(),f=p.foundationParameters,soil=p.soilParameters
+  const N=forceToBase(f.structuralWeight,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
+  const ready=f.footingWidth>0&&f.footingLength>0&&N>=0
+  const r=ready?foundationChecks({
+    B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,
+    deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
+    passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance
+  }):undefined
+  return <Frame screen="foundation"><Source>{SOURCE_NOTES.foundation} TBDY 16.8.4 yatay kayma kontrolü; 16.8.4.6 YASS altında depremde Cu yaklaşımı uygulanır.</Source>
+    {!r?<Card title="TEMEL VERİSİ BEKLENİYOR"><div className="inline-empty">B, L ve yapı yükü girilmelidir.</div></Card>:
+      <><div className="metric-strip"><Metric label="B" value={f.footingWidth.toFixed(2)} unit="m"/><Metric label="L" value={f.footingLength.toFixed(2)} unit="m"/><Metric label="Vtx" value={Vx.toFixed(2)} unit="kN"/><Metric label="Vty" value={Vy.toFixed(2)} unit="kN"/><Metric label="Rth+0.3Rpt" value={r.slidingCapacityX.toFixed(2)} unit="kN"/><Metric label="Durum" value={r.evaluable&&r.slidingSafeX&&r.slidingSafeY?'YETERLİ':'KONTROL GEREKLİ'}/></div>
+        <Card title="TBDY 2018 16.8.4"><div className="table-wrap"><table><thead><tr><th>Kontrol</th><th>Değer</th><th>Oran</th><th>Durum</th></tr></thead><tbody><tr><td>X</td><td>{Vx.toFixed(2)} / {r.slidingCapacityX.toFixed(2)}</td><td>{r.slidingUtilizationX.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeX?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr><tr><td>Y</td><td>{Vy.toFixed(2)} / {r.slidingCapacityY.toFixed(2)}</td><td>{r.slidingUtilizationY.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeY?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr></tbody></table></div><div className="engineering-note">Rth={r.slidingCapacityX.toFixed(2)} kN · Rpt={r.passiveResistanceDesign.toFixed(2)} kN · mod={r.slidingMode}</div></Card>
+        {r.warnings.length>0&&<Card title="UYARILAR"><div className="inline-empty">{r.warnings.join(' ')}</div></Card>}</>}
+  </Frame>
+}
+
+export function Settlement(){
+  return <Frame screen="settlement"><Card title="OTURMA"><div className="inline-empty">Oturma hesabı İdealize Zemin Profili ekranındaki ortak oturma motorundan yürütülür.</div></Card></Frame>
+}
+
+export function JetGrout(){
+  return <Frame screen="jet-grout"><Card title="JET GROUT"><div className="inline-empty">Jet Grout ileri tasarım ekranını kullanın.</div></Card></Frame>
 }

@@ -26,7 +26,7 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
       layers:i.layers?.map((x,idx)=>({topDepth:i.Df+i.layers!.slice(0,idx).reduce((a,y)=>a+y.thickness,0),bottomDepth:i.Df+i.layers!.slice(0,idx+1).reduce((a,y)=>a+y.thickness,0),gamma:x.gamma,gammaSat:x.gammaSat??x.gamma,cohesion:x.c,phi:x.phi}))
     })
     return{
-      value:{Nq:r.Nq,Nc:r.Nc,Ngamma:r.Ngamma,sc:r.sc,sq:r.sq,sgamma:r.sg,dc:r.dc,dq:r.dq,dgamma:r.dg,ic:r.ic,iq:r.iq,igamma:r.ig,characteristic:r.qk,designResistance:r.qt,allowableGross:r.qk/Math.max(i.FS??3,1e-9),qApplied:r.qo,BEffective:r.Be,LEffective:r.Le,ex:r.ex,ey:r.ey,qSurcharge:r.surcharge,resistanceFactor:1.4},
+      value:{Nq:r.Nq,Nc:r.Nc,Ngamma:r.Ngamma,sc:r.sc,sq:r.sq,sgamma:r.sg,dc:r.dc,dq:r.dq,dgamma:r.dg,ic:r.ic,iq:r.iq,igamma:r.ig,characteristic:r.qk,designResistance:r.qt,allowableGross:i.FS==null?undefined:r.qk/Math.max(i.FS,1e-9),qApplied:r.qo,BEffective:r.Be,LEffective:r.Le,ex:r.ex,ey:r.ey,qSurcharge:r.surcharge,resistanceFactor:1.4},
       method:'TBDY 2018',source:r.source,warnings:r.warnings,steps:r.steps
     }
   }
@@ -47,11 +47,11 @@ export interface Stage2SettlementInput{
 }
 
 export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
-  const B=Math.max(i.B,0),L=Math.max(i.L??i.B,0),q=Math.max(i.q,0),method=i.method??'elastic'
+  const B=Math.max(i.B,0),L=Math.max(i.L??i.B,0),qGross=Math.max(i.q,0),qNet=i.qNet==null?undefined:Math.max(i.qNet,0),q=qNet??qGross,method=i.method??'elastic'
   const warnings:string[]=[]
   if(B<=0||L<=0)warnings.push('B ve L pozitif olmalıdır.')
   if(!i.layers.length)warnings.push('Katman tanımlanmadı.')
-  if(method==='schmertmann'&&i.schmertmannC1==null)warnings.push('Schmertmann C1 verilmedi; 1.0 kullanılmadı, sonuç yalnız verilen katsayılarla üretilebilir.')
+  if(method==='schmertmann'&&(i.schmertmannC1==null||i.schmertmannC2==null))warnings.push('Schmertmann C1 ve C2 açıkça verilmelidir; varsayılan 1.0 kullanılmaz.')
   const C1=i.schmertmannC1,C2=i.schmertmannC2
   if(method==='elastic'||method==='2:1') {
     for(const [index,layer] of i.layers.entries()) if(layer.Es==null||!Number.isFinite(layer.Es)||layer.Es<=0) warnings.push('Katman '+(index+1)+': Es eksik.'); else if(layer.nu==null) warnings.push('Katman '+(index+1)+': ν eksik; varsayılan 0.30 kullanılmaz.')
@@ -65,8 +65,8 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
         const E=layer.Es
         if(E!=null&&Number.isFinite(E)&&E>0&&layer.nu!=null&&Number.isFinite(layer.nu)&&layer.nu>-1&&layer.nu<.5){const nu=layer.nu;s=ds*H*(1-nu*nu)/E;type=method==='elastic'?'elastic':'2:1 + elastic'}else warnings.push('Katman '+(index+1)+': Es eksik.')
       }else if(method==='janbu'){
-        const M=layer.M??layer.Es
-        if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push('Katman '+(index+1)+': M eksik.')
+        const M=layer.M
+        if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push('Katman '+(index+1)+': Janbu M eksik; Es otomatik olarak M kabul edilmez.')
       }else if(method==='schmertmann'){
         const E=layer.Es
         const Iz=layer.Iz

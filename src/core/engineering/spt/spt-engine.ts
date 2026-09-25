@@ -2,7 +2,7 @@ export type SptHammerType='donut'|'safety'|'automatic'|'measured'
 export type SptSamplerType='standard'|'without-liner'|'liner'
 export interface SptEngineInput{nField:number;energyRatio?:number;hammerType?:SptHammerType;boreholeDiameterMm?:number;sampler?:SptSamplerType;samplerCorrection?:number;rodLengthM?:number;effectiveStress?:number;fineContent?:number;applyOverburden?:boolean;applyDilatancy?:boolean}
 export interface SptTraceStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string}
-export interface SptEngineResult{nField:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number;n1_60_dilatancy?:number;dilatancyApplied:boolean;correctionReady:boolean;missingCorrections:string[];trace:SptTraceStep[];warnings:string[]}
+export interface SptEngineResult{nField:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number;n1_60_dilatancy?:number;dilatancyApplied:boolean;correctionReady:boolean;normalizationReady:boolean;missingCorrections:string[];trace:SptTraceStep[];warnings:string[]}
 const finitePositive=(value:number|undefined)=>value!==undefined&&Number.isFinite(value)&&value>0
 function resolveEnergyRatio(input:SptEngineInput){if(finitePositive(input.energyRatio))return{value:input.energyRatio!,source:'Girilen enerji oranı'};if(input.hammerType==='automatic')return{value:80,source:'Seçilen automatic şahmerdan için %80'};if(input.hammerType==='safety')return{value:60,source:'Seçilen safety şahmerdan için %60'};if(input.hammerType==='donut')return{value:45,source:'Seçilen donut şahmerdan için %45'};return{value:undefined,source:'Enerji oranı veya şahmerdan tipi seçilmedi.'}}
 function boreholeFactor(diameter:number|undefined){if(diameter===undefined)return{value:undefined,source:'Sondaj çapı girilmedi.'};if(!Number.isFinite(diameter)||diameter<65||diameter>200)throw new Error('TBDY Tablo 16B.1 dışındaki sondaj çapı için CB açıkça belirlenmelidir; 65–200 mm aralığında geçerli çap giriniz.');if(diameter<=115)return{value:1,source:'115 mm ve altı'};if(diameter<=150)return{value:1.05,source:'116–150 mm'};return{value:1.15,source:'151–200 mm'}}
@@ -41,5 +41,5 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
     {symbol:'(N1)60',title:'Normalize SPT',formula:'(N1)60=CN·N60',value:correctionReady&&normalizationReady?n1_60:undefined}
   ]
   if(dilatancyApplied)trace.push({symbol:'(N1)60,d',title:'Dilatansi düzeltmesi',formula:'15+0.5[(N1)60−15]',value:n1_60_dilatancy,note:'Yalnız ilgili yöntem açıkça gerektiriyorsa kullanılmalıdır.'})
-  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,dilatancyApplied,correctionReady,missingCorrections:missing,trace,warnings}
+  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,dilatancyApplied,correctionReady,normalizationReady,missingCorrections:missing,trace,warnings}
 }
