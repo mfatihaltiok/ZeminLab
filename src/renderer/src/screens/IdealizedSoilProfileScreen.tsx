@@ -5,21 +5,37 @@ import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../../../core/
 import type { IdealizedSoilLayer, IdealizedSoilProfile } from '../../../core/models/idealized-soil-profile'
 import { createEmptyIdealizedProfile } from '../../../core/models/idealized-soil-profile'
 import { EngineeringSectionRenderer } from '../components/EngineeringSectionRenderer'
+import { calculateSpt } from '../../../core/engineering/spt/spt-engine'
+import { laboratoryValueToBase } from '../../../core/units/project-units'
 
 const n=(v:number|undefined)=>v==null||!Number.isFinite(v)?'—':v.toFixed(2)
 type Props={boreholes:BoreholeRecord[];labs:LaboratoryRecord[];profile?:IdealizedSoilProfile;onChange:(p:IdealizedSoilProfile)=>void}
 function allSpt(boreholes:BoreholeRecord[]){return boreholes.flatMap(b=>b.spt.filter(x=>x.testType==='SPT').map(spt=>({borehole:b,spt})))}
 function linkedLab(labs:LaboratoryRecord[],boreholeId:string,sptId:string,depth:number){return labs.find(x=>x.id==='LAB-'+boreholeId+'-'+sptId)??labs.find(x=>x.boreholeId===boreholeId&&Math.abs(x.depth-depth)<0.01)}
-const clearLab:Partial<IdealizedSoilLayer>={waterContent:undefined,liquidLimit:undefined,plasticLimit:undefined,plasticityIndex:undefined,finesContent:undefined,gamma:undefined,cohesion:undefined,frictionAngle:undefined,compressionIndexCc:undefined,recompressionIndexCr:undefined,initialVoidRatio:undefined,constrainedModulus:undefined,oedometricModulus:undefined,poissonRatio:undefined}
+const clearLab:Partial<IdealizedSoilLayer>={waterContent:undefined,liquidLimit:undefined,plasticLimit:undefined,plasticityIndex:undefined,finesContent:undefined,gamma:undefined,cohesion:undefined,frictionAngle:undefined,undrainedCohesion:undefined,compressionIndexCc:undefined,recompressionIndexCr:undefined,initialVoidRatio:undefined,elasticModulus:undefined,constrainedModulus:undefined,oedometricModulus:undefined,poissonRatio:undefined}
 function labPatch(lab:LaboratoryRecord|undefined):Partial<IdealizedSoilLayer>{
  if(!lab)return {}
- return {waterContent:lab.waterContent,liquidLimit:lab.liquidLimit,plasticLimit:lab.plasticLimit,plasticityIndex:lab.plasticityIndex,finesContent:lab.finesContent??lab.sieve200Passing,gamma:lab.unitWeight,cohesion:lab.directShearC??lab.c??lab.uuC,frictionAngle:lab.directShearPhi??lab.phi??lab.uuPhi,compressionIndexCc:lab.consolidationCc,recompressionIndexCr:lab.consolidationCs,initialVoidRatio:lab.voidRatio,constrainedModulus:lab.elasticModulus,oedometricModulus:lab.elasticModulus,poissonRatio:lab.poissonRatio}
+ return {
+   waterContent:lab.waterContent,liquidLimit:lab.liquidLimit,plasticLimit:lab.plasticLimit,plasticityIndex:lab.plasticityIndex,
+   finesContent:lab.finesContent??lab.sieve200Passing,
+   gamma:laboratoryValueToBase('unitWeight',lab.unitWeight,lab.unitSystem),
+   cohesion:laboratoryValueToBase('cohesion',lab.directShearC??lab.c,lab.unitSystem),
+   frictionAngle:lab.directShearPhi??lab.phi,
+   undrainedCohesion:laboratoryValueToBase('uuC',lab.uuC,lab.unitSystem),
+   compressionIndexCc:lab.consolidationCc,recompressionIndexCr:lab.consolidationCs,initialVoidRatio:lab.voidRatio,
+   elasticModulus:laboratoryValueToBase('elasticModulus',lab.elasticModulus,lab.unitSystem),
+   poissonRatio:lab.poissonRatio
+ }
 }
 function reflow(layers:IdealizedSoilLayer[]){let cursor=0;return layers.map((x,i)=>{const t=Number.isFinite(x.thickness)&&x.thickness!>0?x.thickness!:Math.max(0,x.bottomDepth-x.topDepth);const next={...x,order:i+1,topDepth:cursor,bottomDepth:cursor+t,thickness:t};cursor+=t;return next})}
 function sourceOf(spts:Array<{borehole:BoreholeRecord;spt:SptRecord}>,layer:IdealizedSoilLayer){return spts.find(x=>x.borehole.id===layer.sourceBoreholeId&&x.spt.id===layer.sourceSptRecordId)}
 function makeLayer(source:{borehole:BoreholeRecord;spt:SptRecord},labs:LaboratoryRecord[],order:number):IdealizedSoilLayer{
  const lab=linkedLab(labs,source.borehole.id,source.spt.id,source.spt.depth),patch=labPatch(lab)
- return {id:crypto.randomUUID(),order,topDepth:0,bottomDepth:0,thickness:0,soilName:source.spt.soilDescription??'Zemin tanımı seçilmedi',soilCode:source.spt.soilCode??'',boreholeIds:[source.borehole.id],sptRecordIds:[source.spt.id],laboratoryRecordIds:lab?[lab.id]:[],sourceBoreholeId:source.borehole.id,sourceSptRecordId:source.spt.id,sourceLaboratoryRecordId:lab?.id,representativeSptN:source.spt.n2!=null&&source.spt.n3!=null?source.spt.n2+source.spt.n3:undefined,parameterSources:lab?{...Object.fromEntries(Object.keys(patch).filter(k=>(patch as Record<string,unknown>)[k]!=null).map(k=>[k,{type:'LABORATUVAR',sampleIds:[lab.id]}]))}: {},userOverride:false,...patch}
+ return {id:crypto.randomUUID(),order,topDepth:0,bottomDepth:0,thickness:0,soilName:source.spt.soilDescription??'Zemin tanımı seçilmedi',soilCode:source.spt.soilCode??'',boreholeIds:[source.borehole.id],sptRecordIds:[source.spt.id],laboratoryRecordIds:lab?[lab.id]:[],sourceBoreholeId:source.borehole.id,sourceSptRecordId:source.spt.id,sourceLaboratoryRecordId:lab?.id,representativeSptN:source.spt.n2!=null&&source.spt.n3!=null?source.spt.n2+source.spt.n3:undefined,representativeN60:correctedN60(source),parameterSources:lab?{...Object.fromEntries(Object.keys(patch).filter(k=>(patch as Record<string,unknown>)[k]!=null).map(k=>[k,{type:'LABORATUVAR',sampleIds:[lab.id]}]))}: {},userOverride:false,...patch}
+}
+function correctedN60(source:{borehole:BoreholeRecord;spt:SptRecord}){
+ const n=source.spt.n2!=null&&source.spt.n3!=null?source.spt.n2+source.spt.n3:undefined;if(n==null)return undefined
+ try{const cfg=source.spt.correction??{};const r=calculateSpt({nField:n,energyRatio:cfg.energyRatio,hammerType:cfg.hammerType,boreholeDiameterMm:source.borehole.drillingDiameter,sampler:cfg.sampler,samplerCorrection:cfg.samplerCorrection,rodLengthM:cfg.rodLengthM,applyOverburden:false});return r.correctionReady?r.n60:undefined}catch{return undefined}
 }
 function label(source:{borehole:BoreholeRecord;spt:SptRecord}){return source.borehole.name+' · '+source.spt.depth.toFixed(2)+' m · '+(source.spt.soilCode??'Zemin seçilmedi')+' · N='+(source.spt.n2!=null&&source.spt.n3!=null?source.spt.n2+source.spt.n3:'—')}
 function color(code:string=''){const c=code.toLowerCase();return c.includes('cl')||c.includes('ci')||c.includes('ch')?'clay':c.includes('si')?'silt':c.includes('gr')?'gravel':c.includes('sa')?'sand':'fill'}
@@ -31,7 +47,7 @@ export function IdealizedSoilProfileScreen({boreholes,labs,profile,onChange}:Pro
  const add=()=>{if(p.status==='SABİTLENDİ'||!spts.length)return;const used=new Set(layers.map(x=>x.sourceSptRecordId));const src=spts.find(x=>!used.has(x.spt.id))??spts[0];const next=[...layers,makeLayer(src,labs,layers.length+1)];setSel(next.length-1);save(next)}
  const remove=()=>{if(p.status==='SABİTLENDİ'||!selected)return;const next=layers.filter((_,i)=>i!==sel);setSel(Math.max(0,Math.min(sel,next.length-1)));save(next)}
  const move=(dir:number)=>{if(p.status==='SABİTLENDİ')return;const j=sel+dir;if(!selected||j<0||j>=layers.length)return;const next=[...layers];[next[sel],next[j]]=[next[j],next[sel]];setSel(j);save(next)}
- const chooseSpt=(i:number,value:string)=>{if(p.status==='SABİTLENDİ')return;const src=spts.find(x=>x.borehole.id+'::'+x.spt.id===value);if(!src)return;const lab=linkedLab(labs,src.borehole.id,src.spt.id,src.spt.depth),patch=labPatch(lab);save(layers.map((x,k)=>k!==i?x:{...x,soilName:src.spt.soilDescription??'Zemin tanımı seçilmedi',soilCode:src.spt.soilCode??'',boreholeIds:[src.borehole.id],sptRecordIds:[src.spt.id],laboratoryRecordIds:lab?[lab.id]:[],sourceBoreholeId:src.borehole.id,sourceSptRecordId:src.spt.id,sourceLaboratoryRecordId:lab?.id,representativeSptN:src.spt.n2!=null&&src.spt.n3!=null?src.spt.n2+src.spt.n3:undefined,...clearLab,parameterSources:lab?{...Object.fromEntries(Object.keys(patch).filter(k=>(patch as Record<string,unknown>)[k]!=null).map(k=>[k,{type:'LABORATUVAR',sampleIds:[lab.id]}]))}:{},...patch}))}
+ const chooseSpt=(i:number,value:string)=>{if(p.status==='SABİTLENDİ')return;const src=spts.find(x=>x.borehole.id+'::'+x.spt.id===value);if(!src)return;const lab=linkedLab(labs,src.borehole.id,src.spt.id,src.spt.depth),patch=labPatch(lab);save(layers.map((x,k)=>k!==i?x:{...x,soilName:src.spt.soilDescription??'Zemin tanımı seçilmedi',soilCode:src.spt.soilCode??'',boreholeIds:[src.borehole.id],sptRecordIds:[src.spt.id],laboratoryRecordIds:lab?[lab.id]:[],sourceBoreholeId:src.borehole.id,sourceSptRecordId:src.spt.id,sourceLaboratoryRecordId:lab?.id,representativeSptN:src.spt.n2!=null&&src.spt.n3!=null?src.spt.n2+src.spt.n3:undefined,representativeN60:correctedN60(src),...clearLab,parameterSources:lab?{...Object.fromEntries(Object.keys(patch).filter(k=>(patch as Record<string,unknown>)[k]!=null).map(k=>[k,{type:'LABORATUVAR',sampleIds:[lab.id]}]))}:{},...patch}))}
  const chooseLab=(i:number,labId:string)=>{if(p.status==='SABİTLENDİ')return;const lab=labId?labs.find(x=>x.id===labId):undefined;save(layers.map((x,k)=>k!==i?x:{...x,sourceLaboratoryRecordId:lab?.id,laboratoryRecordIds:lab?[lab.id]:[],...clearLab,parameterSources:lab?{...x.parameterSources,...Object.fromEntries(Object.keys(labPatch(lab)).filter(key=>(labPatch(lab) as Record<string,unknown>)[key]!=null).map(key=>[key,{type:'LABORATUVAR',sampleIds:[lab.id]}]))}:{},...labPatch(lab)}))}
  const thickness=(i:number,v:string)=>{if(p.status==='SABİTLENDİ')return;save(layers.map((x,k)=>k===i?{...x,thickness:Math.max(0,Number(v)||0)}:x))}
  const freeze=()=>{if(!layers.length||layers.some(x=>!x.sourceSptRecordId||!x.thickness||x.thickness<=0)){window.alert('Her katmana SPT kaydı seçilmeli ve katman kalınlığı 0’dan büyük girilmelidir.');return}onChange({...p,layers:reflow(layers),status:'SABİTLENDİ',frozenAt:new Date().toISOString(),version:p.version+1})}
@@ -43,7 +59,7 @@ export function IdealizedSoilProfileScreen({boreholes,labs,profile,onChange}:Pro
   <div className="metric-strip"><Metric label="Durum" value={p.status}/><Metric label="Katman" value={layers.length}/><Metric label="SPT bağlı" value={layers.filter(x=>x.sourceSptRecordId).length}/><Metric label="LAB bağlı" value={layers.filter(x=>x.sourceLaboratoryRecordId).length}/><Metric label="Toplam kalınlık" value={layers.reduce((a,x)=>a+(x.thickness||0),0).toFixed(2)} unit="m"/><Metric label="Eksik kalınlık" value={layers.filter(x=>!x.thickness||x.thickness<=0).length}/></div>
   <div className="profile-render-card"><div className="profile-render-header"><div><b>GELİŞMİŞ MÜHENDİSLİK KESİT MOTORU</b><span>Vektörel teknik kesit · zemin dokusu · SPT · LAB · YASS · temel tabanı</span></div></div><EngineeringSectionRenderer variant="profile" totalDepth={maxDepth} groundwaterDepth={project.soilParameters.groundwaterDepth} foundationDepth={project.foundationParameters.footingDepth} layers={layers.map(x=>({id:x.id,topDepth:x.topDepth,bottomDepth:x.bottomDepth,code:x.soilCode,description:x.soilName,colorClass:color(x.soilCode),sptN:x.representativeSptN,gamma:x.gamma,cohesion:x.cohesion,frictionAngle:x.frictionAngle,labId:x.sourceLaboratoryRecordId}))}/></div>
   <Card title="KATMANLAR · SPT KAYNAĞI + LABORATUVAR ÖZELLİKLERİ">
-   <div className="profile-layer-editor-head"><span>#</span><span>SPT</span><span>KUYU</span><span>KALINLIK m</span><span>ZEMİN</span><span>LAB</span><span>γ</span><span>c</span><span>φ</span><span>E</span></div>
+   <div className="profile-layer-editor-head"><span>#</span><span>SPT</span><span>KUYU</span><span>KALINLIK m</span><span>ZEMİN</span><span>LAB</span><span>γ (kN/m³)</span><span>c′</span><span>φ′</span><span>E (kPa)</span></div>
    <div className="profile-layer-editor">{layers.map((layer,i)=>{const sptKey=layer.sourceBoreholeId&&layer.sourceSptRecordId?layer.sourceBoreholeId+'::'+layer.sourceSptRecordId:'';const labRows=layer.sourceBoreholeId?labs.filter(x=>x.boreholeId===layer.sourceBoreholeId):[];return <div className={i===sel?'profile-layer-row selected':'profile-layer-row'} key={layer.id} onClick={()=>setSel(i)}>
     <b>{i+1}</b>
     <select value={sptKey} disabled={p.status==='SABİTLENDİ'} onChange={e=>chooseSpt(i,e.target.value)}><option value="">SPT seçiniz</option>{spts.map(src=><option key={src.borehole.id+'::'+src.spt.id} value={src.borehole.id+'::'+src.spt.id}>{label(src)}</option>)}</select>
@@ -51,7 +67,7 @@ export function IdealizedSoilProfileScreen({boreholes,labs,profile,onChange}:Pro
     <input type="number" min="0" step="0.10" placeholder="Giriniz" value={layer.thickness&&layer.thickness>0?layer.thickness:''} disabled={p.status==='SABİTLENDİ'} onChange={e=>thickness(i,e.target.value)}/>
     <span className="profile-layer-soil"><b>{layer.soilCode||'—'}</b><small>{layer.soilName}</small></span>
     <select value={layer.sourceLaboratoryRecordId??''} disabled={p.status==='SABİTLENDİ'} onChange={e=>chooseLab(i,e.target.value)}><option value="">LAB seçiniz</option>{labRows.map(x=><option key={x.id} value={x.id}>{x.sampleId} · {x.depth.toFixed(2)} m</option>)}</select>
-    <span>{n(layer.gamma)}</span><span>{n(layer.cohesion)}</span><span>{n(layer.frictionAngle)}</span><span>{n(layer.oedometricModulus)}</span>
+    <span>{n(layer.gamma)}</span><span>{n(layer.cohesion)}</span><span>{n(layer.frictionAngle)}</span><span>{n(layer.elasticModulus)}</span>
    </div>})}</div>
    {!layers.length&&<div className="inline-empty">“Katman Ekle” ile SPT kaynağı seçerek başlayın.</div>}
   </Card>
