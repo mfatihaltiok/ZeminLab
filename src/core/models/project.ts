@@ -68,7 +68,7 @@ export const defaultProjectInfo:ProjectInfo={
   id:'',title:'',projectNo:'',date:'',location:'',province:'',district:'',address:'',parcelInfo:'',pafta:'',ada:'',parsel:'',zoningStatus:'',
   engineer:'',clientName:'',firmName:'',buildingType:'',basementCount:0,normalFloorCount:0,unitSystem:'ton-m',
   geophysical:{soilGroupSource:'VS30',siteSpecificResponseAnalysisCompleted:false},
-  seismic:{bks:2},
+  seismic:{},
   soilParameters:{unitWeight:0,saturatedUnitWeight:0,cohesion:0,frictionAngle:0,undrainedCohesion:undefined,groundwaterDepth:undefined,surfaceSlope:0,foundationBaseSlope:0,finesContent:0,classification:{system:'TS EN ISO 14688-2'}},
   foundationParameters:{
     foundationType:'tekil',footingWidth:0,footingLength:0,footingDepth:0,safetyFactor:3,verticalLoad:0,horizontalLoad:0,momentX:0,momentY:0,
