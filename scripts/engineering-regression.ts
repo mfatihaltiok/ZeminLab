@@ -50,7 +50,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 {
   const result=liquefactionProfile({
     Mw:7.5,Sds:1,gwt:2,
-    soilGroup:'ZE',dts:'1',
+    soilGroup:'ZE',dts:'1',continuousOrThickLens:true,
     layers:[{top:0,bottom:10,gamma:18,gammaSat:19,soil:'SA',finesContent:30,plasticityIndex:5}],
     spt:[{depth:5,nField:10,fineContent:30,plasticityIndex:5,waterContent:20,soil:'SA',energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10}]
   })
@@ -59,6 +59,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.equal(result.rows[0].n1_60,9.78)
   approx(result.rows[0].beta,1.1543167672515497,1e-12)
   assert.ok(result.rows[0].FS !== undefined)
+  assert.equal(result.rows[0].conclusion,'SIVILAŞMA RİSKİ VAR')
 }
 
 {
