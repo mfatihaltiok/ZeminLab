@@ -92,6 +92,18 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(profile.status!=='SABİTLENDİ')warnings.push('İdealize Zemin Profili SABİTLENDİ durumunda değil.')
   if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve yük girdileri geçerli olmalıdır.'],source:'ZeminLab idealize zemin profili oturma motoru'}
   const baseStress=effectiveStressAtDepth(layers,Df,gwt)
+  const coverageLimit=Df+Math.max(2*B,method==='schmertmann'?(L/B>=10?4*B:2*B):2*B)
+  let coverageCursor=Df
+  let coverageOk=true
+  for(const layer of layers){
+    if(layer.bottomDepth<=coverageCursor)continue
+    const top=Math.max(layer.topDepth,coverageCursor)
+    if(top>coverageCursor+1e-9||!finite(layer.gamma)||layer.gamma<=0){coverageOk=false;break}
+    coverageCursor=Math.max(coverageCursor,layer.bottomDepth)
+    if(coverageCursor>=coverageLimit-1e-9)break
+  }
+  if(coverageCursor<coverageLimit-1e-9)coverageOk=false
+  if(!coverageOk)warnings.push('Temel altındaki oturma etki derinliğinde profil sürekliliği veya γ verisi eksik; eksik tabaka sıfır gerilme ile geçiştirilmez.')
   const qNet=Math.max(0,qGross-baseStress.effective)
   if(qNet<=0)warnings.push('Temel seviyesinde net ilave basınç sıfır/negatif; oturma hesabı yük artışı açısından sınırlıdır.')
   const ratio=L/Math.max(B,1e-9)
@@ -153,5 +165,5 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(method==='schmertmann'&&input.timeYears==null)warnings.push('Schmertmann C2=1 alındı; zaman bilgisi girilmediği için creep düzeltmesi yapılmadı.')
   if(method==='janbu')warnings.push('Janbu burada M-integrasyonu olarak uygulanır; tam gerilme-bağımlı Janbu parametre seti mevcut değilse sonuç ön tasarım olarak değerlendirilmelidir.')
   if(method==='burland-burbidge')warnings.push('Burland-Burbidge bağıntısı özellikle kum/granüler zemin için ampirik bir yöntemdir; kohezyonlu tabakalarda ayrı konsolidasyon hesabı yapılır.')
-  return{method,layers:results,totalImmediate,totalConsolidation,totalSecondary,totalSettlement:totalImmediate+totalConsolidation+totalSecondary,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,ready:results.length>0&&!results.some(x=>x.status==='VERİ EKSİK'),warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978), 2:1 ve Janbu M-integrasyonu; yöntem ve parametre kaynakları raporlanır.'}
+  return{method,layers:results,totalImmediate,totalConsolidation,totalSecondary,totalSettlement:totalImmediate+totalConsolidation+totalSecondary,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,ready:results.length>0&&coverageOk&&!results.some(x=>x.status==='VERİ EKSİK'),warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978), 2:1 ve Janbu M-integrasyonu; yöntem ve parametre kaynakları raporlanır.'}
 }
