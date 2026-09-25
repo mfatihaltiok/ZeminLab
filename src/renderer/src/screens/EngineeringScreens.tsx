@@ -55,7 +55,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
     })
     return liquefactionProfile({
       Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:l.unitWeight??0,gammaSat:l.saturatedUnitWeight??l.unitWeight??0,soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex})),
-      spt:rows,dts:p.seismic.dts
+      spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup
     })
   },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,validSpt])
 
