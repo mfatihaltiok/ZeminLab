@@ -49,7 +49,7 @@ function groundwater(Df:number,B:number,gammaNatural:number,gammaSat?:number,gwt
 function vesicGroundFactors(betaDeg:number,phi:number,Nq:number){
   const beta=Math.abs(betaDeg)
   if(beta===0)return{gc:1,gq:1,gg:1}
-  if(phi<=0)throw new Error('TBDY yüzeysel temel hesabında eğimli arazi için φ′>0 gerekir; drenajsız özel durum ayrı değerlendirilmelidir.')
+  if(phi<=0)return{gc:Math.max(0,1-beta/147),gq:1,gg:1}
   if(beta>=phi)throw new Error('Arazi eğimi β, içsel sürtünme açısı φ′ değerinden küçük olmalıdır.')
   const gq=Math.max(0,(1-Math.tan(rad(beta)))**2),gg=gq
   const gc=Math.max(0,gq-(1-gq)/Math.max(Nq-1,1e-9))
