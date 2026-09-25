@@ -80,38 +80,62 @@ export function liquefaction(i:LiquefactionInput):CalculationResult<any>{
   ]}
 }
 
+export type FoundationInterface='cast-in-place-soil'|'precast-soil'|'concrete-concrete'|'concrete-bedrock'
 export interface FoundationCheckInput{
   B:number;L:number;N:number;Vx?:number;Vy?:number;V?:number;Mx:number;My:number;deltaTan?:number;cu?:number;area?:number
   groundwaterDepth?:number;foundationDepth?:number;passiveResistanceCharacteristic?:number;usePassiveResistance?:boolean;gammaRh?:number;gammaRp?:number
+  seismic?:boolean;interfaceType?:FoundationInterface
 }
 export function foundationChecks(i:FoundationCheckInput){
   if(i.B<=0||i.L<=0)throw new Error('Temel boyutları pozitif olmalıdır.')
-  const N=Math.max(0,i.N),ex=N!==0?i.My/N:0,ey=N!==0?i.Mx/N:0
+  if(!Number.isFinite(i.N)||i.N<0)throw new Error('Düşey temel yükü N sıfır veya pozitif olmalıdır.')
+  const N=i.N,ex=N>0?i.My/N:0,ey=N>0?i.Mx/N:0
   const qAvg=N/(i.B*i.L)
   const qMax=qAvg*(1+6*Math.abs(ex)/i.B+6*Math.abs(ey)/i.L)
   const qMin=qAvg*(1-6*Math.abs(ex)/i.B-6*Math.abs(ey)/i.L)
   const effectiveLength=Math.max(0,i.L-2*Math.abs(ey)),effectiveWidth=Math.max(0,i.B-2*Math.abs(ex))
-  const contactArea=i.area??effectiveWidth*effectiveLength
+  const geometricEffectiveArea=effectiveWidth*effectiveLength
+  const contactArea=i.area!=null?Math.max(0,i.area):geometricEffectiveArea
   const rh=i.gammaRh??1.10,rp=i.gammaRp??1.40
-  const rawTan=i.deltaTan??.60,deltaTan=Math.min(.60,Math.max(0,rawTan))
+  if(rh<=0||rp<=0)throw new Error('γRh ve γRp pozitif olmalıdır.')
+  const interfaceLimits:Record<FoundationInterface,number>={
+    'cast-in-place-soil':.60,
+    'precast-soil':.40,
+    'concrete-concrete':.50,
+    'concrete-bedrock':.50
+  }
+  const interfaceType=i.interfaceType??'cast-in-place-soil'
+  const tanLimit=interfaceLimits[interfaceType]
+  const rawTan=i.deltaTan??tanLimit
+  if(rawTan<0||!Number.isFinite(rawTan))throw new Error('tanδ sıfır veya pozitif ve sonlu olmalıdır.')
+  const deltaTan=Math.min(tanLimit,rawTan)
   const warnings:string[]=[]
-  if(i.deltaTan==null)warnings.push('tanδ girilmedi; 0.60 üst sınırı varsayımsal olarak kullanıldı. TBDY Tablo 16.3 gerçek arayüz koşuluna göre ayrıca doğrulanmalıdır.')
+  if(i.deltaTan==null)warnings.push('tanδ girilmedi; TBDY Tablo 16.3 arayüz üst sınırı seçilen arayüze göre kullanıldı. Proje özelinde deney/veri varsa doğrudan girilmelidir.')
+  if(rawTan>tanLimit)warnings.push('Girilen tanδ, TBDY Tablo 16.3 seçilen arayüz üst sınırını aştığı için sınırlandırıldı.')
   if(rh!==1.10)warnings.push('TBDY 2018 Tablo 16.2 için γRh=1.10 kullanılmalıdır.')
   if(rp!==1.40)warnings.push('TBDY 2018 Tablo 16.2 için γRp=1.40 kullanılmalıdır.')
-  let rth=0
   const submerged=i.groundwaterDepth!=null&&i.foundationDepth!=null&&i.groundwaterDepth<=i.foundationDepth
-  if(submerged){
-    if(i.cu!=null&&i.cu>0)rth=contactArea*i.cu/rh
-    else warnings.push('Temel YASS altında/aynı kotta. TBDY 16.8.4.6 gereği deprem sürtünme direnci cu ile hesaplanmalı; cu girilmedi.')
+  const seismic=Boolean(i.seismic)
+  let rth=0
+  let slidingMode:'undrained-cu'|'drained-interface'|'data-missing'='drained-interface'
+  if(seismic&&submerged){
+    slidingMode='undrained-cu'
+    if(i.cu!=null&&Number.isFinite(i.cu)&&i.cu>0){
+      rth=contactArea*i.cu/rh
+    }else{
+      slidingMode='data-missing'
+      warnings.push('Temel tabanı YASS altında/aynı kotta ve deprem durumu seçili. TBDY 16.8.4.6 gereği sürtünme direnci drenajsız cu ile hesaplanmalıdır; cu girilmeden sürtünme direnci kredilendirilmedi.')
+    }
   }else{
     rth=N*deltaTan/rh
-    if(rawTan>0.60)warnings.push('tanδ, TBDY Tablo 16.3 üst sınırı olan 0.60 ile sınırlandı.')
+    if(seismic&&submerged===false&&i.groundwaterDepth!=null)warnings.push('Deprem sürtünme kontrolünde temel tabanı YASS altında olmadığı için drenajlı arayüz yaklaşımı kullanıldı.')
   }
   const rpk=Math.max(0,i.passiveResistanceCharacteristic??0)
   const rpt=i.usePassiveResistance?rpk/rp:0
   if(rpk>0&&!i.usePassiveResistance)warnings.push('Karakteristik pasif direnç girilmiş ancak pasif direnç kredilendirmesi kapalıdır.')
+  if(i.usePassiveResistance&&rpk<=0)warnings.push('Pasif direnç kullanımı açık ancak karakteristik pasif direnç pozitif girilmemiştir.')
   const designResistance=rth+.30*rpt
-  const vx=i.Vx??0,vy=i.Vy??0
+  const vx=i.Vx??(i.V??0),vy=i.Vy??0
   const vh=Math.hypot(vx,vy)
   const utilizationX=designResistance>0?Math.abs(vx)/designResistance:Infinity
   const utilizationY=designResistance>0?Math.abs(vy)/designResistance:Infinity
@@ -119,8 +143,9 @@ export function foundationChecks(i:FoundationCheckInput){
   const safeX=designResistance>0&&Math.abs(vx)<=designResistance,safeY=designResistance>0&&Math.abs(vy)<=designResistance
   const safeResultant=designResistance>0&&vh<=designResistance
   if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
-  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; qmin<0 olabilir.')
-  const requiredData=submerged&&(i.cu==null||i.cu<=0)
+  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; qmin<0 olabilir. Kayma kontrolü için düşey kuvvetin temas basıncı dağılımı ayrıca incelenmelidir.')
+  if(contactArea<=0)warnings.push('Temas alanı sıfırdır; sürtünme direnci ve temel temas kontrolleri geçersizdir.')
+  const requiredData=slidingMode==='data-missing'||(i.usePassiveResistance&&rpk<=0)
   return{
     ex,ey,qAvg,qMax,qMin,contactArea,effectiveWidth,effectiveLength,
     horizontalResultant:vh,slidingFS:vh>0?designResistance/vh:Infinity,
@@ -128,7 +153,7 @@ export function foundationChecks(i:FoundationCheckInput){
     slidingUtilizationX:utilizationX,slidingUtilizationY:utilizationY,slidingUtilizationResultant:utilizationResultant,
     slidingSafeX:safeX,slidingSafeY:safeY,slidingSafeResultant:safeResultant,
     slidingResistanceFactor:rh,passiveResistanceDesign:rpt,passiveResistanceCharacteristic:rpk,slidingTanDelta:deltaTan,
-    slidingMode:submerged?'undrained-cu':'drained-interface',evaluable:!requiredData,warnings
+    slidingTanDeltaLimit:tanLimit,slidingInterface:interfaceType,slidingMode,evaluable:!requiredData,warnings
   }
 }
 
