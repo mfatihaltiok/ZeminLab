@@ -34,6 +34,7 @@ export interface IdealizedSoilLayer {
   recompressionIndexCr?: number
   initialVoidRatio?: number
   preconsolidationPressure?: number
+  secondaryCompressionIndex?: number
   constrainedModulus?: number
   oedometricModulus?: number
   poissonRatio?: number
