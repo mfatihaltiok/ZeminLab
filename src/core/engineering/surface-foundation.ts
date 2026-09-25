@@ -20,7 +20,8 @@ export interface SurfaceFoundationResult{
 const gammaW=9.80665,rad=(d:number)=>d*Math.PI/180,finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x),clamp=(x:number,a:number,b:number)=>Math.max(a,Math.min(b,x))
 
 function factors(phiDeg:number,method:SurfaceFoundationMethod){
- const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi)),Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2,Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
+ if(!finite(phiDeg)||phiDeg<0||phiDeg>=90)throw new Error('φ′ 0° ile 90° arasında olmalıdır.')
+ const phi=phiDeg,t=Math.tan(rad(phi)),Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2,Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
  let Ngamma=0
  if(phi>0){if(method==='Terzaghi'){const Kpy=3*(1+Math.sin(rad(phi)))/Math.max(1-Math.sin(rad(phi)),1e-9);Ngamma=.5*t*(Kpy/Math.cos(rad(phi))**2-1)}else Ngamma=method==='Meyerhof'?(Nq-1)*Math.tan(rad(1.4*phi)):method==='Hansen'?1.5*(Nq-1)*t:2*(Nq+1)*t}
  return{phi,t,Nq,Nc,Ngamma}
@@ -46,12 +47,12 @@ function methodFactors(method:SurfaceFoundationMethod,B:number,L:number,Df:numbe
  const sc=foundationType==='surekli'?1:method==='Meyerhof'?1+.2*Nphi*ratio:1+(Nq/Math.max(Nc,1e-9))*ratio
  const sq=foundationType==='surekli'?1:method==='Meyerhof'?(phi>10?1+.1*Nphi*ratio:1):1+ratio*t
  const sg=foundationType==='surekli'?1:method==='Meyerhof'?(phi>10?sq:1):Math.max(.6,1-.4*ratio)
- const k=Df/Math.max(B,1e-9),kk=k<=1?k:Math.atan(k)
+ const k=Df/Math.max(B,1e-9),kk=Math.atan(k)
  const dc=method==='Meyerhof'?1+.2*Math.sqrt(Nphi)*k:1+.4*kk
  const dq=method==='Meyerhof'?(phi>10?1+.1*Math.sqrt(Nphi)*k:1):1+2*t*(1-sin)**2*kk
  let ic=1,iq=1,ig=1
  if(H>0&&N>0){
-  if(phi===0){iq=1;ic=Math.max(0,1-H/Math.max(B*L*c*Nc,1e-9));ig=Math.max(0,1-H/Math.max(N,1e-9))}
+  if(phi===0){iq=1;ic=c>0?Math.max(0,1-H/Math.max(B*L*c*Nc,1e-9)):0;ig=0}
   else{const area=B*L,denom=N+area*c/Math.max(t,1e-9),ratioH=Math.min(.999999,H/Math.max(denom,1e-9)),m=Math.max((2+ratio)/(1+ratio),Math.min((2+1/Math.max(ratio,1e-9))/(1+1/Math.max(ratio,1e-9)),2));iq=Math.max(0,(1-ratioH)**m);ic=Math.max(0,iq-(1-iq)/Math.max(Nq-1,1e-9));ig=Math.max(0,(1-ratioH)**(m+1))}
  }
  return{sc,sq,sg,dc,dq,dg:1,ic,iq,ig,...slope,...base}
@@ -62,7 +63,7 @@ function groundFactors(betaDeg:number,phi:number,Nq:number){
 }
 function baseFactors(thetaDeg:number,phi:number,Nq:number){
  const theta=Math.abs(thetaDeg);if(theta===0)return{bc:1,bq:1,bg:1};if(theta>=90)throw new Error('Temel tabanı eğimi 90° veya daha büyük olamaz.')
- if(phi<=0)return{bc:Math.max(0,1-theta/147),bq:1,bg:1};const bq=Math.max(0,(1-theta*Math.tan(rad(phi))/57)**2),bg=bq,bc=Math.max(0,bq-(1-bq)/Math.max(Nq-1,1e-9));return{bc,bq,bg}
+ if(phi<=0)return{bc:Math.max(0,1-2*rad(theta)/(Math.PI+2)),bq:1,bg:0};const bq=Math.max(0,(1-rad(theta)*Math.tan(rad(phi)))**2),bg=bq,bc=Math.max(0,bq-(1-bq)/Math.max(Nq-1,1e-9));return{bc,bq,bg}
 }
 function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,Bp:number,Lp:number,baseQ:number,method:SurfaceFoundationMethod){
   if(!layers?.length)return[]
@@ -84,7 +85,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
  const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad,H=Math.hypot(i.horizontalLoad??0,0),groundSlope=Math.abs(i.groundSlope??0),baseSlope=Math.abs(i.baseSlope??0),warnings:string[]=[]
  if(i.groundwaterDepth==null)warnings.push('YASS girilmedi; nihai efektif gerilme/temel tasarım sonucu üretilemez.')
  if(groundSlope>=90||baseSlope>=90||groundSlope+baseSlope>=90)throw new Error('Arazi ve temel tabanı eğimleri geçersiz.')
- const ex=N>0?(i.momentY??0)/N:0,ey=N>0?(i.momentX??0)/N:0,Be=i.B-2*Math.abs(ex),Le=i.L-2*Math.abs(ey),effectiveArea=Math.max(0,Be)*Math.max(0,Le)
+ const ex=N>0?(i.momentY??0)/N:0,ey=N>0?(i.momentX??0)/N:0,Be=i.B-2*Math.abs(ex),Le=i.L-2*Math.abs(ey),effectiveArea=Math.max(0,Be)*Math.max(0,Le),outsideKern=Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6
  if(N===0&&(i.momentX!==0||i.momentY!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
  if(Be<=0||Le<=0)warnings.push('Eksantrisite temel boyutunu tüketiyor; temas alanı geçersiz.')
  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; q dağılımı ve temas ayrıca incelenmelidir.')
@@ -98,20 +99,21 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
  const layeredScreeningOnly=checks.length>0
  const zfBlocked=i.soilGroup==='ZF'&&!i.siteSpecificResponseAnalysisCompleted
  if(zfBlocked)warnings.push('ZF için saha özel zemin davranış analizi tamamlanmadan nihai deprem tasarım sonucu uygun kabul edilmez.')
- const finalDesignEligible=!layeredScreeningOnly&&!zfBlocked&&i.groundwaterDepth!=null
+ const finalDesignEligible=!layeredScreeningOnly&&!zfBlocked&&i.groundwaterDepth!=null&&!outsideKern&&N>0
  const adequate=finalDesignEligible&&qo<=qt&&Be>0&&Le>0
  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: efektif temel sürşarjı ve ağırlıklı γ′ kullanıldı.')
  if(groundSlope>0)warnings.push('Arazi eğimi katsayıları β<φ′ koşulu kontrol edilerek uygulandı.')
  if(baseSlope>0)warnings.push('Temel tabanı eğimi katsayıları uygulandı.')
  if(foundationType==='radye')warnings.push('Radye temelde diferansiyel/toplam oturma ayrıca kontrol edilmelidir.')
- const undrainedQk=i.undrainedCu!=null?Math.max(0,i.undrainedCu)*5.14*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+qBase:undefined
+ const undrainedCu=i.undrainedCu!=null&&Number.isFinite(i.undrainedCu)&&i.undrainedCu>=0?i.undrainedCu:undefined
+ const undrainedQk=undrainedCu!=null?undrainedCu*5.14*1*1*(H>0?(undrainedCu>0?Math.max(0,1-H/Math.max(Bp*Lp*undrainedCu*5.14,1e-9)):0):1)*groundFactors(groundSlope,0,1).gc*baseFactors(baseSlope,0,1).bc+qBase:undefined
  const steps:SurfaceFoundationStep[]=[
   {symbol:'ex/ey',title:'Eksantrisite',formula:'ex=My/N ; ey=Mx/N',value:Math.max(Math.abs(ex),Math.abs(ey)),unit:'m'},
   {symbol:'B′/L′',title:'Etkin temel boyutları',formula:'B′=B−2|ex| ; L′=L−2|ey|',value:Math.min(Be,Le),unit:'m'},
   {symbol:'q′',title:'Temel seviyesinde efektif sürşarj',formula:'σ′v0(Df)=ΣγH−u',value:qBase,unit:'kPa'},
   {symbol:'Nq/Nc/Nγ',title:'Taşıma gücü katsayıları',formula:'TBDY 2018 / seçilen klasik yöntemin bağıntıları',value:f.Nq},
   {symbol:'s',title:'Şekil katsayıları',formula:'sc,sq,sγ',value:mf.sc},
-  {symbol:'d',title:'Derinlik katsayıları',formula:'dc,dq,dγ',value:mf.dc},
+  {symbol:'d',title:'Derinlik katsayıları',formula:'Vesic: k=atan(Df/B), dc=1+0.4k, dq=1+2k·tanφ·(1−sinφ)^2, dγ=1',value:mf.dc},
   {symbol:'i',title:'Eğimli yük katsayıları',formula:'ic,iq,iγ',value:mf.ic},
   {symbol:'g',title:'Arazi eğimi katsayıları',formula:'gc,gq,gγ',value:mf.gc},
   {symbol:'b',title:'Temel tabanı eğimi katsayıları',formula:'bc,bq,bγ',value:mf.bc},
