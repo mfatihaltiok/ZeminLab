@@ -28,7 +28,7 @@ export default function BoreholeLogScreen({ boreholes, labs, onBoreholesChange }
     if (!borehole) return []
     const spt = borehole.spt.map(row=>({depth:row.depth,label:row.testType,detail:row.testType==='SPT'&&row.n2!=null&&row.n3!=null?'N30 '+(row.n2+row.n3).toFixed(0):'UD',kind:'spt' as const}))
     const lab = labRows.map(row=>({depth:row.depth,label:row.sampleId,detail:row.sampleType,kind:'lab' as const}))
-    const notes=(borehole.logObservations??[]).map(row=>({depth:row.depth,label:row.type.toUpperCase(),detail:row.text||undefined,kind:'note' as const}))
+    const notes=(borehole.logObservations??[]).map(row=>({depth:row.depth,label:row.type.toUpperCase(),detail:row.text||undefined,kind:row.type==='sample'?'sample' as const:'note' as const}))
     return [...spt,...lab,...notes]
   }, [borehole, labRows])
   const update = (patch: Partial<BoreholeRecord>) => { if (!borehole) return; onBoreholesChange(boreholes.map((b) => b.id === borehole.id ? { ...b, ...patch } : b)) }

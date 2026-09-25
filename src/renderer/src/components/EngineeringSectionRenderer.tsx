@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react'
 export type EngineeringRenderLayer={id:string;topDepth:number;bottomDepth:number;code?:string;description?:string;colorClass?:'fill'|'clay'|'silt'|'sand'|'gravel'|'rock';sptN?:number;gamma?:number;cohesion?:number;frictionAngle?:number;labId?:string}
-export type EngineeringRenderMarker={depth:number;label:string;detail?:string;kind:'spt'|'lab'|'note'}
+export type EngineeringRenderMarker={depth:number;label:string;detail?:string;kind:'spt'|'lab'|'sample'|'note'}
 type Props={variant:'profile'|'borehole';totalDepth:number;groundwaterDepth?:number;foundationDepth?:number;layers:EngineeringRenderLayer[];markers?:EngineeringRenderMarker[];footer?:ReactNode;scale?:50|100|200;showSpt?:boolean;showLaboratory?:boolean;showGroundwater?:boolean;showSamples?:boolean;showRemarks?:boolean}
 const fmt=(v:number|undefined,d=2)=>v==null||!Number.isFinite(v)?'—':v.toFixed(d)
 const pat=(code:string='')=>{const c=code.toLowerCase();if(c.includes('cl')||c.includes('ci')||c.includes('ch'))return'clay';if(c.includes('si')||c.includes('ml')||c.includes('mh'))return'silt';if(c.includes('gr')||c.includes('bo'))return'gravel';if(c.includes('sa'))return'sand';if(c.includes('kaya')||c.includes('rk'))return'rock';return'fill'}
 export function EngineeringSectionRenderer({variant,totalDepth,groundwaterDepth,foundationDepth,layers,markers=[],footer,scale=100,showSpt=true,showLaboratory=true,showGroundwater=true,showSamples=true,showRemarks=true}:Props){
  const d=Math.max(1,totalDepth),soilPixelsPerM=6*(100/scale),soilDepthPixels=Math.max(620,d*soilPixelsPerM),svgHeight=120+soilDepthPixels,y=(v:number)=>60+Math.max(0,Math.min(d,v))/d*soilDepthPixels,maxN=Math.max(30,...layers.map(x=>x.sptN||0)),soilX=variant==='profile'?130:105
- const filteredMarkers=markers.filter(m=>m.kind==='spt'?showSpt:m.kind==='lab'?showLaboratory:showRemarks&&showSamples)
+ const filteredMarkers=markers.filter(m=>{if(m.kind==='spt')return showSpt;if(m.kind==='lab')return showLaboratory;if(m.kind==='sample')return showSamples;return showRemarks})
  const auto=filteredMarkers.length?filteredMarkers:layers.flatMap(x=>showSpt&&x.sptN!=null?[{depth:(x.topDepth+x.bottomDepth)/2,label:'SPT',detail:'N='+fmt(x.sptN,0),kind:'spt' as const}]:[])
  return <div className="engineering-render-shell"><svg className="engineering-render-svg" viewBox={`0 0 980 ${svgHeight}`} height={svgHeight} preserveAspectRatio="xMidYMin meet" role="img" aria-label="Mühendislik zemin kesiti">
   <defs>
