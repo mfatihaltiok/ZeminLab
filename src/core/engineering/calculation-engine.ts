@@ -10,21 +10,66 @@ const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 const requireNumber=(x:unknown,name:string,min=-Infinity)=>{if(!finite(x)||x<min)throw new Error(name+' geçerli bir sayı olmalıdır.');return x}
 
 export interface BearingInput{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS:number;method:BearingMethod;waterReduction?:number}
+
+function classicalFactors(i:BearingInput){
+  const B=i.B,L=i.L,Df=i.Df,phi=i.phi,ratio=Math.min(B,L)/Math.max(B,L),t=Math.tan(rad(phi)),Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2,Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
+  let Ngamma=0,sc=1,sq=1,sg=1,dc=1,dq=1,dg=1
+  const Nphi=Math.tan(Math.PI/4+rad(phi)/2)**2
+  if(phi>0){
+    if(i.method==='Terzaghi'){
+      const Kp=Math.pow(Math.tan(Math.PI/4+rad(phi)/2),2)
+      Ngamma=1.5*(Kp-1)*t
+      sc=Math.abs(B-L)<1e-12?1.3:1
+      sg=Math.abs(B-L)<1e-12?0.8:1
+    }else if(i.method==='Meyerhof'){
+      Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
+      sc=1+0.2*Nphi*ratio
+      sq=phi>10?1+0.1*Nphi*ratio:1
+      sg=phi>10?sq:1
+      dc=1+0.2*Math.sqrt(Nphi)*(Df/Math.max(B,1e-12))
+      dq=phi>10?1+0.1*Math.sqrt(Nphi)*(Df/Math.max(B,1e-12)):1
+    }else if(i.method==='Hansen'){
+      Ngamma=1.5*(Nq-1)*t
+      sc=1+(Nq/Nc)*ratio
+      sq=1+ratio*t
+      sg=Math.max(0.6,1-0.4*ratio)
+      const k=Math.atan(Df/Math.max(B,1e-12))
+      dc=1+0.4*k
+      dq=1+2*k*t*(1-Math.sin(rad(phi)))**2
+    }else{
+      Ngamma=2*(Nq-1)*t
+      sc=1+(Nq/Nc)*ratio
+      sq=1+ratio*t
+      sg=Math.max(0.6,1-0.4*ratio)
+      const k=Math.atan(Df/Math.max(B,1e-12))
+      dc=1+0.4*k
+      dq=1+2*k*t*(1-Math.sin(rad(phi)))**2
+    }
+  }else{
+    if(i.method==='Terzaghi'&&Math.abs(B-L)<1e-12){sc=1.3;sg=0.8}
+  }
+  return{Nq,Nc,Ngamma,sc,sq,sg,dc,dq,dg}
+}
+
 export function bearingCapacity(i:BearingInput):CalculationResult<any>{
   requireNumber(i.B,'B',Number.EPSILON);requireNumber(i.L,'L',Number.EPSILON);requireNumber(i.Df,'Df',0);requireNumber(i.gamma,'γ',Number.EPSILON);requireNumber(i.c,'c',0);requireNumber(i.phi,'φ',0);requireNumber(i.FS,'FS',Number.EPSILON)
   if(i.phi>=90)throw new Error('φ 90° veya daha büyük olamaz.')
   const waterReduction=i.waterReduction??1
   if(!finite(waterReduction)||waterReduction<0||waterReduction>1)throw new Error('Su azaltma katsayısı 0–1 aralığında olmalıdır.')
-  const r=calculateSurfaceFoundation({B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma,gamma2:i.gamma,c:i.c,phi:i.phi,verticalLoad:0,horizontalLoad:0,momentX:0,momentY:0,groundSlope:0,baseSlope:0,resistanceFactor:1,method:i.method,foundationType:'tekil',groundwaterDepth:undefined})
-  const ultimate=i.waterReduction==null?r.qk:r.qk*waterReduction
-  const netUltimate=ultimate-i.gamma*i.Df
-  const value={Nq:r.Nq,Nc:r.Nc,Ngamma:r.Ngamma,sc:r.sc,sq:r.sq,sg:r.sg,dc:r.dc,dq:r.dq,dg:r.dg,ultimate,netUltimate,allowableGross:ultimate/i.FS,allowableNet:netUltimate/i.FS}
-  return{value,method:i.method,source:'Klasik taşıma gücü: aynı yüzeysel temel çekirdek motorunun seçilen bağıntıları; yalnız klasik izin verilebilir değer dönüşümü uyumluluk katmanındadır.',steps:[
-    {symbol:'Nq',title:'Taşıma gücü katsayısı',formula:'Seçilen yöntemin Nq bağıntısı',value:r.Nq},
-    {symbol:'Nc',title:'Kohezyon katsayısı',formula:'Nc=(Nq−1)cotφ',value:r.Nc},
-    {symbol:'Nγ',title:'Birim hacim ağırlığı katsayısı',formula:'Seçilen yöntemin Nγ bağıntısı',value:r.Ngamma},
-    {symbol:'qult',title:'Nihai taşıma gücü',formula:'Canonical surface-foundation qk'+(i.waterReduction!=null?'·waterReduction':''),value:ultimate,unit:'kPa'},
-    {symbol:'qallow',title:'İzin verilen gross',formula:'qult/FS',value:value.allowableGross,unit:'kPa'}],warnings:r.warnings}
+  const f=classicalFactors(i)
+  const surcharge=i.gamma*i.Df
+  const gammaTerm=.5*i.gamma*i.B*f.Ngamma*f.sg*f.dg*f.ig
+  const ultimate=(i.c*f.Nc*f.sc*f.dc)+(surcharge*f.Nq*f.sq*f.dq)+(gammaTerm*waterReduction)
+  const netUltimate=ultimate-surcharge
+  const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:f.sc,sq:f.sq,sg:f.sg,dc:f.dc,dq:f.dq,dg:f.dg,ultimate,netUltimate,allowableGross:ultimate/i.FS,allowableNet:netUltimate/i.FS}
+  return{value,method:i.method,source:'Klasik taşıma gücü karşılaştırma motoru. TBDY yüzeysel temel motorundan bağımsızdır; düzeltme katsayıları yöntem bazında açıkça seçilir.',steps:[
+    {symbol:'Nq',title:'Taşıma gücü katsayısı',formula:'Nq=e^(πtanφ)·tan²(45°+φ/2)',value:f.Nq},
+    {symbol:'Nc',title:'Kohezyon katsayısı',formula:'Nc=(Nq−1)cotφ',value:f.Nc},
+    {symbol:'Nγ',title:'Birim hacim ağırlığı katsayısı',formula:'Seçilen yöntemin Nγ bağıntısı',value:f.Ngamma},
+    {symbol:'s',title:'Şekil katsayıları',formula:'sc, sq, sγ',value:f.sc},
+    {symbol:'d',title:'Derinlik katsayıları',formula:'dc, dq, dγ',value:f.dc},
+    {symbol:'qult',title:'Nihai taşıma gücü',formula:'cNcscdc + qNqsqdq + 0.5γBNγsγdγ',value:ultimate,unit:'kPa'},
+    {symbol:'qallow',title:'İzin verilen gross',formula:'qult/FS',value:value.allowableGross,unit:'kPa'}],warnings:['Bu sonuçlar TBDY qk/qt tasarım zincirinin yerine geçmez.']}
 }
 
 export interface TbdyBearingInput{
