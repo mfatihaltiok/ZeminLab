@@ -68,7 +68,7 @@ function SptCorrectionPanel({value,onChange}:{value:SptCorrectionParameters;onCh
   return <div className="spt-global-correction">
     <div className="spt-global-correction-title"><b>SPT DÜZELTME KATSAYILARI · PROJE GENELİ</b><span>Tüm sondaj ve SPT deneylerinde aynı katsayı seti kullanılır.</span></div>
     <div className="spt-global-correction-grid">
-      <label>CE<select value={ceMode} onChange={e=>{if(e.target.value==='measured')return;set('ce',e.target.value)}}>{options(CE_OPTIONS)}<option value="measured">Ölçülmüş ER</option></select>{ceMode==='measured'&&<input className="ce-er-input" type="number" min="27" max="100" step="1" value={(value.ce*60).toFixed(0)} onChange={e=>{const er=Number(e.target.value);if(Number.isFinite(er)&&er>=27&&er<=100)onChange({...value,ce:er/60})}} placeholder="ER %"/>}</label>
+      <label>CE<select value={ceMode} onChange={e=>{if(e.target.value==='measured')return;set('ce',e.target.value)}}>{options(CE_OPTIONS)}<option value="measured">Ölçülmüş ER</option></select>{ceMode==='measured'&&<input className="ce-er-input" type="number" min="27" max="96" step="1" value={(value.ce*60).toFixed(0)} onChange={e=>{const er=Number(e.target.value);if(Number.isFinite(er)&&er>=27&&er<=100)onChange({...value,ce:er/60})}} placeholder="ER %"/>}</label>
       <label>CB<select value={value.cb} onChange={e=>set('cb',e.target.value)}>{options(CB_OPTIONS)}</select></label>
       <label>CS<select value={value.cs} onChange={e=>set('cs',e.target.value)}>{options(CS_OPTIONS)}</select></label>
       <label>CR<select value={value.cr} onChange={e=>set('cr',e.target.value)}>{options(CR_OPTIONS)}</select></label>
@@ -139,7 +139,7 @@ function SptAnalysis({ borehole, labs, unitSystem, fallback, correction }: { bor
   })
   return <div className="engineering-grid-wrap">
     <div className="grid-toolbar"><b>SPT HESAP ZİNCİRİ</b><span>N30 → N60 → CN → (N1)60 → (N1)60f</span><span className="spt-correction-note">CE/CB/CS/CR proje geneli sabit · CN: killi zemin = 1.00, diğer zeminler = derinliğe göre</span></div>
-    <table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>CE</th><th>CB</th><th>CS</th><th>CR</th><th>N60</th><th>σv0</th><th>u0</th><th>σ′v0</th><th>CN</th><th>(N1)60</th><th>(N1)60f</th><th>Durum</th></tr></thead>
+    <table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>CE</th><th>CB</th><th>CS</th><th>CR</th><th>N60</th><th>σv0 (kPa)</th><th>u0 (kPa)</th><th>σ′v0 (kPa)</th><th>CN</th><th>(N1)60</th><th>(N1)60f</th><th>Durum</th></tr></thead>
       <tbody>{rows.map(({record,derived,error})=><tr key={record.id}>
         <td>{fmt(record.depth)}–{fmt(experimentDepthTo(record))}</td><td>{fmt(derived?.nField,0)}</td><td>{fmt(derived?.ce)}</td><td>{fmt(derived?.cb)}</td><td>{fmt(derived?.cs)}</td><td>{fmt(derived?.cr)}</td>
         <td className="computed-cell">{fmt(derived?.n60)}</td><td>{fmt(derived?.verticalStress)}</td><td>{fmt(derived?.porePressure)}</td><td>{fmt(derived?.effectiveStress)}</td><td>{derived?.overburdenCorrectionApplied?fmt(derived.cn):'—'}</td><td className="computed-cell">{derived?.overburdenCorrectionApplied?fmt(derived.n1_60):fmt(derived?.n60)}</td><td>{fmt(derived?.n1_60f)}</td><td>{error??(derived?.warnings.length?'UYARI':'HESAPLANDI')}</td>
