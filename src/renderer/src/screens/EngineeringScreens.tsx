@@ -41,27 +41,24 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
     const rows:LiquefactionSptRecord[]=validSpt.map(record=>{
       const lab=labs.filter(x=>x.boreholeId===b.id).filter(x=>record.depth>=x.depth&&record.depth<=(x.depthTo??x.depth+.5)).sort((x,y)=>Math.abs(x.depth-record.depth)-Math.abs(y.depth-record.depth))[0]
       const layer=b.lithology.find(x=>record.depth>=x.from&&record.depth<x.to)
-      const cfg=record.correction??{}
       return{
         depth:record.depth,depthTo:record.depthTo,nField:record.n2!+record.n3!,soil:record.soilCode??layer?.code,
         fineContent:cfg.fineContent??lab?.finesContent??lab?.sieve200Passing??layer?.finesContent,
         plasticityIndex:lab?.plasticityIndex??(lab?.liquidLimit!=null&&lab?.plasticLimit!=null?lab.liquidLimit-lab.plasticLimit:undefined)??layer?.plasticityIndex,
         clayContent:lab?.hydrometer002,
-        waterContent:lab?.waterContent,
-        energyRatio:cfg.energyRatio,hammerType:cfg.hammerType,boreholeDiameterMm:b.drillingDiameter,
-        sampler:cfg.sampler,samplerCorrection:cfg.samplerCorrection,rodLengthM:cfg.rodLengthM
+        waterContent:lab?.waterContent
       }
     })
     return liquefactionProfile({
       Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:unitWeightToBase(l.unitWeight??0,p.unitSystem),gammaSat:unitWeightToBase(l.saturatedUnitWeight??l.unitWeight??0,p.unitSystem),soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex})),
-      spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth
+      spt:rows,sptCorrection:p.sptCorrections,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth
     })
-  },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,p.geophysical.soilGroup,p.soilParameters.liquefactionContinuousOrThickLens,validSpt])
+  },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,p.geophysical.soilGroup,p.soilParameters.liquefactionContinuousOrThickLens,p.sptCorrections,validSpt])
 
   return <Frame screen="liquefaction">
     <Source>{SOURCE_NOTES.liquefaction} 16.6.1 kapsam koşulları, 16.6.2–16.6.6 tetiklenme koşulları ve Ek 16B hesabı aynı sonuç zincirinde gösterilir.</Source>
     {!b?<Card title="SONDAJ GEREKLİ"><div className="inline-empty">Sıvılaşma için sondaj ve SPT verisi gerekir.</div></Card>:
-      <><Card title="HESAP KAPSAMI"><div className="form-grid"><label>Sondaj<select value={b.id} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><Metric label="DTS" value={p.seismic.dts??'—'}/><Metric label="SDS" value={sds?.toFixed(3)??'—'}/><Metric label="Mw" value={p.seismic.magnitude??'—'}/><Metric label="YASS" value={b.groundwaterDepth??'—'}/><Metric label="SPT" value={validSpt.length}/></div></Card>
+      <><Card title="HESAP KAPSAMI"><div className="form-grid"><label>Sondaj<select value={b.id} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><Metric label="DTS" value={p.seismic.dts??'—'}/><Metric label="SDS" value={sds?.toFixed(3)??'—'}/><Metric label="Mw" value={p.seismic.magnitude??'—'}/><Metric label="YASS" value={b.groundwaterDepth??'—'}/><Metric label="SPT" value={validSpt.length}/><Metric label="CE" value={p.sptCorrections.ce.toFixed(2)}/><Metric label="CB" value={p.sptCorrections.cb.toFixed(2)}/><Metric label="CS" value={p.sptCorrections.cs.toFixed(2)}/><Metric label="CR" value={p.sptCorrections.cr.toFixed(2)}/></div></Card>
         {!profileInput?
           <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">YASS, SDS, Mw ve geçerli SPT kayıtları birlikte bulunmalıdır. YASS bilinmiyorsa 16.6.2 kapsamında sıvılaşma değerlendirmesi başlatılmaz.</div></Card>:
           <><div className="metric-strip"><Metric label="TBDY zorunluluğu" value={profileInput.mandatoryByProject?'EVET':'DTS/zemin koşuluna bağlı'}/></div>

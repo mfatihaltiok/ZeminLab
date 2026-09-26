@@ -1,6 +1,7 @@
 import type { UnitSystem } from '../models/project'
 import { unitWeightToBase } from '../units/project-units'
 import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../models/field-data'
+import type { SptCorrectionParameters } from '../models/project'
 import { calculateSpt, type SptEngineResult } from './spt/spt-engine'
 import { effectiveStressAtDepth } from './stress-profile'
 
@@ -98,26 +99,21 @@ function stressAtDepth(
   }
 }
 
-export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[],unitSystem:UnitSystem='kN-m',fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number}):SptDerivedValues{
+export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[],unitSystem:UnitSystem='kN-m',fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number},correction:SptCorrectionParameters={ce:1,cb:1,cs:1,cr:1}):SptDerivedValues{
   const nField=fieldN(record)
   if(nField===undefined)return{nField,ce:1,cb:1,cs:1,cr:1,cn:1,n60:0,n1_60:0,dilatancyApplied:false,trace:[],overburdenCorrection:1,overburdenCorrectionApplied:false,warnings:[],hasAssumptions:false}
   const stress=stressAtDepth(borehole,record.depth,laboratories,unitSystem,fallback)
-  const cfg=record.correction??{}
+  const cfg=correction
   const lab=linkedLabForSpt(laboratories,borehole.id,record.id,record.depth)
   const layer=layerAtDepth(borehole,record.depth)
   const fineContent=cfg.fineContent??lab?.finesContent??lab?.sieve200Passing??layer?.finesContent
   const result=calculateSpt({
     nField,
-    energyRatio:cfg.energyRatio,
-    hammerType:cfg.hammerType,
-    boreholeDiameterMm:borehole.drillingDiameter,
-    sampler:cfg.sampler,
-    samplerCorrection:cfg.samplerCorrection,
-    rodLengthM:cfg.rodLengthM,
+    ce:cfg.ce,cb:cfg.cb,cs:cfg.cs,cr:cfg.cr,
     effectiveStress:stress.effectiveStress,
     fineContent,
-    applyOverburden:cfg.applyOverburdenCorrection??true,
-    applyDilatancy:cfg.applyDilatancyCorrection??false
+    applyOverburden:true,
+    applyDilatancy:false
   })
   return{...result,verticalStress:stress.verticalStress,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:stress.effectiveStress!=null,n60DilatancyCorrected:result.n1_60_dilatancy}
 }

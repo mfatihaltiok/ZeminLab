@@ -68,6 +68,13 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
+  const global=calculateSpt({nField:20,ce:.90,cb:1.05,cs:1.20,cr:.95,effectiveStress:100})
+  approx(global.n60,20*.90*1.05*1.20*.95,1e-12)
+  approx(global.n1_60,global.n60*.978,1e-12)
+  assert.equal(global.hasAssumptions,false)
+}
+
+{
   const borehole={
     id:'CN-FALLBACK',
     name:'SK-01',

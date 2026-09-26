@@ -3,6 +3,10 @@ export type SptSamplerType='standard'|'without-liner'|'liner'
 
 export interface SptEngineInput{
   nField:number
+  ce?:number
+  cb?:number
+  cs?:number
+  cr?:number
   energyRatio?:number
   hammerType?:SptHammerType
   boreholeDiameterMm?:number
@@ -28,6 +32,13 @@ function resolveEnergyRatio(input:SptEngineInput){
   if(input.hammerType==='donut')return {value:45,source:'donut şahmerdan için proje varsayımı %45',assumption:true}
   if(input.hammerType==='safety')return {value:60,source:'safety şahmerdan için proje varsayımı %60',assumption:true}
   return {value:60,source:'enerji oranı girilmedi; %60 proje varsayımı',assumption:true}
+}
+
+function directCoefficient(name:string,value:number|undefined,min:number,max:number,allowed?:number[]){
+  if(value===undefined)return undefined
+  if(!Number.isFinite(value)||value<min||value>max)throw new Error(`${name} katsayısı ${min}–${max} aralığında olmalıdır.`)
+  if(allowed&&!allowed.some(x=>Math.abs(x-value)<1e-9))throw new Error(`${name} için geçerli değer seçilmelidir.`)
+  return{value,source:'kullanıcı seçimi',assumption:false}
 }
 
 function boreholeFactor(diameter?:number){
@@ -68,14 +79,16 @@ export function fineContentCorrection(fines:number){
 export function calculateSpt(input:SptEngineInput):SptEngineResult{
   if(!Number.isFinite(input.nField)||input.nField<0)throw new Error('SPT N değeri geçerli olmalıdır.')
   const warnings:string[]=[]
-  const er=resolveEnergyRatio(input)
-  if(er.value<=0||er.value>100)throw new Error('SPT enerji oranı %0–100 arasında olmalıdır.')
-  if(er.assumption)warnings.push('CE için kullanılan enerji oranı TBDY Tablo 16B.1 içindeki olası aralıktan seçilmiş bir proje varsayımıdır; ölçülmüş ER varsa girilmelidir. '+er.source)
-  const ce=er.value/60
-  const cb=boreholeFactor(input.boreholeDiameterMm)
-  const cs=samplerFactor(input)
-  const cr=rodFactor(input.rodLengthM)
+  const ceResolved=input.ce!==undefined?directCoefficient('CE',input.ce,.45,1.60)!:(()=>{const er=resolveEnergyRatio(input);if(er.value<=0||er.value>100)throw new Error('SPT enerji oranı %0–100 arasında olmalıdır.');return{value:er.value/60,source:er.source,assumption:er.assumption}})()
+  const cbResolved=input.cb!==undefined?directCoefficient('CB',input.cb,1,1.15,[1,1.05,1.15])!: {value:boreholeFactor(input.boreholeDiameterMm),source:'sondaj çapından',assumption:false}
+  const csResolved=input.cs!==undefined?directCoefficient('CS',input.cs,1,1.30)!: {value:samplerFactor(input),source:'numune alıcıdan',assumption:false}
+  const crResolved=input.cr!==undefined?directCoefficient('CR',input.cr,.75,1,[.75,.85,.95,1])!: {value:rodFactor(input.rodLengthM),source:'tij boyundan',assumption:false}
+  if(ceResolved.assumption)warnings.push('CE için otomatik enerji oranı kullanıldı; proje-geneli CE seçimi yapıldığında bu varsayım kaldırılır. '+ceResolved.source)
+  const ce=ceResolved.value,cb=cbResolved.value,cs=csResolved.value,cr=crResolved.value
   const assumptions:string[]=[]
+  if(input.cb===undefined&&input.boreholeDiameterMm===undefined)assumptions.push('CB: proje-geneli CB seçimi ve sondaj çapı verilmedi; CB=1 varsayıldı.')
+  if(input.cr===undefined&&input.rodLengthM===undefined)assumptions.push('CR: proje-geneli CR seçimi ve tij boyu verilmedi; CR=1 varsayıldı.')
+  if(input.cs===undefined&&input.sampler==='without-liner'&&input.samplerCorrection===undefined)assumptions.push('CS: iç tüpsüz numune alıcı için CS=1.10 varsayıldı.')
   if(input.boreholeDiameterMm===undefined)assumptions.push('CB: sondaj çapı girilmedi, CB=1 varsayıldı.')
   if(input.rodLengthM===undefined)assumptions.push('CR: tij boyu girilmedi, CR=1 varsayıldı.')
   if(input.sampler==='without-liner'&&input.samplerCorrection===undefined)assumptions.push('CS: iç tüpsüz numune alıcı için CS=1.10 varsayıldı.')
@@ -98,10 +111,10 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const n1_60_dilatancy=dilatancyApplied?15+.5*(n1_60-15):undefined
   const trace:SptTraceStep[]=[
     {symbol:'N',title:'Ham SPT',formula:'N=N₂+N₃',value:input.nField,note:'Sahada ölçülen 30 cm penetrasyon vuruş sayısı.'},
-    {symbol:'CE',title:'Enerji düzeltmesi',formula:'CE=ER/60',value:ce,note:'ER='+er.value.toFixed(1)+' %'},
-    {symbol:'CB',title:'Sondaj çapı düzeltmesi',formula:'CB=f(D)',value:cb},
-    {symbol:'CS',title:'Numune alıcı düzeltmesi',formula:'CS=f(sampler)',value:cs},
-    {symbol:'CR',title:'Rod boyu düzeltmesi',formula:'CR=f(L)',value:cr},
+    {symbol:'CE',title:'Enerji düzeltmesi',formula:'CE=ER/60 veya proje katsayısı',value:ce,note:ceResolved.source},
+    {symbol:'CB',title:'Sondaj çapı düzeltmesi',formula:'CB=f(D) veya proje katsayısı',value:cb,note:cbResolved.source},
+    {symbol:'CS',title:'Numune alıcı düzeltmesi',formula:'CS=f(sampler) veya proje katsayısı',value:cs,note:csResolved.source},
+    {symbol:'CR',title:'Rod boyu düzeltmesi',formula:'CR=f(L) veya proje katsayısı',value:cr,note:crResolved.source},
     {symbol:'N60',title:'Standartlaştırılmış SPT',formula:'N60=N·CE·CB·CS·CR',value:n60},
     {symbol:'CN',title:'Örtü basıncı düzeltmesi',formula:'CN=min(1.70,9.78/√σ′v0)',value:cn,note:finitePositive(sigma)?'σ′v0='+sigma!.toFixed(2)+' kPa':'Uygulanmadı'},
     {symbol:'(N1)60',title:'Normalize SPT',formula:'(N1)60=CN·N60',value:n1_60}
@@ -115,5 +128,5 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
     trace.push({symbol:'(N1)60,d',title:'Dilatansi düzeltmesi',formula:'15+0.5[(N1)60−15]',value:n1_60_dilatancy,note:'Yalnız yöntem açıkça gerektiriyorsa kullanılmalıdır.'})
   }
   warnings.push(...assumptions)
-  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,alpha,beta,n1_60f,dilatancyApplied,hasAssumptions:er.assumption||assumptions.length>0,trace,warnings}
+  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,alpha,beta,n1_60f,dilatancyApplied,hasAssumptions:ceResolved.assumption||assumptions.length>0,trace,warnings}
 }

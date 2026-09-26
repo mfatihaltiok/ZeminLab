@@ -1,7 +1,7 @@
 import { calculateSpt, type SptEngineInput, type SptTraceStep } from '../spt/spt-engine'
 import { tbdy2018Liquefaction } from './tbdy2018-liquefaction'
 import { effectiveStressAtDepth as centralEffectiveStressAtDepth } from '../stress-profile'
-import type { EarthquakeDesignClass } from '../../models/project'
+import type { EarthquakeDesignClass, SptCorrectionParameters } from '../../models/project'
 
 export type LiquefactionSoilGroup='ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF'
 export interface LiquefactionSoilLayer{
@@ -13,7 +13,7 @@ export interface LiquefactionSptRecord{
 }
 export interface LiquefactionProfileInput{
   Mw:number;Sds:number;gwt:number;layers:LiquefactionSoilLayer[];spt:LiquefactionSptRecord[];gammaW?:number;applyDilatancy?:boolean
-  dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup;continuousOrThickLens?:boolean;foundationDepth?:number
+  dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup;continuousOrThickLens?:boolean;foundationDepth?:number;sptCorrection?:SptCorrectionParameters
 }
 export interface LiquefactionProfileRow{
   depth:number;soil?:string;fineContent?:number;plasticityIndex?:number;clayContent?:number;waterContent?:number
@@ -73,9 +73,12 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const clayContent=record.clayContent??layer?.clayContent,soil=record.soil??layer?.soil
     const waterContent=record.waterContent
     const npt=calculateSpt({
-      nField:record.nField,energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,
-      sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM,effectiveStress:stress.sigmaVPrime,fineContent,
-      applyOverburden:true,applyDilatancy:false
+      nField:record.nField,
+      ...(input.sptCorrection?{ce:input.sptCorrection.ce,cb:input.sptCorrection.cb,cs:input.sptCorrection.cs,cr:input.sptCorrection.cr}:{
+        energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,
+        sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM
+      }),
+      effectiveStress:stress.sigmaVPrime,fineContent,applyOverburden:true,applyDilatancy:false
     })
     const fines=fineContent; const alpha=npt.alpha??NaN,beta=npt.beta??NaN; const n1_60f=npt.n1_60f??NaN
     const saturated=record.depth>=input.gwt-1e-9,within20=record.depth<=20+1e-9
