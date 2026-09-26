@@ -50,7 +50,7 @@ function boussinesqRectangularAverage(q:number,B:number,L:number,z:number){
     for(const [eta,wj] of gaussNodes8()){
       const y=eta*L/2
       const r2=x*x+y*y+z*z
-      sum += wi*wj*(3*z*z)/(2*Math.PI*Math.pow(r2,2.5))
+      sum += wi*wj*(3*z**3)/(2*Math.PI*Math.pow(r2,2.5))
     }
   }
   return q*(B*L/4)*sum
@@ -165,7 +165,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     }else if(method==='elasticity'){
       methodName='Elastik tabaka gerinimi'
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
-      if(finite(M)&&M>0)immediate=deltaSigma*thickness/M*1000
+      if(finite(M)&&M>0)immediate=deltaSigma*thickness*(1-(finite(layer.poissonRatio)?layer.poissonRatio!:0.3)**2)/M*1000
       else{status='VERİ EKSİK';note='Constrained/oedometric modül gerekir.'}
       if(cohesive){const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective);if(r.ok)consolidation=r.value;else status='VERİ EKSİK'}
     }else if(method==='boussinesq'){
@@ -176,11 +176,11 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     }else if(method==='2to1-layer'){
       methodName='2:1 gerilme yayılımı + elastik tabaka'
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
-      if(finite(M)&&M>0)immediate=deltaSigma*thickness/M*1000;else{status='VERİ EKSİK';note='Constrained/oedometric modül gerekir.'}
+      if(finite(M)&&M>0)immediate=deltaSigma*thickness*(1-(finite(layer.poissonRatio)?layer.poissonRatio!:0.3)**2)/M*1000;else{status='VERİ EKSİK';note='Constrained/oedometric modül gerekir.'}
     }else if(method==='janbu'){
-      methodName='Janbu M-integrasyonu'
-      const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
-      if(finite(M)&&M>0)immediate=deltaSigma*thickness/M*1000;else{status='VERİ EKSİK';note='Janbu için M/constrained modulus gerekir.'}
+      methodName='Janbu — M0/M1 verisi gerekli'
+      status='VERİ EKSİK'
+      note='Gerilme-bağımlı Janbu hesabı için M0 ve M1 parametreleri veri modelinde bulunmadığından elastik M ile Janbu sonucu üretilmez.'
     }else{
       methodName='Schmertmann et al. (1978)'
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
@@ -206,8 +206,8 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   }
   if(results.some(x=>x.status==='VERİ EKSİK'))warnings.push('Bir veya daha fazla tabakada gerekli oturma parametresi eksik; eksik katkılar sıfır kabul edilmez ve sonuç hazırlıksız işaretlenir.')
   if(method==='schmertmann'&&input.timeYears==null)warnings.push('Schmertmann C2=1 alındı; zaman bilgisi girilmediği için creep düzeltmesi yapılmadı.')
-  if(method==='janbu')warnings.push('Janbu hesabı mevcut veri modelindeki M/constrained modulus ile yapılır; gerilme-bağımlı M0–M1 parametreleri verilmedikçe sonuç tam gerilme-bağımlı Janbu modeli değildir.')
+  if(method==='janbu')warnings.push('Janbu yöntemi M0–M1 gerilme-bağımlı parametreleri veri modeline eklenene kadar hesaplanmaz; sonuç VERİ EKSİK olarak tutulur.')
   if(method==='burland-burbidge')warnings.push('Burland-Burbidge bağıntısı özellikle kum/granüler zemin için ampirik bir yöntemdir; kohezyonlu tabakalarda ayrı konsolidasyon hesabı yapılır.')
   if(finite(input.timeYears)&&input.timeYears!>0&&input.secondaryStartTimeYears==null&&results.some(x=>x.secondarySettlement>0))warnings.push('İkincil oturma için başlangıç zamanı girilmedi; t1=1 yıl referansı kullanıldı. Proje verisi varsa secondaryStartTimeYears girilmelidir.')
-  return{method,layers:results,totalImmediate,totalConsolidation,totalSecondary,totalSettlement:totalImmediate+totalConsolidation+totalSecondary,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,ready:results.length>0&&coverageOk&&!results.some(x=>x.status==='VERİ EKSİK'),warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978), Boussinesq alan integrasyonu, 2:1 ve mevcut veri modeliyle Janbu M-integrasyonu.'}
+  return{method,layers:results,totalImmediate,totalConsolidation,totalSecondary,totalSettlement:totalImmediate+totalConsolidation+totalSecondary,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,ready:results.length>0&&coverageOk&&!results.some(x=>x.status==='VERİ EKSİK'),warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978), Boussinesq alan integrasyonu, 2:1 gerilme yayılımı. Janbu M0–M1 verisi yoksa sonuç üretilmez.'}
 }
