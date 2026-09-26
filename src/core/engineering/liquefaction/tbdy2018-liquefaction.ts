@@ -28,7 +28,6 @@ export function tbdy2018Liquefaction(i:TBDYLiquefactionInput):TBDYLiquefactionRe
   const tau=.65*i.totalStress*(.4*i.SDS)*rd
   const FS=Number.isFinite(Rtau)&&tau>0?Rtau/tau:NaN
   if(N160f<=0||N160f>=34)warnings.push('N1,60f CRR bağıntısının geçerli aralığında değil; CRR, Rτ ve FS üretilemez.')
-  if(N160f<=0||N160f>=34)warnings.push('N1,60f CRR bağıntısının geçerli aralığında değil; tetiklenme hesabı üretilmedi.')
   return{N160,N160f,CN,alpha,beta,CRRM75,CM,Rtau,rd,tauEarthquake:tau,FS,steps:[
     {symbol:'CN',formula:'min(1.70,9.78/√σ′vo)',value:CN,source:'TBDY 2018 Ek 16B'},
     {symbol:'(N1)60',formula:'N·CN·CE·CB·CR·CS',value:N160,source:'TBDY 2018 Ek 16B'},
