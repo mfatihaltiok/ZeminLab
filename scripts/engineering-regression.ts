@@ -75,6 +75,30 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
+  const clay=calculateSpt({nField:20,ce:.90,cb:1.05,cs:1.20,cr:.95,effectiveStress:100,claySoil:true,claySoilSource:'Zemin sınıfı CIM'})
+  approx(clay.cn,1,1e-12)
+  approx(clay.n1_60,clay.n60,1e-12)
+  assert.equal(clay.trace.find(x=>x.symbol==='CN')!.note,'Zemin sınıfı CIM')
+  assert.equal(clay.warnings.length,0)
+}
+
+{
+  const borehole={
+    id:'CLAY-CN',
+    name:'SK-CLAY',
+    firstSptDepth:1.5,
+    totalDepth:6,
+    groundwaterDepth:20,
+    lithology:[{id:'L1',from:0,to:6,code:'CIM',description:'Orta Plastisiteli Kil',colorClass:'clay' as const}],
+    spt:[],
+  }
+  const record={id:'SPT-CLAY',depth:3,testType:'SPT' as const,n1:5,n2:10,n3:10,soilCode:'CIM',source:'manual' as const,confirmed:false}
+  const derived=deriveSptValues(borehole,record,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:20})
+  approx(derived.cn,1,1e-12)
+  approx(derived.n1_60,derived.n60,1e-12)
+}
+
+{
   const borehole={
     id:'CN-FALLBACK',
     name:'SK-01',
@@ -210,6 +234,18 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(result.rows[0].beta,1.1543167672515497,1e-12)
   assert.ok(result.rows[0].FS !== undefined)
   assert.equal(result.rows[0].conclusion,'SIVILAŞMA RİSKİ VAR')
+}
+
+{
+  const clayLiquefaction=liquefactionProfile({
+    Mw:7.5,Sds:1,gwt:2,
+    soilGroup:'ZE',dts:'1',continuousOrThickLens:true,foundationDepth:2,
+    layers:[{top:0,bottom:10,gamma:18,gammaSat:19,soil:'CIM',finesContent:50,plasticityIndex:15}],
+    spt:[{depth:5,nField:10,fineContent:50,plasticityIndex:15,waterContent:25,soil:'CIM',energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10}]
+  })
+  approx(clayLiquefaction.rows[0].cn,1,1e-12)
+  approx(clayLiquefaction.rows[0].n1_60,clayLiquefaction.rows[0].n60,1e-12)
+  assert.ok(clayLiquefaction.rows[0].trace.some(x=>x.symbol==='CN'&&x.note==='Zemin sınıfı CIM'))
 }
 
 {
