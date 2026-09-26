@@ -77,6 +77,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const claySoil=isClaySoilCode(soil)
     const claySoilSource=claySoil?`Zemin sınıfı ${soil}`:undefined
     const waterContent=record.waterContent
+    const stressSnapshotReady=record.stressSnapshot!==undefined
     const npt=calculateSpt({
       nField:record.nField,
       ...(input.sptCorrection?{ce:input.sptCorrection.ce,cb:input.sptCorrection.cb,cs:input.sptCorrection.cs,hammerType:input.sptCorrection.hammerType,sampler:input.sptCorrection.samplerType,rodLengthM:record.rodLengthM,sptDepthM:record.depth}:{
@@ -99,7 +100,8 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       {symbol:'(N1)60f',title:'İnce dane düzeltilmiş SPT',formula:'(N1)60f=α+β(N1)60',value:n1_60f}
     ]
     const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent:clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha,beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired}
-    if(npt.hasAssumptions){ warnings.push(...npt.warnings); return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace} }
+    if(!stressSnapshotReady)warnings.push('SPT deney koşulları sabitlenmedi; sıvılaşma için onaylı test-zamanı σv0/u0/σ′v0 snapshotı gereklidir.')
+    if(npt.hasAssumptions||!stressSnapshotReady){ warnings.push(...npt.warnings); return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace} }
     if(stress.covered<Math.max(0,record.depth)-1e-9){
       trace.push({symbol:'Kapsama',title:'Katman kapsamı',formula:'ΣΔz=z',value:stress.covered,unit:'m',note:'SPT derinliğine kadar sürekli γ profili yok.'})
       return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
