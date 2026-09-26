@@ -70,6 +70,8 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       if(sliding){ if(!sliding.evaluable)missing.push('Deprem + YASS altında kayma için cu');else if(!sliding.slidingSafeResultant)failed.push('Kayma'); warnings.push(...sliding.warnings) }
     }catch(e){missing.push(e instanceof Error?e.message:'Temel hesabı doğrulanamadı')}
   }
+  if(p.foundationParameters.cyclicSettlementAnalysisRequired===true && !p.foundationParameters.cyclicSettlementAnalysisCompleted) missing.push('16.8.3.4(a) çevrimsel yükleme altında temel altı yerdeğiştirme analizi')
+  if(p.foundationParameters.cyclicSettlementAnalysisRequired===undefined) missing.push('16.8.3.4(a) çevrimsel yerdeğiştirme analizinin uygulanabilirlik kararı')
   if(!input.settlement) missing.push('Temel altında yerdeğiştirme/oturma kontrolü')
   if(input.settlement&&bearing){
     try{
