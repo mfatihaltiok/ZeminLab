@@ -15,6 +15,8 @@ export interface SptEngineInput{
   rodLengthM?:number
   effectiveStress?:number
   fineContent?:number
+  claySoil?:boolean
+  claySoilSource?:string
   applyOverburden?:boolean
   applyDilatancy?:boolean
 }
@@ -95,10 +97,16 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const n60=input.nField*ce*cb*cs*cr
   const sigma=input.effectiveStress
   const applyOverburden=input.applyOverburden??true
+  const claySoil=input.claySoil===true
   let cn=1
   if(applyOverburden){
-    if(finitePositive(sigma))cn=Math.min(1.70,9.78/Math.sqrt(sigma!))
-    else warnings.push('Etkin düşey gerilme verilmediği için CN uygulanmadı; (N1)60 yalnız N60 olarak raporlanır.')
+    if(claySoil){
+      cn=1
+    }else if(finitePositive(sigma)){
+      cn=Math.min(1.70,9.78/Math.sqrt(sigma!))
+    }else{
+      warnings.push('Etkin düşey gerilme verilmediği için CN uygulanmadı; (N1)60 yalnız N60 olarak raporlanır.')
+    }
   }
   const n1_60=n60*cn
   const fines=input.fineContent
@@ -116,7 +124,7 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
     {symbol:'CS',title:'Numune alıcı düzeltmesi',formula:'CS=f(sampler) veya proje katsayısı',value:cs,note:csResolved.source},
     {symbol:'CR',title:'Rod boyu düzeltmesi',formula:'CR=f(L) veya proje katsayısı',value:cr,note:crResolved.source},
     {symbol:'N60',title:'Standartlaştırılmış SPT',formula:'N60=N·CE·CB·CS·CR',value:n60},
-    {symbol:'CN',title:'Örtü basıncı düzeltmesi',formula:'CN=min(1.70,9.78/√σ′v0)',value:cn,note:finitePositive(sigma)?'σ′v0='+sigma!.toFixed(2)+' kPa':'Uygulanmadı'},
+    {symbol:'CN',title:'Örtü basıncı düzeltmesi',formula:claySoil?'CN=1.00 (killi/kohezyonlu zemin)':'CN=min(1.70,9.78/√σ′v0)',value:cn,note:claySoil?(input.claySoilSource??'Killi zemin'):finitePositive(sigma)?'σ′v0='+sigma!.toFixed(2)+' kPa':'Uygulanmadı'},
     {symbol:'(N1)60',title:'Normalize SPT',formula:'(N1)60=CN·N60',value:n1_60}
   ]
   if(fc){
