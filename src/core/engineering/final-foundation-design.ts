@@ -7,6 +7,15 @@ import { type ProjectInfo, normalizeProjectInfo, classifyVs30 } from '../models/
 export type FinalStatus='UYGUN'|'UYGUN DEĞİL'|'VERİ EKSİK'
 
 export interface SeismicFoundationActions{vertical?:number;vx?:number;vy?:number;mx?:number;my?:number;source:string;designAction?:boolean}
+export interface FinalFoundationInput{
+  project:Partial<ProjectInfo>
+  actions?:SeismicFoundationActions
+  surfaceLayers?:SurfaceFoundationLayer[]
+  settlement?:Omit<IdealizedSettlementInput,'profile'|'B'|'L'|'Df'|'qGross'|'groundwaterDepth'> & {profile:IdealizedSettlementInput['profile']}
+  liquefaction?:LiquefactionProfileInput
+  foundationInterface?:FoundationCheckInput['interfaceType']
+  seismicBelowGroundwater?:boolean
+}
 export interface FinalFoundationResult{
   status:FinalStatus;evaluable:boolean
   project:{dts?:string;bks?:number;sds?:number;soilGroup?:string;vs30?:number;zfSiteSpecificRequired:boolean}
@@ -34,22 +43,25 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       trace.push({check:'Taşıma gücü',status:bearing.adequate&&bearing.finalDesignEligible?'UYGUN':'UYGUN DEĞİL',source:'TBDY 2018 16.8.2–16.8.3',details:'q0='+bearing.qo.toFixed(3)+' kPa; qt='+bearing.qt.toFixed(3)+' kPa'})
       if(!bearing.adequate||!bearing.finalDesignEligible)failed.push('Taşıma gücü')
       warnings.push(...bearing.warnings)
-      const si:FoundationCheckInput={B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,deltaTan:fp.baseFrictionTanDelta,cu:sp.undrainedCohesion,groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,usePassiveResistance:fp.usePassiveResistance,seismic:input.seismicBelowGroundwater??false,interfaceType:'cast-in-place-soil'}
+      const si:FoundationCheckInput={B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,deltaTan:fp.baseFrictionTanDelta,cu:sp.undrainedCohesion,groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,usePassiveResistance:fp.usePassiveResistance,seismic:input.seismicBelowGroundwater??false,interfaceType:input.foundationInterface}
       sliding=foundationChecks(si)
+      if(input.foundationInterface===undefined) sliding.warnings.push('Temel-zemin ara yüzü seçilmedi; TBDY 16.8.4.3 kapsamında tanδ varsayımı nihai tasarım girdisi olarak kabul edilmemelidir.')
       const slideStatus=sliding.evaluable?(sliding.slidingSafeResultant?'UYGUN':'UYGUN DEĞİL'):'VERİ EKSİK'
       trace.push({check:'Kayma',status:slideStatus,source:'TBDY 2018 16.8.4',details:'Vh='+sliding.horizontalResultant.toFixed(3)+'; R='+sliding.slidingCapacityResultant.toFixed(3)})
+      if(input.foundationInterface===undefined) missing.push('Temel-zemin ara yüzü')
       if(!sliding.evaluable)missing.push('Deprem + YASS altında kayma için cu');else if(!sliding.slidingSafeResultant)failed.push('Kayma')
       warnings.push(...sliding.warnings)
     }catch(e){missing.push(e instanceof Error?e.message:'Temel hesabı doğrulanamadı')}
   }
   if(input.settlement&&bearing){
     try{
-      const settlement=calculateIdealizedSettlement({...input.settlement,profile:input.settlement.profile,B:fp.footingWidth,L:fp.footingLength,Df:fp.footingDepth,qGross:bearing.qo,groundwaterDepth:sp.groundwaterDepth})
+      settlement=calculateIdealizedSettlement({...input.settlement,profile:input.settlement.profile,B:fp.footingWidth,L:fp.footingLength,Df:fp.footingDepth,qGross:bearing.qo,groundwaterDepth:sp.groundwaterDepth})
       trace.push({check:'Oturma',status:settlement.ready?'UYGUN':'VERİ EKSİK',source:'TBDY 2018 16.8.3.4 + seçilen yöntem',details:'Toplam oturma='+settlement.totalSettlement.toFixed(3)+' mm'})
       if(!settlement.ready)missing.push('Oturma için gerekli profil parametreleri')
       warnings.push(...settlement.warnings)
     }catch(e){missing.push(e instanceof Error?e.message:'Oturma hesabı doğrulanamadı')}
   }
+  let settlement:IdealizedSettlementResult|undefined
   let liquefaction:LiquefactionProfileResult|undefined
   if(input.liquefaction){
     try{
@@ -61,5 +73,5 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   }
   if(!soilGroup)warnings.push('Zemin grubu girilmemiş; taşıma gücü ve oturma hesabı için kullanılan zemin parametreleri ayrıca doğrulanmalıdır.')
   const m=[...new Set(missing)],f=[...new Set(failed)],status:FinalStatus=f.length?'UYGUN DEĞİL':m.length?'VERİ EKSİK':'UYGUN'
-  return{status,evaluable:status!=='VERİ EKSİK',project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired:false},actions,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,liquefaction}
+  return{status,evaluable:status!=='VERİ EKSİK',project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired:false},actions,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,settlement,liquefaction}
 }
