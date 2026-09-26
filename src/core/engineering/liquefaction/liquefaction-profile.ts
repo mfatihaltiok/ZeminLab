@@ -79,13 +79,13 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM,effectiveStress:stress.sigmaVPrime,fineContent,
       applyOverburden:true,applyDilatancy:false
     })
-    const fines=clamp(fineContent??0,0,100),fc=fineContentCorrection(fines),n1_60f=fc.alpha+fc.beta*npt.n1_60
+    const fines=fineContent; const fc=fines==null?{alpha:NaN,beta:NaN}:fineContentCorrection(fines); const n1_60f=fines==null?NaN:fc.alpha+fc.beta*npt.n1_60
     const saturated=record.depth>=input.gwt-1e-9,within20=record.depth<=20+1e-9
     const classificationDataComplete=soil!=null&&soil.trim().length>0&&fineContent!=null&&pi!=null
     const potentiallyLiquefiable=classificationDataComplete&&saturated&&within20&&soilIsPotential(soil!,pi)
     const exceptionA=input.dts==='4'&&clayContent!=null&&pi!=null&&clayContent>20&&pi>10,exceptionB=input.dts==='4'&&fineContent!=null&&fineContent>35&&npt.n1_60>20,exemption=exceptionA||exceptionB
     const mandatoryAnalysis=potentiallyLiquefiable&&mandatoryByProject&&!exemption
-    const researchDataComplete=fineContent!=null&&pi!=null&&waterContent!=null
+    const researchDataComplete=fineContent!=null&&fineContent>=0&&fineContent<=100&&pi!=null&&pi>=0&&waterContent!=null&&waterContent>=0
     const triggerRequired=mandatoryAnalysis&&researchDataComplete&&npt.n1_60<30
     const postLiquefactionRequired=triggerRequired
     const trace:SptTraceStep[]=[...npt.trace,
@@ -96,6 +96,10 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha:fc.alpha,beta:fc.beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionRequired}
     if(stress.covered<Math.max(0,record.depth)-1e-9){
       trace.push({symbol:'Kapsama',title:'Katman kapsamı',formula:'ΣΔz=z',value:stress.covered,unit:'m',note:'SPT derinliğine kadar sürekli γ profili yok.'})
+      return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
+    }
+    if((fineContent!=null&&(fineContent<0||fineContent>100))||(pi!=null&&pi<0)||(waterContent!=null&&waterContent<0)){
+      trace.push({symbol:'Veri',title:'Laboratuvar aralığı',formula:'0≤FC≤100; PI≥0; w≥0',value:0,note:'Laboratuvar verisi fiziksel aralık dışında.'})
       return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
     }
     if(!classificationDataComplete&&saturated&&within20&&!exemption){
