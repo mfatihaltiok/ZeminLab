@@ -91,9 +91,6 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   if(input.cb===undefined&&input.boreholeDiameterMm===undefined)assumptions.push('CB: proje-geneli CB seçimi ve sondaj çapı verilmedi; CB=1 varsayıldı.')
   if(input.cr===undefined&&input.rodLengthM===undefined)assumptions.push('CR: proje-geneli CR seçimi ve tij boyu verilmedi; CR=1 varsayıldı.')
   if(input.cs===undefined&&input.sampler==='without-liner'&&input.samplerCorrection===undefined)assumptions.push('CS: iç tüpsüz numune alıcı için CS=1.10 varsayıldı.')
-  if(input.boreholeDiameterMm===undefined)assumptions.push('CB: sondaj çapı girilmedi, CB=1 varsayıldı.')
-  if(input.rodLengthM===undefined)assumptions.push('CR: tij boyu girilmedi, CR=1 varsayıldı.')
-  if(input.sampler==='without-liner'&&input.samplerCorrection===undefined)assumptions.push('CS: iç tüpsüz numune alıcı için CS=1.10 varsayıldı.')
   const n60=input.nField*ce*cb*cs*cr
   const sigma=input.effectiveStress
   const applyOverburden=input.applyOverburden??true
