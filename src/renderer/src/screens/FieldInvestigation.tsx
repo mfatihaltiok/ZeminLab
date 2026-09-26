@@ -52,6 +52,7 @@ function syncLabs(labs: LaboratoryRecord[], borehole: BoreholeRecord): Laborator
 }
 
 function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (b: BoreholeRecord) => void }) {
+  const [openCorrectionId,setOpenCorrectionId]=useState<string>()
   const updateMeta = (key: 'firstSptDepth'|'totalDepth'|'groundwaterDepth', value: string) => {
     const n = value === '' ? undefined : Number(value)
     if (key === 'firstSptDepth') {
@@ -72,18 +73,20 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
     onChange({ ...borehole, spt: borehole.spt.map(r => r.id === id ? next : r).sort((a,b) => a.depth-b.depth) })
   }
   const updateUdDepth = (id: string, value: string) => { const n = Number(value); if (Number.isFinite(n)) updateRow(id, { depth: n, depthTo: n + 0.5 }) }
+  const updateCorrection=(id:string,patch:Partial<SptRecord['correction']>)=>{const current=borehole.spt.find(row=>row.id===id);if(!current)return;updateRow(id,{correction:{...(current.correction??{}),...patch}})}
   const add = () => { const next = appendSpt(borehole); if (next) onChange(next) }
   return <>
     <div className="field-meta-strip">
       <label>İlk deney derinliği (m)<input type="number" value={borehole.firstSptDepth} min="0" step="0.1" onChange={e => updateMeta('firstSptDepth', e.target.value)} /></label>
       <label>Kuyu toplam derinliği (m)<input type="number" value={borehole.totalDepth || ''} min="0" step="0.1" placeholder="Boş" onChange={e => updateMeta('totalDepth', e.target.value)} /></label>
       <label>YASS (m)<input type="number" value={borehole.groundwaterDepth ?? ''} min="0" step="0.01" placeholder="Ölçülmediyse boş" onChange={e => updateMeta('groundwaterDepth', e.target.value)} /></label>
-      <span className="field-rule-note">SPT: 45 cm · UD: 50 cm · SPT düzeltmeleri hesap izinde otomatik gösterilir</span>
+      <label>Sondaj çapı (mm)<input type="number" value={borehole.drillingDiameter ?? ''} min="65" max="200" step="1" placeholder="65–200" onChange={e=>onChange({...borehole,drillingDiameter:e.target.value===''?undefined:Number(e.target.value)})} /></label>
+      <span className="field-rule-note">SPT: 45 cm · Ek 16B düzeltmeleri satırdaki Düzeltme panelinden girilir.</span>
     </div>
     <div className="engineering-grid-wrap spt-grid-wrap">
       <div className="grid-toolbar"><b>SPT / ARAZİ DENEYLERİ</b><span>{borehole.spt.length} deney · son başlangıç {fmt(borehole.spt.at(-1)?.depth)} m</span><button onClick={add}>+ Deney</button></div>
-      <table className="engineering-grid spt-grid"><colgroup><col className="col-depth"/><col className="col-type"/><col className="col-n"/><col className="col-n"/><col className="col-n"/><col className="col-n30"/><col className="col-soil"/><col className="col-description"/><col className="col-source"/><col className="col-confirm"/><col className="col-lab"/><col className="col-delete"/></colgroup>
-        <thead><tr><th>Derinlik</th><th>Deney Tipi</th><th>n1</th><th>n2</th><th>n3</th><th>N30</th><th>Zemin Sınıfı</th><th>Zemin Açıklaması</th><th>Kaynak</th><th>Onay</th><th>Lab</th><th/></tr></thead>
+      <table className="engineering-grid spt-grid"><colgroup><col className="col-depth"/><col className="col-type"/><col className="col-n"/><col className="col-n"/><col className="col-n"/><col className="col-n30"/><col className="col-soil"/><col className="col-description"/><col className="col-source"/><col className="col-confirm"/><col className="col-lab"/><col className="col-correction"/><col className="col-delete"/></colgroup>
+        <thead><tr><th>Derinlik</th><th>Deney Tipi</th><th>n1</th><th>n2</th><th>n3</th><th>N30</th><th>Zemin Sınıfı</th><th>Zemin Açıklaması</th><th>Kaynak</th><th>Onay</th><th>Lab</th><th>Düzeltme</th><th/></tr></thead>
         <tbody>{borehole.spt.map(row => {
           const n30 = row.testType === 'SPT' && row.n2 !== undefined && row.n3 !== undefined ? row.n2 + row.n3 : undefined
           return <tr key={row.id}>
@@ -97,8 +100,21 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
             <td className="description-cell">{row.soilDescription || '—'}</td><td><span className="source-badge">{sourceLabel(row.source,row.confirmed)}</span></td>
             <td><button className="confirm-button" onClick={()=>updateRow(row.id,{confirmed:!row.confirmed})}>{row.confirmed?'✓':'○'}</button></td>
             <td><button className={`lab-link-button ${row.laboratoryLinked !== false ? 'linked' : ''}`} title={row.laboratoryLinked !== false ? 'Laboratuvar numunesini ayır' : 'Laboratuvar numunesini bağla'} onClick={()=>updateRow(row.id,{laboratoryLinked:row.laboratoryLinked === false})}>{row.laboratoryLinked !== false ? 'LAB' : '—'}</button></td>
+            <td><button className="correction-button" onClick={()=>setOpenCorrectionId(openCorrectionId===row.id?undefined:row.id)}>{openCorrectionId===row.id?'Kapat':'Düzelt'}</button></td>
             <td><button className="icon-button" onClick={()=>onChange({...borehole,spt:borehole.spt.filter(r=>r.id!==row.id)})}>×</button></td>
           </tr>
+          {openCorrectionId===row.id&&<tr className="spt-correction-row"><td colSpan={13}>
+            <div className="spt-correction-panel">
+              <div className="spt-correction-title"><b>TBDY 2018 EK 16B.2 · SPT DÜZELTMELERİ</b><span>N₁,₆₀ = N · Cₙ · Cᵣ · Cₛ · Cᵦ · Cₑ</span></div>
+              <label>ER (%)<input type="number" min="1" max="160" step="0.01" value={row.correction?.energyRatio??''} placeholder="Ölçülmüşse gir" onChange={e=>updateCorrection(row.id,{energyRatio:e.target.value===''?undefined:Number(e.target.value)})}/></label>
+              <label>Tokmak<select value={row.correction?.hammerType??''} onChange={e=>updateCorrection(row.id,{hammerType:e.target.value?e.target.value as any:undefined})}><option value="">Belirtilmedi</option><option value="safety">Güvenli</option><option value="donut">Halkalı</option><option value="automatic">Otomatik</option><option value="measured">Ölçülmüş ER</option></select></label>
+              <label>Numune alıcı<select value={row.correction?.sampler??''} onChange={e=>updateCorrection(row.id,{sampler:e.target.value?e.target.value as any:undefined})}><option value="">Standart</option><option value="without-liner">İç tüpsüz</option><option value="liner">İç tüplü</option></select></label>
+              <label>CS<input type="number" min="1.10" max="1.30" step="0.01" value={row.correction?.samplerCorrection??''} disabled={row.correction?.sampler!=='without-liner'} placeholder="1.10–1.30" onChange={e=>updateCorrection(row.id,{samplerCorrection:e.target.value===''?undefined:Number(e.target.value)})}/></label>
+              <label>Tij boyu (m)<input type="number" min="3" step="0.10" value={row.correction?.rodLengthM??''} placeholder="≥ 3" onChange={e=>updateCorrection(row.id,{rodLengthM:e.target.value===''?undefined:Number(e.target.value)})}/></label>
+              <label className="spt-check"><input type="checkbox" checked={row.correction?.applyOverburdenCorrection!==false} onChange={e=>updateCorrection(row.id,{applyOverburdenCorrection:e.target.checked})}/> CN</label>
+              <label className="spt-check"><input type="checkbox" checked={row.correction?.applyDilatancyCorrection===true} onChange={e=>updateCorrection(row.id,{applyDilatancyCorrection:e.target.checked})}/> Dilatansi</label>
+            </div>
+          </td></tr>
         })}</tbody>
       </table>
     </div>
