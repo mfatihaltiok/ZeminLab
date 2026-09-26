@@ -7,7 +7,6 @@ import { createEmptyIdealizedProfile } from '../../../core/models/idealized-soil
 import { deriveSptValues } from '../../../core/engineering/field-calculations'
 import { stressToBase, unitWeightToBase } from '../../../core/units/project-units'
 import { EngineeringSectionRenderer } from '../components/EngineeringSectionRendererV2'
-import { Soil3DViewport } from '../components/Soil3DViewport'
 
 const n=(v:number|undefined)=>v==null||!Number.isFinite(v)?'—':v.toFixed(2)
 type Props={boreholes:BoreholeRecord[];labs:LaboratoryRecord[];profile?:IdealizedSoilProfile;onChange:(p:IdealizedSoilProfile)=>void}
