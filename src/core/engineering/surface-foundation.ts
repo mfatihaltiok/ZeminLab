@@ -114,7 +114,7 @@ function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influen
 }
 
 
-function compressionContact(B:number,L:number,N:number,Mx:number,My:number){
+export function compressionContact(B:number,L:number,N:number,Mx:number,My:number){
   if(N<=0)return{area:0,qMax:0,qMin:0,contactState:'NO_CONTACT' as const}
   const fullA=B*L,fullQ=N/fullA,ex=My/N,ey=Mx/N
   if(Math.abs(ex)<=B/6+1e-12&&Math.abs(ey)<=L/6+1e-12)
