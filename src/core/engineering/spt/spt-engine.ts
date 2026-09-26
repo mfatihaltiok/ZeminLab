@@ -17,7 +17,7 @@ export interface SptEngineInput{
 export interface SptTraceStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string}
 export interface SptEngineResult{
   nField:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number
-  n1_60_dilatancy?:number;dilatancyApplied:boolean;trace:SptTraceStep[];warnings:string[]
+  n1_60_dilatancy?:number;dilatancyApplied:boolean;hasAssumptions:boolean;trace:SptTraceStep[];warnings:string[]
 }
 
 function finitePositive(value:number|undefined){return value!==undefined&&Number.isFinite(value)&&value>0}
@@ -74,6 +74,10 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const cb=boreholeFactor(input.boreholeDiameterMm)
   const cs=samplerFactor(input)
   const cr=rodFactor(input.rodLengthM)
+  const assumptions:string[]=[]
+  if(input.boreholeDiameterMm===undefined)assumptions.push('CB: sondaj çapı girilmedi, CB=1 varsayıldı.')
+  if(input.rodLengthM===undefined)assumptions.push('CR: tij boyu girilmedi, CR=1 varsayıldı.')
+  if(input.sampler==='without-liner'&&input.samplerCorrection===undefined)assumptions.push('CS: iç tüpsüz numune alıcı için CS=1.10 varsayıldı.')
   const n60=input.nField*ce*cb*cs*cr
   const sigma=input.effectiveStress
   const applyOverburden=input.applyOverburden??true
@@ -83,7 +87,8 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
     else warnings.push('Etkin düşey gerilme verilmediği için CN uygulanmadı; (N1)60 yalnız N60 olarak raporlanır.')
   }
   const n1_60=n60*cn
-  const fines=Math.max(0,Math.min(100,input.fineContent??0))
+  const fines=input.fineContent
+  if(fines!==undefined&&(!Number.isFinite(fines)||fines<0||fines>100))throw new Error('İnce dane oranı 0–100% arasında olmalıdır.')
   const dilatancyApplied=Boolean(input.applyDilatancy&&fines<35&&finitePositive(sigma)&&n1_60>15)
   const n1_60_dilatancy=dilatancyApplied?15+.5*(n1_60-15):undefined
   const trace:SptTraceStep[]=[
@@ -99,5 +104,6 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   if(dilatancyApplied){
     trace.push({symbol:'(N1)60,d',title:'Dilatansi düzeltmesi',formula:'15+0.5[(N1)60−15]',value:n1_60_dilatancy,note:'Yalnız yöntem açıkça gerektiriyorsa kullanılmalıdır.'})
   }
-  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,dilatancyApplied,trace,warnings}
+  warnings.push(...assumptions)
+  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,dilatancyApplied,hasAssumptions:er.assumption||assumptions.length>0,trace,warnings}
 }
