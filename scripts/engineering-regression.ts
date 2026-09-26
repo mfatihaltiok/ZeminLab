@@ -6,9 +6,18 @@ import { foundationChecks } from '../src/core/engineering/calculation-engine.ts'
 import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-settlement-engine.ts'
 import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
+import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
 
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(Math.abs(actual-expected)<=tolerance,`expected ${expected}, got ${actual}`)
+}
+
+{
+  const stress=effectiveStressAtDepth(10,[{top:0,bottom:4,gamma:18,gammaSat:19},{top:4,bottom:12,gamma:19,gammaSat:20}],6)
+  approx(stress.sigmaV,190)
+  approx(stress.porePressure,39.24)
+  approx(stress.sigmaVPrime,150.76)
+  approx(stress.covered,10)
 }
 
 {
