@@ -52,26 +52,26 @@ function syncLabs(labs: LaboratoryRecord[], borehole: BoreholeRecord): Laborator
   return [...labs.filter(l => l.boreholeId !== borehole.id), ...next]
 }
 
-const CE_OPTIONS=Array.from({length:116},(_,i)=>Number((0.45+i*0.01).toFixed(2)))
-const CB_OPTIONS=[1,1.05,1.15]
-const CS_OPTIONS=Array.from({length:21},(_,i)=>Number((1.10+i*0.01).toFixed(2))).concat([1])
-const CR_OPTIONS=[0.75,0.85,0.95,1]
+const CE_OPTIONS=[{value:.75,label:'0.75 · ER %45 · halkalı'},{value:1,label:'1.00 · ER %60 · güvenli'},{value:1.5,label:'1.50 · ER %90 · otomatik'}]
+const CB_OPTIONS=[{value:1,label:'1.00 · 65–115 mm'},{value:1.05,label:'1.05 · 150 mm'},{value:1.15,label:'1.15 · 200 mm'}]
+const CS_OPTIONS=[{value:1,label:'1.00 · standart'},{value:1.1,label:'1.10'},{value:1.2,label:'1.20'},{value:1.3,label:'1.30'}]
+const CR_OPTIONS=[{value:.75,label:'0.75 · 3–4 m'},{value:.85,label:'0.85 · 4–6 m'},{value:.95,label:'0.95 · 6–10 m'},{value:1,label:'1.00 · >10 m'}]
 
 function SptCorrectionPanel({value,onChange}:{value:SptCorrectionParameters;onChange:(next:SptCorrectionParameters)=>void}){
   const set=(key:keyof SptCorrectionParameters,raw:string)=>{
     const n=Number(raw)
     if(Number.isFinite(n))onChange({...value,[key]:n})
   }
-  const options=(items:number[])=>items.map(x=><option key={x} value={x}>{x.toFixed(2)}</option>)
+  const options=(items:{value:number;label:string}[])=>items.map(x=><option key={x.value} value={x.value}>{x.label}</option>)
   return <div className="spt-global-correction">
-    <div className="spt-global-correction-title"><b>TBDY 2018 EK 16B.2 · PROJE GENELİ SPT DÜZELTME KATSAYILARI</b><span>Projede bulunan tüm sondaj kuyuları ve tüm SPT deneyleri aynı katsayı setini kullanır.</span></div>
+    <div className="spt-global-correction-title"><b>SPT DÜZELTME KATSAYILARI · PROJE GENELİ</b><span>Tüm sondaj ve SPT deneylerinde aynı katsayı seti kullanılır.</span></div>
     <div className="spt-global-correction-grid">
       <label>CE<select value={value.ce} onChange={e=>set('ce',e.target.value)}>{options(CE_OPTIONS)}</select></label>
       <label>CB<select value={value.cb} onChange={e=>set('cb',e.target.value)}>{options(CB_OPTIONS)}</select></label>
       <label>CS<select value={value.cs} onChange={e=>set('cs',e.target.value)}>{options(CS_OPTIONS)}</select></label>
       <label>CR<select value={value.cr} onChange={e=>set('cr',e.target.value)}>{options(CR_OPTIONS)}</select></label>
     </div>
-    <div className="spt-global-correction-note">CE, CB, CS ve CR burada bir kez seçilir ve proje seviyesinde saklanır. CN sabit bir donanım/geometri katsayısı değildir; her SPT derinliğinde hesaplanan σ′v0 değerinden <b>CN=min(1.70, 9.78/√σ′v0)</b> bağıntısıyla otomatik belirlenir.</div>
+    <div className="spt-global-correction-note">CE ölçülmüş enerji oranı yoksa literatür/TBDY temsil değerleriyle seçilir. CB, CS ve CR TBDY Tablo 16B.1 seçeneklerinden seçilir. CN kumlu/kohezyonsuz zeminde σ′v0 ile, killi zeminde 1.00 olarak hesaplanır.</div>
   </div>
 }
 
@@ -102,8 +102,8 @@ function SptGrid({ borehole, onChange, sptCorrections, onSptCorrectionsChange }:
       <label>İlk deney derinliği (m)<input type="number" value={borehole.firstSptDepth} min="0" step="0.1" onChange={e=>updateMeta('firstSptDepth',e.target.value)} /></label>
       <label>Kuyu toplam derinliği (m)<input type="number" value={borehole.totalDepth||''} min="0" step="0.1" placeholder="Boş" onChange={e=>updateMeta('totalDepth',e.target.value)} /></label>
       <label>YASS (m)<input type="number" value={borehole.groundwaterDepth??''} min="0" step="0.01" placeholder="Ölçülmediyse boş" onChange={e=>updateMeta('groundwaterDepth',e.target.value)} /></label>
-      <label>Sondaj çapı (mm)<input type="number" value={borehole.drillingDiameter??''} min="65" max="200" step="1" placeholder="65–200" onChange={e=>onChange({...borehole,drillingDiameter:e.target.value===''?undefined:Number(e.target.value)})} /></label>
-      <span className="field-rule-note">SPT: 45 cm · CE/CB/CS/CR aşağıdaki proje-geneli panelinden seçilir.</span>
+
+      <span className="field-rule-note">SPT: 45 cm · CE/CB/CS/CR proje-geneli panelden seçilir.</span>
     </div>
     <SptCorrectionPanel value={sptCorrections} onChange={onSptCorrectionsChange}/>
     <div className="engineering-grid-wrap spt-grid-wrap">
@@ -137,10 +137,10 @@ function SptAnalysis({ borehole, labs, unitSystem, fallback, correction }: { bor
   })
   return <div className="engineering-grid-wrap">
     <div className="grid-toolbar"><b>SPT HESAP ZİNCİRİ</b><span>N30 → N60 → CN → (N1)60 → (N1)60f</span><span className="spt-correction-note">CE/CB/CS/CR proje geneli sabit · CN: killi zemin = 1.00, diğer zeminler = derinliğe göre</span></div>
-    <table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>CE</th><th>CB</th><th>CS</th><th>CR</th><th>N60</th><th>σ′v0</th><th>CN</th><th>(N1)60</th><th>(N1)60f</th><th>Durum</th></tr></thead>
+    <table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>CE</th><th>CB</th><th>CS</th><th>CR</th><th>N60</th><th>σv0</th><th>u0</th><th>σ′v0</th><th>CN</th><th>(N1)60</th><th>(N1)60f</th><th>Durum</th></tr></thead>
       <tbody>{rows.map(({record,derived,error})=><tr key={record.id}>
         <td>{fmt(record.depth)}–{fmt(experimentDepthTo(record))}</td><td>{fmt(derived?.nField,0)}</td><td>{fmt(derived?.ce)}</td><td>{fmt(derived?.cb)}</td><td>{fmt(derived?.cs)}</td><td>{fmt(derived?.cr)}</td>
-        <td className="computed-cell">{fmt(derived?.n60)}</td><td>{fmt(derived?.effectiveStress)}</td><td>{derived?.overburdenCorrectionApplied?fmt(derived.cn):'—'}</td><td className="computed-cell">{derived?.overburdenCorrectionApplied?fmt(derived.n1_60):fmt(derived?.n60)}</td><td>{fmt(derived?.n1_60f)}</td><td>{error??(derived?.warnings.length?'UYARI':'HESAPLANDI')}</td>
+        <td className="computed-cell">{fmt(derived?.n60)}</td><td>{fmt(derived?.verticalStress)}</td><td>{fmt(derived?.porePressure)}</td><td>{fmt(derived?.effectiveStress)}</td><td>{derived?.overburdenCorrectionApplied?fmt(derived.cn):'—'}</td><td className="computed-cell">{derived?.overburdenCorrectionApplied?fmt(derived.n1_60):fmt(derived?.n60)}</td><td>{fmt(derived?.n1_60f)}</td><td>{error??(derived?.warnings.length?'UYARI':'HESAPLANDI')}</td>
       </tr>)}</tbody>
     </table>
     {rows.map(({record,derived,error})=>error?<div className="spt-row-error" key={record.id}><b>{fmt(record.depth)} m:</b> {error}</div>:derived?.warnings.length?<div className="spt-row-warning" key={record.id}><b>{fmt(record.depth)} m:</b> {derived.warnings.join(' ')}</div>:null)}
