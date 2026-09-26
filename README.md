@@ -39,3 +39,6 @@ npm run dev
 ```bash
 npm run build:win
 ```
+
+
+<!-- engineering audit verification -->
