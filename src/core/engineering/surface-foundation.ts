@@ -50,9 +50,10 @@ function groundwater(Df:number,B:number,gammaNatural:number,gammaSat?:number,gwt
 function vesicGroundFactors(betaDeg:number,phi:number,Nq:number){
   const beta=Math.abs(betaDeg)
   if(beta===0)return{gc:1,gq:1,gg:1}
-  if(phi<=0)return{gc:Math.max(0,1-beta/147),gq:1,gg:1}
+  if(beta>=90)throw new Error('Arazi eğimi β 90° veya daha büyük olamaz.')
+  if(phi<=0)return{gc:Math.max(0,1-beta/147),gq:Math.max(0,1-Math.tan(rad(beta))**2),gg:Math.max(0,1-Math.tan(rad(beta))**2)}
   if(beta>=phi)throw new Error('Arazi eğimi β, içsel sürtünme açısı φ′ değerinden küçük olmalıdır.')
-  const gq=Math.max(0,(1-Math.tan(rad(beta)))**2),gg=gq
+  const gq=Math.max(0,1-Math.tan(rad(beta))**2),gg=gq
   const gc=Math.max(0,gq-(1-gq)/Math.max(Nq-1,1e-9))
   return{gc,gq,gg}
 }
@@ -114,10 +115,10 @@ function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influen
 
 
 function compressionContact(B:number,L:number,N:number,Mx:number,My:number){
-  if(N<=0)return{area:0,qMax:Infinity,qMin:0,contactState:'NO_CONTACT' as const}
+  if(N<=0)return{area:0,qMax:0,qMin:0,contactState:'NO_CONTACT' as const}
   const fullA=B*L,fullQ=N/fullA,ex=My/N,ey=Mx/N
   if(Math.abs(ex)<=B/6+1e-12&&Math.abs(ey)<=L/6+1e-12)
-    return{area:fullA,qMax:fullQ*(1+6*ex/B+6*ey/L),qMin:Math.max(0,fullQ*(1-6*ex/B-6*ey/L)),contactState:'FULL' as const}
+    return{area:fullA,qMax:fullQ*(1+6*Math.abs(ex)/B+6*Math.abs(ey)/L),qMin:Math.max(0,fullQ*(1-6*Math.abs(ex)/B-6*Math.abs(ey)/L)),contactState:'FULL' as const}
 
   const nx=80,ny=80,dx=B/nx,dy=L/ny
   const cells:Array<[number,number]>=[]
@@ -222,6 +223,22 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
       representativeGamma=layerData.gamma
       warnings.push('Tabakalı zemin için 2B′ etki derinliğinde eşdeğer parametreler kullanıldı: c ağırlıklı, tanφ ağırlıklı ve γ′ kalınlık ağırlıklı ortalama. TBDY 16.8.3.3 tabakaların etkisinin dikkate alınmasını ister; tek bir tabakalı-zemin bağıntısı tarif etmediği için bu yaklaşım mühendislik modeli olarak raporlanır.')
     }
+  }
+
+  if(layerData?.complete && i.layers?.length){
+    const ordered=[...i.layers].filter(l=>l.bottomDepth>l.topDepth&&l.topDepth<i.Df).sort((a,b)=>a.topDepth-b.topDepth)
+    let sigmaBase=0
+    for(const l of ordered){
+      const top=Math.max(0,l.topDepth),bottom=Math.min(i.Df,l.bottomDepth)
+      if(bottom<=top)continue
+      const gSat=finite(l.gammaSat)?Math.max(l.gammaSat-gammaW,0.001):Math.max(l.gamma,0.001)
+      const gwt=i.groundwaterDepth
+      const above=!finite(gwt)||gwt!<0?bottom-top:Math.max(0,Math.min(bottom,gwt)-top)
+      const below=(bottom-top)-above
+      sigmaBase+=above*l.gamma+below*gSat
+    }
+    water.surcharge=sigmaBase
+    water.gammaBelow=layerData.gamma??water.gammaBelow
   }
 
   const rf=method==='TBDY-2018'?i.resistanceFactor??1.4:1
