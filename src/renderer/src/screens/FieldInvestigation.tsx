@@ -52,9 +52,9 @@ function syncLabs(labs: LaboratoryRecord[], borehole: BoreholeRecord): Laborator
   return [...labs.filter(l => l.boreholeId !== borehole.id), ...next]
 }
 
-const CE_OPTIONS=[0.45,0.50,0.55,0.60,0.65,0.70,0.75,0.80,0.85,0.90,0.95,1.00,1.05,1.10,1.15,1.17,1.20,1.25,1.30,1.35,1.40,1.45,1.50,1.55,1.60]
+const CE_OPTIONS=Array.from({length:116},(_,i)=>Number((0.45+i*0.01).toFixed(2)))
 const CB_OPTIONS=[1,1.05,1.15]
-const CS_OPTIONS=[1,1.10,1.15,1.20,1.25,1.30]
+const CS_OPTIONS=Array.from({length:21},(_,i)=>Number((1.10+i*0.01).toFixed(2))).concat([1])
 const CR_OPTIONS=[0.75,0.85,0.95,1]
 
 function SptCorrectionPanel({value,onChange}:{value:SptCorrectionParameters;onChange:(next:SptCorrectionParameters)=>void}){
