@@ -58,7 +58,8 @@ function rodFactor(length?:number){
 }
 
 export function fineContentCorrection(fines:number){
-  const fc=Math.max(0,Math.min(100,fines))
+  if(!Number.isFinite(fines)||fines<0||fines>100)throw new Error('FC 0-100 araliginda olmalidir.')
+  const fc=fines
   if(fc<=5)return{alpha:0,beta:1}
   if(fc<35)return{alpha:Math.exp(1.76-190/(fc*fc)),beta:.99+Math.pow(fc,1.5)/1000}
   return{alpha:5,beta:1.2}
