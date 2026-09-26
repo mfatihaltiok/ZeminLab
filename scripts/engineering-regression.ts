@@ -68,18 +68,32 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
-  const global=calculateSpt({nField:20,ce:.90,cb:1.05,cs:1.20,cr:.95,effectiveStress:100})
+  const global=calculateSpt({nField:20,ce:.90,cb:1.05,cs:1.20,rodLengthM:8,effectiveStress:100})
+  approx(global.cr,.95,1e-12)
   approx(global.n60,20*.90*1.05*1.20*.95,1e-12)
   approx(global.n1_60,global.n60*.978,1e-12)
   assert.equal(global.hasAssumptions,false)
 }
 
 {
-  const clay=calculateSpt({nField:20,ce:.90,cb:1.05,cs:1.20,cr:.95,effectiveStress:100,claySoil:true,claySoilSource:'Zemin sınıfı CIM'})
+  const clay=calculateSpt({nField:20,ce:.90,cb:1.05,cs:1.20,rodLengthM:8,effectiveStress:100,claySoil:true,claySoilSource:'Zemin sınıfı CIM'})
   approx(clay.cn,1,1e-12)
   approx(clay.n1_60,clay.n60,1e-12)
   assert.equal(clay.trace.find(x=>x.symbol==='CN')!.note,'Zemin sınıfı CIM')
   assert.equal(clay.warnings.length,0)
+}
+
+{
+  approx(calculateSpt({nField:10,rodLengthM:3,effectiveStress:100}).cr,.75,1e-12)
+  approx(calculateSpt({nField:10,rodLengthM:4,effectiveStress:100}).cr,.85,1e-12)
+  approx(calculateSpt({nField:10,rodLengthM:6,effectiveStress:100}).cr,.95,1e-12)
+  approx(calculateSpt({nField:10,rodLengthM:10,effectiveStress:100}).cr,.95,1e-12)
+  approx(calculateSpt({nField:10,rodLengthM:10.01,effectiveStress:100}).cr,1,1e-12)
+  const missingRod=calculateSpt({nField:10,effectiveStress:100})
+  assert.equal(missingRod.cr,1)
+  assert.equal(missingRod.hasAssumptions,true)
+  assert.ok(missingRod.warnings.some(w=>w.includes('toplam tij boyu')))
+  assert.throws(() => calculateSpt({nField:10,rodLengthM:2.99,effectiveStress:100}), /toplam tij boyu 3 m veya daha büyük/)
 }
 
 {
@@ -92,7 +106,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     lithology:[{id:'L1',from:0,to:6,code:'CIM',description:'Orta Plastisiteli Kil',colorClass:'clay' as const}],
     spt:[],
   }
-  const record={id:'SPT-CLAY',depth:3,testType:'SPT' as const,n1:5,n2:10,n3:10,soilCode:'CIM',source:'manual' as const,confirmed:false}
+  const record={id:'SPT-CLAY',depth:3,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'CIM',source:'manual' as const,confirmed:false}
   const derived=deriveSptValues(borehole,record,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:20})
   approx(derived.cn,1,1e-12)
   approx(derived.n1_60,derived.n60,1e-12)
@@ -108,7 +122,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     lithology:[{id:'L1',from:0,to:6,code:'Sa',description:'Kum',colorClass:'sand' as const}],
     spt:[],
   }
-  const record={id:'SPT-1',depth:3,testType:'SPT' as const,n1:5,n2:10,n3:10,source:'manual' as const,confirmed:false}
+  const record={id:'SPT-1',depth:3,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,source:'manual' as const,confirmed:false}
   const derived=deriveSptValues(borehole,record,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:20})
   assert.equal(derived.overburdenCorrectionApplied,true)
   assert.ok(derived.effectiveStress!=null&&derived.effectiveStress>0)
@@ -136,7 +150,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     ],
     spt:[]
   }
-  const sandyRecord={id:'SPT-SAND',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,soilCode:'Sa',source:'manual' as const,confirmed:false}
+  const sandyRecord={id:'SPT-SAND',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'Sa',source:'manual' as const,confirmed:false}
   const sandyDerived=deriveSptValues(sandyBorehole,sandyRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
   approx(sandyDerived.verticalStress!,96,1e-12)
   approx(sandyDerived.porePressure!,29.43,1e-12)
@@ -159,7 +173,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     ],
     spt:[]
   }
-  const shallowRecord={id:'SPT-SHALLOW',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,soilCode:'Sa',source:'manual' as const,confirmed:false}
+  const shallowRecord={id:'SPT-SHALLOW',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'Sa',source:'manual' as const,confirmed:false}
   const shallowDerived=deriveSptValues(shallowSandyBorehole,shallowRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:30})
   approx(shallowDerived.effectiveStress!,90,1e-12)
   approx(shallowDerived.cn,9.78/Math.sqrt(90),1e-12)
@@ -177,7 +191,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     ],
     spt:[]
   }
-  const clayRecord={id:'SPT-CLAY-2',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,soilCode:'CIM',source:'manual' as const,confirmed:false}
+  const clayRecord={id:'SPT-CLAY-2',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'CIM',source:'manual' as const,confirmed:false}
   const clayDerived=deriveSptValues(clayBorehole,clayRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
   approx(clayDerived.effectiveStress!,66.57,1e-12)
   approx(clayDerived.cn,1,1e-12)
@@ -194,7 +208,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     lithology:[{id:'L1',from:0,to:8,code:'clSa',description:'Killi Kum',colorClass:'sand' as const,unitWeight:18,saturatedUnitWeight:19}],
     spt:[]
   }
-  const claySandRecord={id:'SPT-CLAY-SAND',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,soilCode:'clSa',source:'manual' as const,confirmed:false}
+  const claySandRecord={id:'SPT-CLAY-SAND',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'clSa',source:'manual' as const,confirmed:false}
   const claySandDerived=deriveSptValues(claySandBorehole,claySandRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
   assert.notEqual(claySandDerived.cn,1)
   approx(claySandDerived.cn,9.78/Math.sqrt(claySandDerived.effectiveStress!),1e-12)
