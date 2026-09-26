@@ -141,7 +141,8 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     }
     const core=tbdy2018Liquefaction({
       depth:record.depth,totalStress:stress.sigmaV,effectiveStress:stress.sigmaVPrime,rawSPT:record.nField,
-      CE:npt.ce,CB:npt.cb,CR:npt.cr,CS:npt.cs,finesContent:fines,Mw:input.Mw,SDS:input.Sds
+      CE:npt.ce,CB:npt.cb,CR:npt.cr,CS:npt.cs,finesContent:fines,Mw:input.Mw,SDS:input.Sds,
+      normalizedSpt:{CN:npt.cn,N160:npt.n1_60,N160f:npt.n1_60f!}
     })
     if(!Number.isFinite(core.FS)){
       trace.push({symbol:'CRR',title:'CRR geçerlilik kontrolü',formula:'0<(N1)60f<34',value:n1_60f,note:'Ek 16B CRR bağıntısı geçerli aralıkta değil.'})
