@@ -15,7 +15,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
   const B=Number(f.footingWidth),L=Number(f.footingLength),Df=Number(f.footingDepth)
   const gamma1=unitWeightToBase(Number(soil.unitWeight),p.unitSystem),gamma2=unitWeightToBase(Number(soil.saturatedUnitWeight),p.unitSystem)
   const c=stressToBase(Number(soil.cohesion),p.unitSystem),phi=Number(soil.frictionAngle)
-  const N=forceToBase(Number(f.structuralWeight),p.unitSystem),cu=soil.undrainedCohesion==null?undefined:stressToBase(Number(soil.undrainedCohesion),p.unitSystem)
+  const N=forceToBase(Number(f.verticalLoad),p.unitSystem),cu=soil.undrainedCohesion==null?undefined:stressToBase(Number(soil.undrainedCohesion),p.unitSystem)
   const Vx=forceToBase(Number(f.vtX),p.unitSystem),Vy=forceToBase(Number(f.vtY),p.unitSystem),H=Math.hypot(Vx,Vy)
   const Mx=momentToBase(Number(f.momentX),p.unitSystem),My=momentToBase(Number(f.momentY),p.unitSystem)
   const valid=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<50&&Number.isFinite(N)&&N>=0&&Number.isFinite(FS)&&FS>0
