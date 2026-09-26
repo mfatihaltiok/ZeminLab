@@ -12,7 +12,6 @@ export interface FinalFoundationResult{
   project:{dts?:string;bks?:number;sds?:number;soilGroup?:string;vs30?:number;zfSiteSpecificRequired:boolean}
   actions:{N:number;Vx:number;Vy:number;Mx:number;My:number;source:string}
   bearing?:ReturnType<typeof calculateSurfaceFoundation>;sliding?:ReturnType<typeof foundationChecks>;settlement?:IdealizedSettlementResult;liquefaction?:LiquefactionProfileResult
-  combinations:FoundationLoadCombination[]
   failedChecks:string[];missingData:string[];warnings:string[]
   trace:Array<{check:string;status:FinalStatus;source:string;details:string}>
 }
@@ -21,7 +20,6 @@ const finiteOr=(x:unknown,d:number)=>finite(x)?x:d
 
 export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFoundationResult{
   const p=normalizeProjectInfo(input.project),missing:string[]=[],failed:string[]=[],warnings:string[]=[],trace:FinalFoundationResult['trace']=[]
-  const combinations: never[]=[]
   const soilGroup=p.geophysical.soilGroup??p.soilParameters.classification.code
   if(p.geophysical.vs30!=null){const inferred=classifyVs30(p.geophysical.vs30);if(inferred&&soilGroup&&inferred!==soilGroup&&soilGroup!=='ZF')warnings.push('VS30 ile seçilen zemin grubu farklı; kaynak/tercih raporda açıkça gösterilmelidir.')}
   const fp=p.foundationParameters,sp=p.soilParameters
@@ -36,7 +34,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       trace.push({check:'Taşıma gücü',status:bearing.adequate&&bearing.finalDesignEligible?'UYGUN':'UYGUN DEĞİL',source:'TBDY 2018 16.8.2–16.8.3',details:'q0='+bearing.qo.toFixed(3)+' kPa; qt='+bearing.qt.toFixed(3)+' kPa'})
       if(!bearing.adequate||!bearing.finalDesignEligible)failed.push('Taşıma gücü')
       warnings.push(...bearing.warnings)
-      const si:FoundationCheckInput={B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,deltaTan:fp.baseFrictionTanDelta,cu:sp.undrainedCohesion,groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,usePassiveResistance:fp.usePassiveResistance,seismic:input.seismicBelowGroundwater??true,interfaceType:'cast-in-place-soil'}
+      const si:FoundationCheckInput={B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,deltaTan:fp.baseFrictionTanDelta,cu:sp.undrainedCohesion,groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,usePassiveResistance:fp.usePassiveResistance,seismic:input.seismicBelowGroundwater??false,interfaceType:'cast-in-place-soil'}
       sliding=foundationChecks(si)
       const slideStatus=sliding.evaluable?(sliding.slidingSafeResultant?'UYGUN':'UYGUN DEĞİL'):'VERİ EKSİK'
       trace.push({check:'Kayma',status:slideStatus,source:'TBDY 2018 16.8.4',details:'Vh='+sliding.horizontalResultant.toFixed(3)+'; R='+sliding.slidingCapacityResultant.toFixed(3)})
@@ -63,5 +61,5 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   }
   if(!soilGroup)warnings.push('Zemin grubu girilmemiş; taşıma gücü ve oturma hesabı için kullanılan zemin parametreleri ayrıca doğrulanmalıdır.')
   const m=[...new Set(missing)],f=[...new Set(failed)],status:FinalStatus=f.length?'UYGUN DEĞİL':m.length?'VERİ EKSİK':'UYGUN'
-  return{status,evaluable:status!=='VERİ EKSİK',project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired:false},actions,combinations,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,liquefaction}
+  return{status,evaluable:status!=='VERİ EKSİK',project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired:false},actions,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,liquefaction}
 }
