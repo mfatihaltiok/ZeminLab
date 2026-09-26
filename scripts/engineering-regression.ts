@@ -5,6 +5,7 @@ import { liquefactionProfile } from '../src/core/engineering/liquefaction/liquef
 import { foundationChecks } from '../src/core/engineering/calculation-engine.ts'
 import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-settlement-engine.ts'
 import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
+import { buildTBDYSeismicCombinations, evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(Math.abs(actual-expected)<=tolerance,`expected ${expected}, got ${actual}`)
@@ -160,5 +161,47 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.equal(result.ready,true)
 }
 
+
+{
+  const combinations=buildTBDYSeismicCombinations({G:1000,Q:200,S:100,EdH:300,EdZ:50,direction:'+'})
+  approx(combinations[0].N,1220)
+  approx(combinations[0].H,300)
+  approx(combinations[1].N,950)
+  assert.equal(combinations[0].source,'TBDY 2018 4.4.4.1 Denk. 4.11')
+}
+
+{
+  const integrated=evaluateFoundationSystem({
+    project:{
+      id:'integrated',title:'',projectNo:'',date:'',location:'',province:'',district:'',address:'',parcelInfo:'',pafta:'',ada:'',parsel:'',zoningStatus:'',
+      engineer:'',clientName:'',firmName:'',buildingType:'',basementCount:0,normalFloorCount:1,unitSystem:'kN-m',
+      geophysical:{soilGroup:'ZD',soilGroupSource:'USER',siteSpecificResponseAnalysisCompleted:false},
+      seismic:{ss:.5,fs:1,sds:.5,bks:2},
+      soilParameters:{unitWeight:18,saturatedUnitWeight:19,cohesion:10,frictionAngle:30,groundwaterDepth:10,surfaceSlope:0,foundationBaseSlope:0,finesContent:10,classification:{system:'TBDY 2018',code:'ZD'}},
+      foundationParameters:{foundationType:'tekil',footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:1000,horizontalLoad:0,momentX:0,momentY:0,resistanceFactorRv:1.4,vtX:100,vtY:0,structuralWeight:1000,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:0,usePassiveResistance:false},
+      jetGrout:{layout:'square'},visualDocuments:{}
+    }
+  })
+  assert.equal(integrated.status,'UYGUN')
+  assert.equal(integrated.evaluable,true)
+  assert.equal(integrated.failedChecks.length,0)
+  assert.ok(integrated.trace.some(x=>x.check==='Taşıma gücü'))
+  assert.ok(integrated.trace.some(x=>x.check==='Kayma'))
+}
+
+{
+  const missing=evaluateFoundationSystem({
+    project:{
+      foundationParameters:{
+        foundationType:'tekil',footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:1000,horizontalLoad:0,momentX:0,momentY:0,
+        resistanceFactorRv:1.4,vtX:100,vtY:0,structuralWeight:1000,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:0,usePassiveResistance:false
+      }
+    }
+  })
+  assert.equal(missing.status,'VERİ EKSİK')
+  assert.equal(missing.evaluable,false)
+  assert.ok(missing.missingData.includes('SDS'))
+  assert.ok(missing.missingData.includes('DTS'))
+}
 
 console.log('Engineering regression tests: PASS')
