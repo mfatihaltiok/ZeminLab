@@ -1,5 +1,6 @@
 import { calculateSpt, fineContentCorrection, type SptEngineInput, type SptTraceStep } from '../spt/spt-engine'
 import { tbdy2018Liquefaction } from './tbdy2018-liquefaction'
+import { effectiveStressAtDepth as centralEffectiveStressAtDepth } from '../stress-profile'
 import type { EarthquakeDesignClass } from '../../models/project'
 
 export type LiquefactionSoilGroup='ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF'
@@ -31,16 +32,13 @@ export interface LiquefactionProfileResult{
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 const clamp=(x:number,a:number,b:number)=>Math.min(b,Math.max(a,x))
 function stressAtDepth(depth:number,layers:LiquefactionSoilLayer[],gwt:number,gammaW:number){
-  let sigmaV=0,covered=0
-  for(const layer of [...layers].filter(x=>x.bottom>x.top).sort((a,b)=>a.top-b.top)){
-    const z0=Math.max(0,layer.top),z1=Math.min(depth,layer.bottom)
-    if(z1<=z0)continue
-    covered+=z1-z0
-    const dry=Math.max(0,Math.min(z1,gwt)-z0),sat=Math.max(0,z1-Math.max(z0,gwt))
-    sigmaV+=dry*Math.max(0,layer.gamma)+sat*Math.max(0,layer.gammaSat)
-  }
-  const u=Math.max(0,depth-gwt)*gammaW
-  return{sigmaV,porePressure:u,sigmaVPrime:Math.max(.01,sigmaV-u),covered}
+  const r=centralEffectiveStressAtDepth(
+    depth,
+    layers.map(layer=>({top:layer.top,bottom:layer.bottom,gamma:layer.gamma,gammaSat:layer.gammaSat})),
+    gwt,
+    gammaW
+  )
+  return{sigmaV:r.sigmaV,porePressure:r.porePressure,sigmaVPrime:Math.max(.01,r.sigmaVPrime),covered:r.covered}
 }
 function rdAtDepth(z:number){
   const d=Math.max(z,0)
@@ -79,7 +77,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM,effectiveStress:stress.sigmaVPrime,fineContent,
       applyOverburden:true,applyDilatancy:false
     })
-    const fines=fineContent; const fc=fines==null?{alpha:NaN,beta:NaN}:fineContentCorrection(fines); const n1_60f=fines==null?NaN:fc.alpha+fc.beta*npt.n1_60
+    const fines=fineContent; const fc=fines!=null&&fines>=0&&fines<=100?fineContentCorrection(fines):{alpha:NaN,beta:NaN}; const n1_60f=fines==null||!Number.isFinite(fc.alpha)||!Number.isFinite(fc.beta)?NaN:fc.alpha+fc.beta*npt.n1_60
     const saturated=record.depth>=input.gwt-1e-9,within20=record.depth<=20+1e-9
     const classificationDataComplete=soil!=null&&soil.trim().length>0&&fineContent!=null&&pi!=null
     const potentiallyLiquefiable=classificationDataComplete&&saturated&&within20&&soilIsPotential(soil!,pi)
@@ -87,7 +85,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const mandatoryAnalysis=potentiallyLiquefiable&&mandatoryByProject&&!exemption
     const researchDataComplete=fineContent!=null&&fineContent>=0&&fineContent<=100&&pi!=null&&pi>=0&&waterContent!=null&&waterContent>=0
     const triggerRequired=mandatoryAnalysis&&researchDataComplete&&npt.n1_60<30
-    const postLiquefactionRequired=triggerRequired
+    const postLiquefactionRequired=false
     const trace:SptTraceStep[]=[...npt.trace,
       {symbol:'α',title:'İnce dane katsayısı',formula:'α=f(IDI)',value:fc.alpha,note:'IDI='+fines.toFixed(2)+' %'},
       {symbol:'β',title:'İnce dane katsayısı',formula:'β=0.99+IDI^1.5/1000',value:fc.beta},
