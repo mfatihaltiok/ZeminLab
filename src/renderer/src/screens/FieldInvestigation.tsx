@@ -122,10 +122,24 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
 }
 
 function SptAnalysis({ borehole, labs, unitSystem }: { borehole: BoreholeRecord; labs: LaboratoryRecord[]; unitSystem: 'ton-m'|'kN-m' }) {
-  const rows = borehole.spt.filter(r=>r.testType==='SPT').map(record=>({record,derived:deriveSptValues(borehole,record,labs,unitSystem)}))
-  return <div className="engineering-grid-wrap"><div className="grid-toolbar"><b>SPT HESAP İZİ</b><span>N30 · N60 · σv · σ′v · CN · (N1)60</span><span className="spt-correction-note">CN = min(1.70, 9.78 / √σ′v) · σ′v profili eksiksiz değilse düzeltme uygulanmaz</span></div><table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>N60</th><th>σv</th><th>σ′v</th><th>CN</th><th>(N1)60</th><th>CN kaynağı</th><th>Dilatasyon</th></tr></thead><tbody>{rows.map(({record,derived})=><tr key={record.id}><td>{fmt(record.depth)}–{fmt(experimentDepthTo(record))}</td><td>{fmt(derived.nField,0)}</td><td>{fmt(derived.n60)}</td><td>{fmt(derived.verticalStress)}</td><td>{fmt(derived.effectiveStress)}</td><td>{derived.overburdenCorrectionApplied?fmt(derived.overburdenCorrection):'—'}</td><td>{derived.overburdenCorrectionApplied?fmt(derived.n1_60):'—'}</td><td>{derived.overburdenCorrectionApplied?(derived.stressSource??'σ′v profili'):'Uygulanmadı'}</td><td>{derived.dilatancyApplied?`Uygulandı → ${fmt(derived.n60DilatancyCorrected)}`:'—'}</td></tr>)}</tbody></table></div>
+  const rows=borehole.spt.filter(r=>r.testType==='SPT').map(record=>{
+    try{return {record,derived:deriveSptValues(borehole,record,labs,unitSystem),error:undefined as string|undefined}}
+    catch(error){return {record,derived:undefined,error:error instanceof Error?error.message:String(error)}}
+  })
+  return <div className="engineering-grid-wrap">
+    <div className="grid-toolbar"><b>SPT HESAP ZİNCİRİ</b><span>N30 → N60 → CN → (N1)60 → (N1)60f</span><span className="spt-correction-note">TBDY Ek 16B.2</span></div>
+    <table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>CE</th><th>CB</th><th>CS</th><th>CR</th><th>N60</th><th>σ′v0</th><th>CN</th><th>(N1)60</th><th>(N1)60f</th><th>Durum</th></tr></thead>
+      <tbody>{rows.map(({record,derived,error})=><tr key={record.id}>
+        <td>{fmt(record.depth)}–{fmt(experimentDepthTo(record))}</td>
+        <td>{fmt(derived?.nField,0)}</td><td>{fmt(derived?.ce)}</td><td>{fmt(derived?.cb)}</td><td>{fmt(derived?.cs)}</td><td>{fmt(derived?.cr)}</td>
+        <td className="computed-cell">{fmt(derived?.n60)}</td><td>{fmt(derived?.effectiveStress)}</td>
+        <td>{derived?.overburdenCorrectionApplied?fmt(derived.cn):'—'}</td><td className="computed-cell">{derived?.overburdenCorrectionApplied?fmt(derived.n1_60):fmt(derived?.n60)}</td>
+        <td>{fmt(derived?.n1_60f)}</td><td>{error??(derived?.warnings.length?'UYARI':'HESAPLANDI')}</td>
+      </tr>)}</tbody>
+    </table>
+    {rows.map(({record,derived,error})=>error?<div className="spt-row-error" key={record.id}><b>{fmt(record.depth)} m:</b> {error}</div>:derived?.warnings.length?<div className="spt-row-warning" key={record.id}><b>{fmt(record.depth)} m:</b> {derived.warnings.join(' ')}</div>:null)}
+  </div>
 }
-
 function LaboratoryGrid({ borehole, labs, onChange }: { borehole: BoreholeRecord; labs: LaboratoryRecord[]; onChange: (rows: LaboratoryRecord[]) => void }) {
   const rows = labs.filter(l=>l.boreholeId===borehole.id)
   const update = (row: LaboratoryRecord, key: keyof LaboratoryRecord, raw: string) => {
