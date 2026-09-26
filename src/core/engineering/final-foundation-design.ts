@@ -49,9 +49,12 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       if(!bearing.adequate||!bearing.finalDesignEligible)failed.push('Taşıma gücü')
       warnings.push(...bearing.warnings)
       const resolvedInterface=input.foundationInterface ?? fp.foundationInterface
-      const si:FoundationCheckInput={B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,deltaTan:fp.baseFrictionTanDelta,cu:sp.undrainedCohesion,groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,usePassiveResistance:fp.usePassiveResistance,seismic:input.seismicBelowGroundwater ?? fp.seismicBelowGroundwater ?? false,interfaceType:resolvedInterface}
+      const resolvedSeismicBelowGroundwater=input.seismicBelowGroundwater ?? fp.seismicBelowGroundwater
+      const submerged=sp.groundwaterDepth!=null&&sp.groundwaterDepth<=fp.footingDepth
+      const si:FoundationCheckInput={B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,deltaTan:fp.baseFrictionTanDelta,cu:sp.undrainedCohesion,groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,usePassiveResistance:fp.usePassiveResistance,seismic:resolvedSeismicBelowGroundwater??false,interfaceType:resolvedInterface}
       if(!resolvedInterface) missing.push('Temel-zemin ara yüzü')
-      else sliding=foundationChecks(si)
+      if(submerged&&resolvedSeismicBelowGroundwater===undefined) missing.push('Temel tabanı YASS altında/aynı kotta ise deprem kayma kontrolü seçimi')
+      if(resolvedInterface&&(!submerged||resolvedSeismicBelowGroundwater!==undefined)) sliding=foundationChecks(si)
       const slideStatus=!sliding?'VERİ EKSİK':sliding.evaluable?(sliding.slidingSafeResultant?'UYGUN':'UYGUN DEĞİL'):'VERİ EKSİK'
       trace.push({check:'Kayma',status:slideStatus,source:'TBDY 2018 16.8.4',details:sliding?('Vh='+sliding.horizontalResultant.toFixed(3)+'; R='+sliding.slidingCapacityResultant.toFixed(3)):'Ara yüzü seçilmedi.'})
       if(sliding){ if(!sliding.evaluable)missing.push('Deprem + YASS altında kayma için cu');else if(!sliding.slidingSafeResultant)failed.push('Kayma'); warnings.push(...sliding.warnings) }
