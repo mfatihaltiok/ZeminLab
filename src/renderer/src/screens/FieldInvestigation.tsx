@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import '../assets/field-workspace.css'
 import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../../../core/models/field-data'
 import { deriveSptValues } from '../../../core/engineering/field-calculations'
@@ -89,7 +89,7 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
         <thead><tr><th>Derinlik</th><th>Deney Tipi</th><th>n1</th><th>n2</th><th>n3</th><th>N30</th><th>Zemin Sınıfı</th><th>Zemin Açıklaması</th><th>Kaynak</th><th>Onay</th><th>Lab</th><th>Düzeltme</th><th/></tr></thead>
         <tbody>{borehole.spt.map(row => {
           const n30 = row.testType === 'SPT' && row.n2 !== undefined && row.n3 !== undefined ? row.n2 + row.n3 : undefined
-          return <><tr key={row.id}>
+          return <Fragment key={row.id}><tr>
             <td>{row.testType === 'UD' ? <div className="depth-range"><input className="depth-input" type="number" value={row.depth} min="0" step="0.01" onChange={e=>updateUdDepth(row.id,e.target.value)}/><span>– {fmt(experimentDepthTo(row))}</span></div> : <span className="depth-range locked-cell"><span>{fmt(row.depth)}</span><span>– {fmt(experimentDepthTo(row))}</span></span>}</td>
             <td><select className={`test-type ${row.testType === 'UD' ? 'ud' : 'spt'}`} value={row.testType} onChange={e => updateRow(row.id,{testType:e.target.value as SptRecord['testType'],n1:e.target.value==='UD'?undefined:row.n1,n2:e.target.value==='UD'?undefined:row.n2,n3:e.target.value==='UD'?undefined:row.n3, laboratoryLinked:e.target.value==='SPT'?row.laboratoryLinked:true})}><option value="SPT">SPT</option><option value="UD">UD</option></select></td>
             <td><input className="n-input" type="number" value={row.n1 ?? ''} disabled={row.testType==='UD'} onChange={e=>updateRow(row.id,{n1:e.target.value===''?undefined:Number(e.target.value)})}/></td>
@@ -107,15 +107,15 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
             <div className="spt-correction-panel">
               <div className="spt-correction-title"><b>TBDY 2018 EK 16B.2 · SPT DÜZELTMELERİ</b><span>N₁,₆₀ = N · Cₙ · Cᵣ · Cₛ · Cᵦ · Cₑ</span></div>
               <label>ER (%)<input type="number" min="1" max="160" step="0.01" value={row.correction?.energyRatio??''} placeholder="Ölçülmüşse gir" onChange={e=>updateCorrection(row.id,{energyRatio:e.target.value===''?undefined:Number(e.target.value)})}/></label>
-              <label>Tokmak<select value={row.correction?.hammerType??''} onChange={e=>updateCorrection(row.id,{hammerType:e.target.value?e.target.value as any:undefined})}><option value="">Belirtilmedi</option><option value="safety">Güvenli</option><option value="donut">Halkalı</option><option value="automatic">Otomatik</option><option value="measured">Ölçülmüş ER</option></select></label>
-              <label>Numune alıcı<select value={row.correction?.sampler??''} onChange={e=>updateCorrection(row.id,{sampler:e.target.value?e.target.value as any:undefined})}><option value="">Standart</option><option value="without-liner">İç tüpsüz</option><option value="liner">İç tüplü</option></select></label>
+              <label>Tokmak<select value={row.correction?.hammerType??''} onChange={e=>updateCorrection(row.id,{hammerType:e.target.value?e.target.value as 'safety'|'donut'|'automatic'|'measured':undefined})}><option value="">Belirtilmedi</option><option value="safety">Güvenli</option><option value="donut">Halkalı</option><option value="automatic">Otomatik</option><option value="measured">Ölçülmüş ER</option></select></label>
+              <label>Numune alıcı<select value={row.correction?.sampler??''} onChange={e=>updateCorrection(row.id,{sampler:e.target.value?e.target.value as 'standard'|'without-liner'|'liner':undefined})}><option value="">Standart</option><option value="without-liner">İç tüpsüz</option><option value="liner">İç tüplü</option></select></label>
               <label>CS<input type="number" min="1.10" max="1.30" step="0.01" value={row.correction?.samplerCorrection??''} disabled={row.correction?.sampler!=='without-liner'} placeholder="1.10–1.30" onChange={e=>updateCorrection(row.id,{samplerCorrection:e.target.value===''?undefined:Number(e.target.value)})}/></label>
               <label>Tij boyu (m)<input type="number" min="3" step="0.10" value={row.correction?.rodLengthM??''} placeholder="≥ 3" onChange={e=>updateCorrection(row.id,{rodLengthM:e.target.value===''?undefined:Number(e.target.value)})}/></label>
               <label className="spt-check"><input type="checkbox" checked={row.correction?.applyOverburdenCorrection!==false} onChange={e=>updateCorrection(row.id,{applyOverburdenCorrection:e.target.checked})}/> CN</label>
               <label className="spt-check"><input type="checkbox" checked={row.correction?.applyDilatancyCorrection===true} onChange={e=>updateCorrection(row.id,{applyDilatancyCorrection:e.target.checked})}/> Dilatansi</label>
             </div>
           </td></tr>
-          </>
+          </Fragment>
         })}</tbody>
       </table>
     </div>
