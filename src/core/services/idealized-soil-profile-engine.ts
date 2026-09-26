@@ -103,7 +103,7 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
   const correctedNValues = spt.map(x => {
     const borehole = boreholes.find(b => b.id === x.boreholeId)
     if (!borehole) return undefined
-    const derived = deriveSptValues(borehole, x, laboratories)
+    const derived = deriveSptValues(borehole, x, laboratories, unitSystem)
     return derived.overburdenCorrectionApplied && Number.isFinite(derived.n1_60) && derived.n1_60 > 0 && Number.isFinite(derived.n60) && derived.n60 > 0
       ? { n60: derived.n60, n1_60: derived.n1_60 }
       : undefined
