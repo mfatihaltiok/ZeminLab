@@ -35,7 +35,7 @@ function median(values:number[]):number|undefined{
   const a=[...values].sort((x,y)=>x-y),m=Math.floor(a.length/2)
   return a.length%2?a[m]:(a[m-1]+a[m])/2
 }
-function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:LaboratoryRecord[]){
+function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:LaboratoryRecord[],unitSystem:UnitSystem){
   const z=Math.max(0,depth)
   if(!borehole.lithology.length)return{verticalStress:undefined,effectiveStress:undefined,source:'Litoloji profili eksik; σ′v0 hesaplanmadı.'}
   const layers=borehole.lithology
@@ -60,7 +60,7 @@ function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:Laborat
 export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[],unitSystem:UnitSystem='kN-m'):SptDerivedValues{
   const nField=fieldN(record)
   if(nField===undefined)return{nField,ce:1,cb:1,cs:1,cr:1,cn:1,n60:0,n1_60:0,dilatancyApplied:false,trace:[],overburdenCorrection:1,overburdenCorrectionApplied:false,warnings:[],hasAssumptions:false}
-  const stress=stressAtDepth(borehole,record.depth,laboratories)
+  const stress=stressAtDepth(borehole,record.depth,laboratories,unitSystem)
   const cfg=record.correction??{}
   const lab=linkedLabForSpt(laboratories,borehole.id,record.id,record.depth)
   const layer=layerAtDepth(borehole,record.depth)
