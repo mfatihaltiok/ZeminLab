@@ -78,12 +78,12 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
       <label>İlk deney derinliği (m)<input type="number" value={borehole.firstSptDepth} min="0" step="0.1" onChange={e => updateMeta('firstSptDepth', e.target.value)} /></label>
       <label>Kuyu toplam derinliği (m)<input type="number" value={borehole.totalDepth || ''} min="0" step="0.1" placeholder="Boş" onChange={e => updateMeta('totalDepth', e.target.value)} /></label>
       <label>YASS (m)<input type="number" value={borehole.groundwaterDepth ?? ''} min="0" step="0.01" placeholder="Ölçülmediyse boş" onChange={e => updateMeta('groundwaterDepth', e.target.value)} /></label>
-      <span className="field-rule-note">SPT: 45 cm · UD: 50 cm · yeni SPT: son SPT başlangıç derinliği + 1.50 m</span>
+      <span className="field-rule-note">SPT: 45 cm · UD: 50 cm · γmax: yalnızca çevrimsel/deformasyon analizi çıktısı varsa girilir</span>
     </div>
     <div className="engineering-grid-wrap spt-grid-wrap">
       <div className="grid-toolbar"><b>SPT / ARAZİ DENEYLERİ</b><span>{borehole.spt.length} deney · son başlangıç {fmt(borehole.spt.at(-1)?.depth)} m</span><button onClick={add}>+ Deney</button></div>
-      <table className="engineering-grid spt-grid"><colgroup><col className="col-depth"/><col className="col-type"/><col className="col-n"/><col className="col-n"/><col className="col-n"/><col className="col-n30"/><col className="col-soil"/><col className="col-description"/><col className="col-source"/><col className="col-confirm"/><col className="col-lab"/><col className="col-delete"/></colgroup>
-        <thead><tr><th>Derinlik</th><th>Deney Tipi</th><th>n1</th><th>n2</th><th>n3</th><th>N30</th><th>Zemin Sınıfı</th><th>Zemin Açıklaması</th><th>Kaynak</th><th>Onay</th><th>Lab</th><th/></tr></thead>
+      <table className="engineering-grid spt-grid"><colgroup><col className="col-depth"/><col className="col-type"/><col className="col-n"/><col className="col-n"/><col className="col-n"/><col className="col-n30"/><col className="col-soil"/><col className="col-description"/><col className="col-source"/><col className="col-confirm"/><col className="col-n"/><col className="col-lab"/><col className="col-delete"/></colgroup>
+        <thead><tr><th>Derinlik</th><th>Deney Tipi</th><th>n1</th><th>n2</th><th>n3</th><th>N30</th><th>Zemin Sınıfı</th><th>Zemin Açıklaması</th><th>Kaynak</th><th>Onay</th><th>γmax (%)</th><th>Lab</th><th/></tr></thead>
         <tbody>{borehole.spt.map(row => {
           const n30 = row.testType === 'SPT' && row.n2 !== undefined && row.n3 !== undefined ? row.n2 + row.n3 : undefined
           return <tr key={row.id}>
@@ -96,6 +96,7 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
             <td><select value={row.soilCode ?? ''} onChange={e=>{const o=soilMap.get(e.target.value);updateRow(row.id,{soilCode:e.target.value||undefined,soilDescription:o?.description})}}><option value="">Seçiniz</option>{soilOptions.map(o=><option key={o.code} value={o.code}>{o.code}</option>)}</select></td>
             <td className="description-cell">{row.soilDescription || '—'}</td><td><span className="source-badge">{sourceLabel(row.source,row.confirmed)}</span></td>
             <td><button className="confirm-button" onClick={()=>updateRow(row.id,{confirmed:!row.confirmed})}>{row.confirmed?'✓':'○'}</button></td>
+            <td><input className="n-input" type="number" min="0" max="8" step="0.01" value={row.correction?.maxCyclicShearStrainPercent ?? ''} placeholder="—" title="Ishihara–Yoshimine için maksimum çevrimsel kayma birim şekil değiştirmesi" onChange={e=>{const value=e.target.value===''?undefined:Number(e.target.value);updateRow(row.id,{correction:{...(row.correction??{}),maxCyclicShearStrainPercent:value}})}}/></td>
             <td><button className={`lab-link-button ${row.laboratoryLinked !== false ? 'linked' : ''}`} title={row.laboratoryLinked !== false ? 'Laboratuvar numunesini ayır' : 'Laboratuvar numunesini bağla'} onClick={()=>updateRow(row.id,{laboratoryLinked:row.laboratoryLinked === false})}>{row.laboratoryLinked !== false ? 'LAB' : '—'}</button></td>
             <td><button className="icon-button" onClick={()=>onChange({...borehole,spt:borehole.spt.filter(r=>r.id!==row.id)})}>×</button></td>
           </tr>
