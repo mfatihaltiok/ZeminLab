@@ -42,6 +42,12 @@ function directCoefficient(name:string,value:number|undefined,min:number,max:num
   if(allowed&&!allowed.some(x=>Math.abs(x-value)<1e-9))throw new Error(`${name} için geçerli değer seçilmelidir.`)
   return{value,source:'kullanıcı seçimi',assumption:false}
 }
+function validateEnergyRatioForHammer(energyRatio:number,hammerType?:SptHammerType){
+  if(!Number.isFinite(energyRatio)||energyRatio<=0||energyRatio>100)throw new Error('SPT enerji oranı %0–100 arasında olmalıdır.')
+  if(!hammerType||hammerType==='measured')return
+  const range=hammerType==='safety'?[36,70.2]:hammerType==='donut'?[27,60]:[54,96]
+  if(energyRatio<range[0]||energyRatio>range[1])throw new Error('TBDY Tablo 16B.1’e göre '+hammerType+' tokmak için ER %'+range[0]+'–%'+range[1]+' aralığında olmalıdır.')
+}
 
 function boreholeFactor(diameter?:number){
   if(diameter===undefined)return 1
@@ -86,7 +92,8 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   if(!Number.isFinite(input.nField)||input.nField<0)throw new Error('SPT N değeri geçerli olmalıdır.')
   const warnings:string[]=[]
   if(input.rodLengthM!==undefined&&input.sptDepthM!==undefined&&input.rodLengthM<input.sptDepthM)throw new Error('Toplam tij boyu SPT deney derinliğinden kısa olamaz.')
-  const ceResolved=input.ce!==undefined?directCoefficient('CE',input.ce,.45,1.60)!:(()=>{const er=resolveEnergyRatio(input);if(er.value<=0||er.value>100)throw new Error('SPT enerji oranı %0–100 arasında olmalıdır.');return{value:er.value/60,source:er.source,assumption:er.assumption}})()
+  if(input.energyRatio!==undefined)validateEnergyRatioForHammer(input.energyRatio,input.hammerType)
+  const ceResolved=input.ce!==undefined?(validateEnergyRatioForHammer(input.ce*60,input.hammerType),directCoefficient('CE',input.ce,.45,1.60)!):( ()=>{const er=resolveEnergyRatio(input);validateEnergyRatioForHammer(er.value,input.hammerType);return{value:er.value/60,source:er.source,assumption:er.assumption}})()
   const cbResolved=input.cb!==undefined?directCoefficient('CB',input.cb,1,1.15,[1,1.05,1.15])!: {value:boreholeFactor(input.boreholeDiameterMm),source:'sondaj çapından',assumption:false}
   const csResolved=input.cs!==undefined?directCoefficient('CS',input.cs,1,1.30)!: {value:samplerFactor(input),source:'numune alıcıdan',assumption:false}
   const crResolved=input.rodLengthM!==undefined
