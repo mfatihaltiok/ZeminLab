@@ -55,7 +55,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   }
   if(input.settlement&&bearing){
     try{
-      settlement=calculateIdealizedSettlement({...input.settlement,profile:input.settlement.profile,B:fp.footingWidth,L:fp.footingLength,Df:fp.footingDepth,qGross:bearing.qo,groundwaterDepth:sp.groundwaterDepth})
+      settlement=calculateIdealizedSettlement({...input.settlement,profile:input.settlement.profile,B:fp.footingWidth,L:fp.footingLength,Df:fp.footingDepth,qGross:bearing.qAvg,groundwaterDepth:sp.groundwaterDepth})
       trace.push({check:'Oturma',status:settlement.ready?'UYGUN':'VERİ EKSİK',source:'TBDY 2018 16.8.3.4 + seçilen yöntem',details:'Toplam oturma='+settlement.totalSettlement.toFixed(3)+' mm'})
       if(!settlement.ready)missing.push('Oturma için gerekli profil parametreleri')
       warnings.push(...settlement.warnings)
