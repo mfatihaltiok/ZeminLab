@@ -43,7 +43,7 @@ function directCoefficient(name:string,value:number|undefined,min:number,max:num
   return{value,source:'kullanıcı seçimi',assumption:false}
 }
 function validateEnergyRatioForHammer(energyRatio:number,hammerType?:SptHammerType){
-  if(!Number.isFinite(energyRatio)||energyRatio<=0||energyRatio>100)throw new Error('SPT enerji oranı %0–100 arasında olmalıdır.')
+  if(!Number.isFinite(energyRatio)||energyRatio<27||energyRatio>96)throw new Error('TBDY Tablo 16B.1 kapsamındaki ER %27–%96 aralığında olmalıdır.')
   if(!hammerType||hammerType==='measured')return
   const range=hammerType==='safety'?[36,70.2]:hammerType==='donut'?[27,60]:[54,96]
   if(energyRatio<range[0]||energyRatio>range[1])throw new Error('TBDY Tablo 16B.1’e göre '+hammerType+' tokmak için ER %'+range[0]+'–%'+range[1]+' aralığında olmalıdır.')
@@ -95,7 +95,11 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   if(input.energyRatio!==undefined)validateEnergyRatioForHammer(input.energyRatio,input.hammerType)
   const ceResolved=input.ce!==undefined?(validateEnergyRatioForHammer(input.ce*60,input.hammerType),directCoefficient('CE',input.ce,.45,1.60)!):( ()=>{const er=resolveEnergyRatio(input);validateEnergyRatioForHammer(er.value,input.hammerType);return{value:er.value/60,source:er.source,assumption:er.assumption}})()
   const cbResolved=input.cb!==undefined?directCoefficient('CB',input.cb,1,1.15,[1,1.05,1.15])!: {value:boreholeFactor(input.boreholeDiameterMm),source:'sondaj çapından',assumption:false}
-  const csResolved=input.cs!==undefined?directCoefficient('CS',input.cs,1,1.30)!: {value:samplerFactor(input),source:'numune alıcıdan',assumption:false}
+  const csResolved=input.cs!==undefined?(()=>{
+    if(input.cs===1)return {value:1,source:'kullanıcı seçimi · standart numune alıcı',assumption:false}
+    if(input.cs>=1.10&&input.cs<=1.30)return {value:input.cs,source:'kullanıcı seçimi · iç tüpsüz numune alıcı',assumption:false}
+    throw new Error('CS için yalnız 1.00 veya 1.10–1.30 aralığı kullanılabilir.')
+  })(): {value:samplerFactor(input),source:'numune alıcıdan',assumption:false}
   const crResolved=input.rodLengthM!==undefined
     ? {value:rodFactor(input.rodLengthM),source:'TBDY Tablo 16B.1 toplam tij boyundan',assumption:false}
     : {value:1,source:'toplam tij boyu girilmedi; geçici CR=1.00',assumption:true}
