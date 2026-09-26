@@ -24,7 +24,6 @@ export interface FinalFoundationResult{
   failedChecks:string[];missingData:string[];warnings:string[]
   trace:Array<{check:string;status:FinalStatus;source:string;details:string}>
 }
-const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 const finiteOr=(x:unknown,d:number)=>finite(x)?x:d
 
 export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFoundationResult{
@@ -67,7 +66,6 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       warnings.push(...bearing.warnings)
 
       const resolvedInterface=input.foundationInterface ?? fp.foundationInterface
-      const submerged=sp.groundwaterDepth!=null&&sp.groundwaterDepth<=fp.footingDepth
       const si:FoundationCheckInput={
         B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,
         deltaTan:undefined,cu:sp.undrainedCohesion,
@@ -86,7 +84,6 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
         else if(!sliding.slidingSafeResultant)failed.push('Kayma')
         warnings.push(...sliding.warnings)
       }
-      void submerged
     }catch(e){
       missing.push(e instanceof Error?e.message:'Temel hesabı doğrulanamadı')
     }
