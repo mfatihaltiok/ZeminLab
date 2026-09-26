@@ -208,14 +208,15 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 
 {
   const integrated=evaluateFoundationSystem({
+    actions:{vertical:1000,vx:0,vy:0,mx:0,my:0,source:'regression design action',designAction:true},
     settlement:{profile:{id:'S',version:1,status:'SABİTLENDİ' as const,targetLayerCount:1,generatedAt:new Date(0).toISOString(),sourceBoreholeIds:[],sourceLaboratoryIds:[],layers:[{id:'S1',order:1,topDepth:0,bottomDepth:10,soilName:'Kum',soilCode:'SA',boreholeIds:[],sptRecordIds:[],laboratoryRecordIds:[],gamma:18,gammaSat:19,constrainedModulus:20000,parameterSources:{},userOverride:false}],methodology:'regression'},method:'2to1-layer'},
     project:{
       id:'integrated',title:'',projectNo:'',date:'',location:'',province:'',district:'',address:'',parcelInfo:'',pafta:'',ada:'',parsel:'',zoningStatus:'',
       engineer:'',clientName:'',firmName:'',buildingType:'',basementCount:0,normalFloorCount:1,unitSystem:'kN-m',
       geophysical:{soilGroup:'ZD',soilGroupSource:'USER',siteSpecificResponseAnalysisCompleted:false},
       seismic:{ss:.5,fs:1,sds:.5,bks:2},
-      soilParameters:{unitWeight:18,saturatedUnitWeight:19,cohesion:10,frictionAngle:30,groundwaterDepth:10,surfaceSlope:0,foundationBaseSlope:0,finesContent:10,classification:{system:'TBDY 2018',code:'ZB'}},
-      foundationParameters:{foundationType:'tekil',footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:1000,horizontalLoad:0,momentX:0,momentY:0,resistanceFactorRv:1.4,vtX:100,vtY:0,structuralWeight:1000,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:0,usePassiveResistance:false,foundationInterface:'cast-in-place-soil',tallBuilding:false,nonlinearSoilDeformationAnalysisCompleted:false},
+      soilParameters:{unitWeight:18,saturatedUnitWeight:19,cohesion:10,frictionAngle:30,groundwaterDepth:10,surfaceSlope:0,foundationBaseSlope:0,finesContent:10,liquefactionContinuousOrThickLens:false,classification:{system:'TBDY 2018',code:'ZB'}},
+      foundationParameters:{foundationType:'tekil',footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:1000,horizontalLoad:0,momentX:0,momentY:0,resistanceFactorRv:1.4,vtX:100,vtY:0,structuralWeight:1000,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:0,usePassiveResistance:false,foundationInterface:'cast-in-place-soil',tallBuilding:false,nonlinearSoilDeformationAnalysisCompleted:true},
       jetGrout:{layout:'square'},visualDocuments:{}
     }
   })
