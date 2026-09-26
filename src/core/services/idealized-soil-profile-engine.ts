@@ -1,3 +1,5 @@
+import type { UnitSystem } from '../models/project'
+import { stressToBase, unitWeightToBase } from '../units/project-units'
 import type { BoreholeRecord, LaboratoryRecord, LithologyLayer, SptRecord } from '../models/field-data'
 import { deriveSptValues } from '../engineering/field-calculations'
 import type { IdealizedParameterSource, IdealizedSoilLayer, IdealizedSoilProfile } from '../models/idealized-soil-profile'
@@ -6,6 +8,7 @@ export interface IdealizedProfileInput {
   boreholes: BoreholeRecord[]
   laboratories: LaboratoryRecord[]
   targetLayerCount: number
+  unitSystem: UnitSystem
   previous?: IdealizedSoilProfile
 }
 
@@ -90,7 +93,7 @@ function chooseCuts(candidates: number[], maxDepth: number, target: number): num
   return [0, ...selected].sort((a, b) => a - b).concat(maxDepth).filter((x, i, arr) => i === 0 || x !== arr[i - 1])
 }
 
-function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[], top: number, bottom: number, order: number): IdealizedSoilLayer {
+function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[], top: number, bottom: number, order: number, unitSystem: UnitSystem): IdealizedSoilLayer {
   const lithology = intervalLithology(boreholes, top, bottom)
   const spt = intervalSpt(boreholes, top, bottom)
   const labs = laboratories.filter(x => x.depth >= top && x.depth < bottom)
@@ -112,35 +115,37 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
   const sources = buildSources(lithology, spt, labs)
 
   if (gamma != null && sources.gamma?.type === 'LİTOLOJİ' && labs.some(x => x.unitWeight != null)) sources.gamma = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (correctedNValues.length) sources.representativeN60 = { type: 'SPT_KORELASYONU', boreholeIds: [...new Set(spt.map(x => x.boreholeId))], note: 'TBDY Ek 16B düzeltmeleri uygulanmış (N1)60; eksik gerilme/enerji girdilerinde değer üretilmez.' }
+  if (correctedNValues.length) sources.representativeN1_60 = { type: 'SPT_KORELASYONU', boreholeIds: [...new Set(spt.map(x => x.boreholeId))], note: 'TBDY Ek 16B düzeltmeleri uygulanmış (N1)60; eksik gerilme/enerji girdilerinde değer üretilmez.' }
 
   return {
     id: crypto.randomUUID(), order, topDepth: top, bottomDepth: bottom,
     soilName: mode(descriptions) ?? 'Tanımlanmamış zemin', soilCode: mode(codes) ?? '',
     boreholeIds: [...new Set([...lithology.flatMap(() => boreholes.filter(b => b.lithology.some(x => overlap(x.from, x.to, top, bottom))).map(b => b.id)), ...spt.map(x => x.boreholeId), ...labs.map(x => x.boreholeId)])],
     sptRecordIds: spt.map(x => x.id), laboratoryRecordIds: labs.map(x => x.id),
-    representativeSptN: median(nValues), representativeN60: median(correctedNValues), gamma, gammaSat,
+    representativeSptN: median(nValues), representativeN1_60: median(correctedNValues),
+    gamma: gamma == null ? undefined : unitWeightToBase(gamma, unitSystem),
+    gammaSat: gammaSat == null ? undefined : unitWeightToBase(gammaSat, unitSystem),
     waterContent: labMedian(labs.map(x => x.waterContent)), liquidLimit: labMedian(labs.map(x => x.liquidLimit)),
     plasticLimit: labMedian(labs.map(x => x.plasticLimit)), plasticityIndex: labMedian(labs.map(x => x.plasticityIndex)),
     finesContent: labMedian(labs.map(x => x.finesContent ?? x.sieve200Passing)),
-    cohesion: cLab ?? firstDefined(lithology.map(x => x.cohesion)), frictionAngle: phiLab ?? firstDefined(lithology.map(x => x.frictionAngle)),
+    cohesion: (() => { const v = cLab ?? firstDefined(lithology.map(x => x.cohesion)); return v == null ? undefined : stressToBase(v, unitSystem) })(), frictionAngle: phiLab ?? firstDefined(lithology.map(x => x.frictionAngle)),
     compressionIndexCc: labMedian(labs.map(x => x.consolidationCc)), recompressionIndexCr: labMedian(labs.map(x => x.consolidationCs)),
     initialVoidRatio: labMedian(labs.map(x => x.voidRatio)),
-    constrainedModulus: labMedian(labs.map(x => x.elasticModulus)), oedometricModulus: labMedian(labs.map(x => x.elasticModulus)),
+    constrainedModulus: (() => { const v = labMedian(labs.map(x => x.elasticModulus)); return v == null ? undefined : stressToBase(v, unitSystem) })(), oedometricModulus: (() => { const v = labMedian(labs.map(x => x.elasticModulus)); return v == null ? undefined : stressToBase(v, unitSystem) })(),
     poissonRatio: labMedian(labs.map(x => x.poissonRatio)), parameterSources: sources, userOverride: false,
   }
 }
 
 export function generateIdealizedSoilProfile(input: IdealizedProfileInput): IdealizedSoilProfile {
-  const { boreholes, laboratories, previous } = input
+  const { boreholes, laboratories, previous, unitSystem } = input
   const targetLayerCount = Math.max(1, Math.min(20, Math.round(input.targetLayerCount)))
   const maxDepth = Math.max(...boreholes.map(x => x.totalDepth), 1)
   const candidates = collectCandidateCuts(boreholes, laboratories, maxDepth)
   const cuts = chooseCuts(candidates, maxDepth, targetLayerCount)
-  const layers = cuts.slice(0, -1).map((top, i) => makeLayer(boreholes, laboratories, top, cuts[i + 1], i + 1))
+  const layers = cuts.slice(0, -1).map((top, i) => makeLayer(boreholes, laboratories, top, cuts[i + 1], i + 1, unitSystem))
   return {
     id: previous?.id ?? crypto.randomUUID(), version: previous?.version ?? 1, status: 'TASLAK', targetLayerCount,
-    generatedAt: new Date().toISOString(), sourceBoreholeIds: [...new Set(boreholes.map(x => x.id))],
+    generatedAt: new Date().toISOString(), unitSystem, sourceBoreholeIds: [...new Set(boreholes.map(x => x.id))],
     sourceLaboratoryIds: [...new Set(laboratories.map(x => x.id))], layers,
     methodology: 'TBDY 2018 ve yürürlükteki Türk mevzuatı esas alınır. Otomatik katmanlama; litoloji sınırları, SPT derinlikleri ve laboratuvar numune derinliklerini aday sınırlar olarak kullanır. SPT, dayanım veya sıkışabilirlik parametrelerine otomatik korelasyonla dönüştürülmez. Nihai mühendislik kararı kullanıcıya aittir.',
     notes: 'Otomatik profil bir mühendislik taslağıdır. Kullanıcı sınırları ve parametreleri değiştirdiğinde ilgili katman userOverride olarak işaretlenir.',
