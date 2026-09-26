@@ -114,7 +114,7 @@ export function normalizeProjectInfo(value:Partial<ProjectInfo>):ProjectInfo{
   const soil={...defaultProjectInfo.soilParameters,...(value.soilParameters??{})}
   const foundation={...defaultProjectInfo.foundationParameters,...(value.foundationParameters??{})}
   const seismic={...defaultProjectInfo.seismic,...(value.seismic??{})}
-  const rawSpt=value.sptCorrections??{}
+  const rawSpt:Partial<SptCorrectionParameters>=value.sptCorrections??{}
   const sptCorrections={ce:Number.isFinite(rawSpt.ce)?rawSpt.ce:1,cb:Number.isFinite(rawSpt.cb)?rawSpt.cb:1,cs:Number.isFinite(rawSpt.cs)?rawSpt.cs:1,cr:Number.isFinite(rawSpt.cr)?rawSpt.cr:1}
   const unitSystem:UnitSystem=value.unitSystem==='kN-m'?'kN-m':'ton-m'
   const foundationType:FoundationType=foundation.foundationType==='surekli'||foundation.foundationType==='radye'||foundation.foundationType==='tekil'?foundation.foundationType:'tekil'
