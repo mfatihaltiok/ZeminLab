@@ -1,4 +1,5 @@
 import { calculateSurfaceFoundation, compressionContact } from './surface-foundation'
+import { effectiveStressAtDepth } from './stress-profile'
 
 export type BearingMethod='Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
 export interface CalculationStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string;source?:string}
@@ -165,18 +166,7 @@ export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number
   return{value:{Ac,ratio,composite,allowable:composite/Math.max(i.FS,1e-9),columnLoad:Ac*i.columnStrength/Math.max(i.FS,1e-9)},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio}],method:'Jet Grout ön model',source:'Proje kaynak paketi'}
 }
 
-export function stressAtDepth(depth:number,layers:{top:number;bottom:number;gamma:number;gammaSat:number}[],gwt:number){
-  let sigmaV=0
-  for(const layer of [...layers].filter(x=>x.bottom>x.top).sort((a,b)=>a.top-b.top)){
-    const z0=Math.max(0,layer.top),z1=Math.min(depth,layer.bottom)
-    if(z1<=z0)continue
-    const dry=gwt>=0?Math.max(0,Math.min(z1,gwt)-z0):z1-z0,sat=Math.max(0,z1-z0-dry)
-    sigmaV+=dry*layer.gamma+sat*layer.gammaSat
-  }
-  const u=gwt>=0&&depth>gwt?9.80665*(depth-gwt):0
-  return{sigmaV,sigmaVPrime:Math.max(0,sigmaV-u),u}
-}
-
+export { effectiveStressAtDepth as stressAtDepth }
 export const SOURCE_NOTES={
   investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',
   liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',
