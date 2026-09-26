@@ -126,17 +126,17 @@ function compressionContact(B:number,L:number,N:number,Mx:number,My:number){
   let a=Math.max(fullQ,1e-6),b=12*My/(Math.max(B**3*L,1e-12)),cc=12*Mx/(Math.max(L**3*B,1e-12))
   const integrate=(aa:number,bb:number,cc0:number)=>{
     const nx=32,ny=32,dx=B/nx,dy=L/ny
-    let f0=0,fx=0,fy=0,fxx=0,fyy=0,fxy=0
+    let f0=0,area=0,fx=0,fy=0,fxx=0,fyy=0,fxy=0
     for(let ix=0;ix<nx;ix++){const x=-B/2+(ix+.5)*dx
       for(let iy=0;iy<ny;iy++){const y=-L/2+(iy+.5)*dy,p=Math.max(0,aa+bb*x+cc0*y),w=dx*dy
         f0+=p*w;fx+=p*y*w;fy+=p*x*w;fxx+=p*y*y*w;fyy+=p*x*x*w;fxy+=p*x*y*w
       }}
-    return{f0,fx,fy,fxx,fyy,fxy}
+    return{f0,area,fx,fy,fxx,fyy,fxy}
   }
   for(let it=0;it<30;it++){
     const f=integrate(a,b,cc),r0=f.f0-N,r1=f.fx-Mx,r2=f.fy-My
     if(Math.max(Math.abs(r0),Math.abs(r1),Math.abs(r2))<=Math.max(1e-7*N,1e-7))break
-    const j00=Math.max(f.f0/Math.max(a,1),1e-9),j01=f.fy,j02=f.fx
+    const j00=Math.max(f.area,1e-12),j01=f.fy,j02=f.fx
     const j10=f.fy,j11=f.fxx,j12=f.fxy
     const j20=f.fx,j21=f.fxy,j22=f.fyy
     const det=j00*(j11*j22-j12*j21)-j01*(j10*j22-j12*j20)+j02*(j10*j21-j11*j20)
