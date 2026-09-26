@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react'
 import type { BoreholeRecord, LaboratoryRecord } from '../models/field-data'
 import type { IdealizedSoilProfile } from '../models/idealized-soil-profile'
 
-export const PROJECT_SCHEMA_VERSION = 1
+export const PROJECT_SCHEMA_VERSION = 2
 export type ProjectDocument = { projectInfo:ProjectInfo; boreholes:BoreholeRecord[]; labs:LaboratoryRecord[]; idealizedSoilProfile?:IdealizedSoilProfile }
 export type ProjectEnvelope = { format:'FALUZMN'; version:number; savedAt:string; data:unknown }
 export function migrateProjectData(value:unknown,version:number):ProjectDocument {
@@ -16,17 +16,16 @@ export function migrateProjectData(value:unknown,version:number):ProjectDocument
   const migratedSpt:Partial<SptCorrectionParameters>|undefined=rawProject.sptCorrections??(legacy?{
     ce:Number.isFinite(legacy.energyRatio)?legacy.energyRatio!/60:undefined,
     cb:Number.isFinite(legacy.boreholeCorrection)?legacy.boreholeCorrection:undefined,
-    cs:Number.isFinite(legacy.samplerCorrection)?legacy.samplerCorrection:undefined,
-    cr:Number.isFinite(legacy.rodLengthCorrection)?legacy.rodLengthCorrection:undefined
+    cs:Number.isFinite(legacy.samplerCorrection)?legacy.samplerCorrection:undefined
   }:undefined)
   const sptCorrections:SptCorrectionParameters={
     ce:migratedSpt?.ce??1,
     cb:migratedSpt?.cb??1,
-    cs:migratedSpt?.cs??1,
-    cr:migratedSpt?.cr??1
+    cs:migratedSpt?.cs??1
   }
+  const boreholes=d.boreholes.map(borehole=>({...borehole,spt:borehole.spt.map(row=>row.rodLengthM!==undefined?row:{...row,rodLengthM:row.correction?.rodLengthM})}))
   const projectInfo=normalizeProjectInfo({...rawProject,sptCorrections})
-  return {projectInfo,boreholes:d.boreholes,labs:d.labs,idealizedSoilProfile:d.idealizedSoilProfile}
+  return {projectInfo,boreholes,labs:d.labs,idealizedSoilProfile:d.idealizedSoilProfile}
 }
 
 type Listener=()=>void
