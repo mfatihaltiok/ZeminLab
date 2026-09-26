@@ -81,7 +81,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
     try{
       liquefaction=liquefactionProfile(input.liquefaction)
       const bad=liquefaction.rows.some(r=>r.conclusion==='SIVILAŞMA RİSKİ VAR'),incomplete=liquefaction.rows.some(r=>r.status==='VERİ EKSİK'||r.liquefactionCheck==='not-evaluable')
-      trace.push({check:'Sıvılaşma',status:bad?'UYGUN DEĞİL':incomplete?'VERİ EKSİK':'UYGUN',source:'TBDY 2018 16.6 + Ek 16B',details=String(liquefaction.rows.length)+' SPT noktası'})
+      trace.push({check:'Sıvılaşma',status:bad?'UYGUN DEĞİL':incomplete?'VERİ EKSİK':'UYGUN',source:'TBDY 2018 16.6 + Ek 16B',details:String(liquefaction.rows.length)+' SPT noktası'})
       if(bad)failed.push('Sıvılaşma');if(incomplete)missing.push('Sıvılaşma için eksik saha/laboratuvar verisi');warnings.push(...liquefaction.warnings)
     }catch(e){missing.push(e instanceof Error?e.message:'Sıvılaşma hesabı doğrulanamadı')}
   }
