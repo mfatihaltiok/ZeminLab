@@ -10,7 +10,7 @@ export interface LiquefactionSoilLayer{
   top:number;bottom:number;gamma:number;gammaSat:number;soil?:string;finesContent?:number;plasticityIndex?:number;clayContent?:number
 }
 export interface LiquefactionSptRecord{
-  depth:number;nField:number;fineContent?:number;energyRatio?:number;hammerType?:SptEngineInput['hammerType'];boreholeDiameterMm?:number
+  depth:number;depthTo?:number;nField:number;fineContent?:number;energyRatio?:number;hammerType?:SptEngineInput['hammerType'];boreholeDiameterMm?:number
   sampler?:SptEngineInput['sampler'];samplerCorrection?:number;rodLengthM?:number;stressSnapshot?:SptStressSnapshot;plasticityIndex?:number;waterContent?:number;clayContent?:number;soil?:string
 }
 export interface LiquefactionProfileInput{
