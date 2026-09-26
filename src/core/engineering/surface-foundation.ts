@@ -112,6 +112,50 @@ function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influen
   })
 }
 
+
+function compressionContact(B:number,L:number,N:number,Mx:number,My:number){
+  if(N<=0)return{area:0,qMax:Infinity,qMin:0,contactState:'NO_CONTACT' as const}
+  const fullA=B*L
+  const fullQ=N/fullA
+  const ex=My/N,ey=Mx/N
+  if(Math.abs(ex)<=B/6+1e-12&&Math.abs(ey)<=L/6+1e-12){
+    return{area:fullA,qMax:fullQ*(1+6*Math.abs(ex)/B+6*Math.abs(ey)/L),qMin:Math.max(0,fullQ*(1-6*Math.abs(ex)/B-6*Math.abs(ey)/L)),contactState:'FULL' as const}
+  }
+  // p(x,y)=max(0,a+b*x+c*y), with x in [-B/2,B/2], y in [-L/2,L/2].
+  // Newton solve enforces resultant N and moments My=N*ex, Mx=N*ey.
+  let a=Math.max(fullQ,1e-6),b=12*My/(Math.max(B**3*L,1e-12)),cc=12*Mx/(Math.max(L**3*B,1e-12))
+  const integrate=(aa:number,bb:number,cc0:number)=>{
+    const nx=32,ny=32,dx=B/nx,dy=L/ny
+    let f0=0,fx=0,fy=0,fxx=0,fyy=0,fxy=0
+    for(let ix=0;ix<nx;ix++){const x=-B/2+(ix+.5)*dx
+      for(let iy=0;iy<ny;iy++){const y=-L/2+(iy+.5)*dy,p=Math.max(0,aa+bb*x+cc0*y),w=dx*dy
+        f0+=p*w;fx+=p*y*w;fy+=p*x*w;fxx+=p*y*y*w;fyy+=p*x*x*w;fxy+=p*x*y*w
+      }}
+    return{f0,fx,fy,fxx,fyy,fxy}
+  }
+  for(let it=0;it<30;it++){
+    const f=integrate(a,b,cc),r0=f.f0-N,r1=f.fx-Mx,r2=f.fy-My
+    if(Math.max(Math.abs(r0),Math.abs(r1),Math.abs(r2))<=Math.max(1e-7*N,1e-7))break
+    const j00=Math.max(f.f0/Math.max(a,1),1e-9),j01=f.fy,j02=f.fx
+    const j10=f.fy,j11=f.fxx,j12=f.fxy
+    const j20=f.fx,j21=f.fxy,j22=f.fyy
+    const det=j00*(j11*j22-j12*j21)-j01*(j10*j22-j12*j20)+j02*(j10*j21-j11*j20)
+    if(Math.abs(det)<1e-18)break
+    const d0=(r0*(j11*j22-j12*j21)-j01*(r1*j22-j12*r2)+j02*(r1*j21-j11*r2))/det
+    const d1=(j00*(r1*j22-j12*r2)-r0*(j10*j22-j12*j20)+j02*(j10*r2-r1*j20))/det
+    const d2=(j00*(j11*r2-r1*j21)-j01*(j10*r2-r1*j20)+r0*(j10*j21-j11*j20))/det
+    a-=d0;b-=d1;cc-=d2
+  }
+  const f=integrate(a,b,cc)
+  let area=0,qMax=0,nx=64,ny=64,dx=B/nx,dy=L/ny
+  for(let ix=0;ix<nx;ix++){const x=-B/2+(ix+.5)*dx
+    for(let iy=0;iy<ny;iy++){const y=-L/2+(iy+.5)*dy,p=Math.max(0,a+b*x+cc*y)
+      if(p>0)area+=dx*dy
+      qMax=Math.max(qMax,p)
+    }}
+  return{area,qMax,qMin:0,contactState:'PARTIAL' as const}
+}
+
 function equivalentLayerParameters(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number){
   if(!layers?.length)return null
   const active=layers
@@ -195,11 +239,12 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const qt=qk/rf
   const qAvg=effectiveArea>0?N/(i.B*i.L):Infinity
   const qo=effectiveArea>0?N/effectiveArea:Infinity
-  const pressureFactor=coreContact?1+6*Math.abs(ex)/i.B+6*Math.abs(ey)/i.L:Infinity
-  const pressureMinFactor=coreContact?1-6*Math.abs(ex)/i.B-6*Math.abs(ey)/i.L:-Infinity
-  const qMax=Number.isFinite(qAvg)&&coreContact?qAvg*pressureFactor:Infinity
-  const qMin=Number.isFinite(qAvg)&&coreContact?qAvg*pressureMinFactor: -Infinity
+  const contact=compressionContact(i.B,i.L,N,i.momentX??0,i.momentY??0)
+  const qMax=contact.qMax
+  const qMin=contact.qMin
+  const contactArea=contact.area
   const utilization=qt>0?qo/qt:Infinity
+  if(contactState==='PARTIAL')warnings.push('Kısmi temas alanı compression-only lineer basınç dağılımından nümerik olarak çözüldü; qmin=0 ve qmax gerçek temas alanı üzerinden raporlanır.')
   let adequate=qo<=qt&&contactState!=='NO_CONTACT'&&(!i.layers||layeredComplete)
   const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,mf,method)
   checks.forEach(x=>x.controlling=false)
@@ -214,7 +259,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
     {symbol:'ex/ey',title:'Yük eksantriklikleri',formula:'ex=My/N ; ey=Mx/N',value:Math.max(Math.abs(ex),Math.abs(ey)),unit:'m'},
     {symbol:'B′/L′',title:'Taşıma gücü etkin boyutları',formula:'B′=B−2|ex| ; L′=L−2|ey|',value:Math.min(Be,Le),unit:'m',note:'Etkin boyutlar taşıma gücü hesabında kullanılır; temas basıncı dağılımı için qmax/qmin ayrı hesaplanır.'},
     {symbol:'qavg',title:'Gerçek taban ortalama basıncı',formula:'qavg=N/(B·L)',value:qAvg,unit:'kPa'},
-    {symbol:'qmax/qmin',title:'Çekirdek içi temas basıncı zarfı',formula:'qmax/min=qavg[1±6|ex|/B±6|ey|/L]',value:qMax,unit:'kPa',note:coreContact?'İki eksenli doğrusal basınç dağılımı.':'Çekirdek dışı: kısmi temas; doğrusal tam temas zarfı uygulanmaz.'},
+    {symbol:'qmax/qmin',title:'Temas basıncı',formula:coreContact?'qmax/min=qavg[1±6|ex|/B±6|ey|/L]':'p=max(0,a+b·x+c·y), ∫p dA=N, ∫p·y dA=Mx, ∫p·x dA=My',value:qMax,unit:'kPa',note:coreContact?'İki eksenli doğrusal basınç dağılımı.':'Çekme gerilmesi sıfırlanarak gerçek kısmi temas alanı nümerik olarak çözüldü.'},
     {symbol:'Nq/Nc/Nγ',title:'Taşıma gücü katsayıları',formula:'Nq=e^(πtanφ)tan²(45°+φ/2); Nc=(Nq−1)cotφ; Nγ=2(Nq−1)tanφ',value:ef.Nq,note:method==='TBDY-2018'?'TBDY 2018 Denk. 16.8b':''},
     {symbol:'s',title:'Şekil katsayıları',formula:'sc,sq,sγ',value:mf.sc},
     {symbol:'d',title:'Derinlik katsayıları',formula:'dc,dq,dγ',value:mf.dc},
