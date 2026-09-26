@@ -23,7 +23,14 @@ function isCohesive(layer:IdealizedSoilLayer){
   const code=(layer.soilCode+' '+layer.soilName).toUpperCase().replace(/İ/g,'I')
   return /(^|[^A-Z])(CI[LHM]|SI[LHM]|CL|CH|ML|MH)([^A-Z]|$)/.test(code)||code.includes('KIL')||code.includes('SILT')||code.includes('CLAY')||code.includes('ORGANIK')||code.includes('TURBA')
 }
-const effectiveStressAtDepth=centralEffectiveStressAtDepth
+function effectiveStressAtDepth(layers:IdealizedSoilLayer[],depth:number,gwt:number){
+  const stress=centralEffectiveStressAtDepth(
+    depth,
+    layers.map(layer=>({top:layer.topDepth,bottom:layer.bottomDepth,gamma:layer.gamma,gammaSat:layer.gammaSat})),
+    Math.max(0,gwt)
+  )
+  return {total:stress.sigmaV,effective:stress.sigmaVPrime,porePressure:stress.porePressure,covered:stress.covered}
+}
 
 function stressIncrement2to1(qNet:number,B:number,L:number,z:number){return qNet*B*L/Math.max((B+z)*(L+z),1e-9)}
 
