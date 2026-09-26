@@ -239,6 +239,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const qMin=contact.qMin
   const contactArea=contact.area
   const utilization=qt>0?qo/qt:Infinity
+  if(contactState==='NO_CONTACT')warnings.push('Temel tabanında basınçlı temas bulunmadığından q0/qt karşılaştırması nihai uygunluk için kullanılamaz.')
   if(contactState==='PARTIAL')warnings.push('Kısmi temas alanı compression-only lineer basınç dağılımından nümerik olarak çözüldü; qmin=0 ve qmax gerçek temas alanı üzerinden raporlanır.')
   let adequate=qo<=qt&&contactState!=='NO_CONTACT'&&(!i.layers||layeredComplete)
   const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,mf,method)
