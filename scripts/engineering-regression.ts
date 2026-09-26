@@ -8,9 +8,20 @@ import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
 import { toEngineeringSI } from '../src/core/units/engineering-input-adapter.ts'
+import { calculateCyclicSettlement } from '../src/core/engineering/cyclic-settlement-engine.ts'
 
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(Math.abs(actual-expected)<=tolerance,`expected ${expected}, got ${actual}`)
+}
+
+{
+  const cyclic=calculateCyclicSettlement({layers:[{topDepth:5,bottomDepth:7,n1_60cs:20,maxCyclicShearStrain:0.08,saturated:true,liquefactionFactorOfSafety:.8}]})
+  assert.equal(cyclic.ready,true)
+  assert.ok(cyclic.totalSettlement>0)
+  assert.equal(cyclic.layers[0].status,'HESAPLANDI')
+  const missing=calculateCyclicSettlement({layers:[{topDepth:5,bottomDepth:7,n1_60cs:20,saturated:true}]})
+  assert.equal(missing.ready,false)
+  assert.equal(missing.layers[0].status,'VERİ EKSİK')
 }
 
 {
