@@ -35,7 +35,7 @@ export function settlement(i:{B:number;q:number;Es:number;nu:number;layers?:{thi
 export function settlementStage2(i:Stage2SettlementInput){return stage2Settlement(i)}
 export function liquefaction(i:{Mw:number;Sds:number;depth:number;N160f:number;sigmaV:number;sigmaVPrime:number}){return liquefactionEngine(i)}
 export function liquefactionProfile(i:LiquefactionProfileInput){return liquefactionProfileEngine(i)}
-export function foundationChecks(i:{B:number;L:number;N:number;Vx?:number;Vy?:number;V?:number;Mx:number;My:number;deltaTan?:number;cu?:number;area?:number;groundwaterDepth?:number;foundationDepth?:number;passiveResistanceCharacteristic?:number;usePassiveResistance?:boolean;gammaRh?:number;gammaRp?:number}){return foundationEngine(i)}
+export function foundationChecks(i:{B:number;L:number;N:number;Vx?:number;Vy?:number;V?:number;Mx:number;My:number;deltaTan?:number;cu?:number;area?:number;groundwaterDepth?:number;foundationDepth?:number;passiveResistanceCharacteristic?:number;usePassiveResistance?:boolean;gammaRh?:number;gammaRp?:number;seismic?:boolean;interfaceType?:import('../engineering/calculation-engine').FoundationInterface}){return foundationEngine(i)}
 export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number}){return jetGroutEngine(i).value}
 export function stressSpread2to1(i:{q:number;B:number;L:number;z:number}){return stressSpread21(i)}
 export function subgradeReaction(i:SubgradeReactionInput){return calculateSubgradeReaction(i)}
