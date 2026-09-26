@@ -120,7 +120,8 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
   const fineContent=lab?.finesContent??lab?.sieve200Passing??layer?.finesContent
   const result=calculateSpt({
     nField,
-    ce:cfg.ce,cb:cfg.cb,cs:cfg.cs,cr:cfg.cr,
+    ce:cfg.ce,cb:cfg.cb,cs:cfg.cs,
+    rodLengthM:record.rodLengthM,
     effectiveStress:stress.effectiveStress,
     fineContent,
     claySoil,
