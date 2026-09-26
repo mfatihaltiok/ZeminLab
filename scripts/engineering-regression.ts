@@ -7,7 +7,7 @@ import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-
 import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
-import { deriveSptValues } from '../src/core/engineering/field-calculations.ts'
+import { captureSptStressSnapshot, deriveSptValues } from '../src/core/engineering/field-calculations.ts'
 import { toEngineeringSI } from '../src/core/units/engineering-input-adapter.ts'
 import { normalizeEngineeringRenderModel } from '../src/renderer/src/components/engineering-render-model.ts'
 
@@ -94,7 +94,37 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.equal(missingRod.hasAssumptions,true)
   assert.ok(missingRod.warnings.some(w=>w.includes('toplam tij boyu')))
   assert.throws(() => calculateSpt({nField:10,rodLengthM:2.99,effectiveStress:100}), /toplam tij boyu 3 m veya daha büyük/)
+  assert.throws(() => calculateSpt({nField:10,rodLengthM:2,effectiveStress:100,sptDepthM:3}), /SPT deney derinliğinden kısa/)
+  approx(calculateSpt({nField:10,boreholeDiameterMm:115,effectiveStress:100,rodLengthM:5}).cb,1,1e-12)
+  approx(calculateSpt({nField:10,boreholeDiameterMm:150,effectiveStress:100,rodLengthM:5}).cb,1.05,1e-12)
+  approx(calculateSpt({nField:10,boreholeDiameterMm:200,effectiveStress:100,rodLengthM:5}).cb,1.15,1e-12)
+  assert.throws(() => calculateSpt({nField:10,boreholeDiameterMm:120,effectiveStress:100,rodLengthM:5}), /CB için yalnız/)
+  assert.throws(() => calculateSpt({nField:10,energyRatio:20,hammerType:'safety',effectiveStress:100,rodLengthM:5}), /safety tokmak/)
 }
+
+{
+  const borehole={
+    id:'SNAPSHOT',
+    name:'SK-SNAP',
+    firstSptDepth:1.5,
+    totalDepth:8,
+    groundwaterDepth:2,
+    lithology:[
+      {id:'L1',from:0,to:2,code:'Sa',description:'Kum',colorClass:'sand' as const,unitWeight:18,saturatedUnitWeight:19},
+      {id:'L2',from:2,to:8,code:'Sa',description:'Kum',colorClass:'sand' as const,unitWeight:19,saturatedUnitWeight:20}
+    ],
+    spt:[]
+  }
+  const record={id:'SPT-SNAP',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'Sa',source:'manual' as const,confirmed:true}
+  const snapshot=captureSptStressSnapshot(borehole,record.depth,[],'kN-m')
+  const derived=deriveSptValues(borehole,{...record,testStressSnapshot:snapshot},[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
+  approx(snapshot.sigmaV0,96,1e-12)
+  approx(snapshot.porePressureU0,29.43,1e-12)
+  approx(snapshot.effectiveStressV0,66.57,1e-12)
+  approx(derived.effectiveStress!,66.57,1e-12)
+  assert.equal(derived.hasAssumptions,false)
+}
+
 
 {
   const borehole={
