@@ -1,6 +1,6 @@
 import type { UnitSystem } from '../models/project'
 import { unitWeightToBase } from '../units/project-units'
-import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../models/field-data'
+import type { BoreholeRecord, LaboratoryRecord, SptRecord, SptStressSnapshot } from '../models/field-data'
 import type { SptCorrectionParameters } from '../models/project'
 import { calculateSpt, type SptEngineResult } from './spt/spt-engine'
 import { effectiveStressAtDepth } from './stress-profile'
@@ -48,7 +48,8 @@ function stressAtDepth(
   const labGamma=median(boreholeLabs.filter(x=>Number.isFinite(x.unitWeight)&&x.unitWeight!>0).map(x=>x.unitWeight!))
   const fallbackGamma=Number.isFinite(fallback?.unitWeight)&&fallback!.unitWeight!>0?fallback!.unitWeight!:undefined
   const fallbackGammaSat=Number.isFinite(fallback?.saturatedUnitWeight)&&fallback!.saturatedUnitWeight!>0?fallback!.saturatedUnitWeight!:undefined
-  const gwt=borehole.groundwaterDepth??fallback?.groundwaterDepth??1e9
+  const gwt=borehole.groundwaterDepth??fallback?.groundwaterDepth
+  if(gwt===undefined)return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'SPT yapıldığı andaki YASS kaydedilmedi; σv0 ve σ′v0 sabitlenemedi.'}
 
   const sourceParts:string[]=[]
   let layers:{top:number;bottom:number;gamma:number;gammaSat:number}[]=[]
@@ -68,9 +69,13 @@ function stressAtDepth(
         .filter(x=>x.depth>=top&&x.depth<bottom&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0)
         .map(x=>x.unitWeight!))
       const gammaValue=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:localLabGamma??labGamma??fallbackGamma
+      const needsSaturatedGamma=bottom>gwt
       const gammaSatValue=Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0
         ?layer.saturatedUnitWeight!
-        :fallbackGammaSat??gammaValue
+        :fallbackGammaSat
+      if(needsSaturatedGamma&&gammaSatValue==null){
+        return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'YASS altında kalan SPT seviyesinde γsat bulunamadı; σ′v0 hesaplanmadı.'}
+      }
       if(gammaValue==null||gammaSatValue==null||!Number.isFinite(gammaValue)||gammaValue<=0||!Number.isFinite(gammaSatValue)||gammaSatValue<=0){
         return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'SPT derinliğine kadar γ/γsat bulunamadı; CN uygulanmadı.'}
       }
@@ -82,9 +87,10 @@ function stressAtDepth(
     sourceParts.push('litoloji')
   }else{
     const gamma=labGamma??fallbackGamma
-    const gammaSat=fallbackGammaSat??gamma
-    if(gamma==null||gammaSat==null)return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'γ/γsat bulunamadı; CN uygulanmadı.'}
-    layers=[{top:0,bottom:Math.max(z,1e-6),gamma:unitWeightToBase(gamma,unitSystem),gammaSat:unitWeightToBase(gammaSat,unitSystem)}]
+    const gammaSat=fallbackGammaSat
+    if(gamma==null)return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'γ bulunamadı; CN uygulanmadı.'}
+    if(z>gwt&&gammaSat==null)return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'YASS altında kalan SPT seviyesinde γsat bulunamadı; CN uygulanmadı.'}
+    layers=[{top:0,bottom:Math.max(z,1e-6),gamma:unitWeightToBase(gamma,unitSystem),gammaSat:unitWeightToBase(gammaSat??gamma,unitSystem)}]
     sourceParts.push(labGamma!=null?'laboratuvar γ':'proje γ/γsat')
   }
 
@@ -105,23 +111,52 @@ function stressAtDepth(
   }
 }
 
+export function captureSptStressSnapshot(
+  borehole:BoreholeRecord,
+  depth:number,
+  laboratories:LaboratoryRecord[]=[],
+  unitSystem:UnitSystem='kN-m',
+  fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number}
+):SptStressSnapshot{
+  const groundwaterDepth=borehole.groundwaterDepth??fallback?.groundwaterDepth
+  if(groundwaterDepth===undefined)throw new Error('SPT yapıldığı andaki YASS girilmeden test koşulları sabitlenemez.')
+  const stress=stressAtDepth(borehole,depth,laboratories,unitSystem,fallback)
+  if(stress.verticalStress==null||stress.porePressure==null||stress.effectiveStress==null)throw new Error(stress.source)
+  return{
+    sigmaV0:stress.verticalStress,
+    porePressureU0:stress.porePressure,
+    effectiveStressV0:stress.effectiveStress,
+    groundwaterDepth,
+    capturedAt:new Date().toISOString()
+  }
+}
+
 export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[],unitSystem:UnitSystem='kN-m',fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number},correction:SptCorrectionParameters={ce:1,cb:1,cs:1}):SptDerivedValues{
   const nField=fieldN(record)
   if(nField===undefined)return{nField,ce:1,cb:1,cs:1,cr:1,cn:1,n60:0,n1_60:0,dilatancyApplied:false,trace:[],overburdenCorrection:1,overburdenCorrectionApplied:false,warnings:[],hasAssumptions:false}
-  const stress=stressAtDepth(borehole,record.depth,laboratories,unitSystem,fallback)
+  const calculatedStress=stressAtDepth(borehole,record.depth,laboratories,unitSystem,fallback)
+  const stress=record.testStressSnapshot?{
+    verticalStress:record.testStressSnapshot.sigmaV0,
+    porePressure:record.testStressSnapshot.porePressureU0,
+    effectiveStress:record.testStressSnapshot.effectiveStressV0,
+    source:'SPT deney koşulları onay anında sabitlendi · YASS='+record.testStressSnapshot.groundwaterDepth.toFixed(2)+' m'
+  }:calculatedStress
   const cfg=correction
   const lab=linkedLabForSpt(laboratories,borehole.id,record.id,record.depth)
   const layer=layerAtDepth(borehole,record.depth)
   const soilCode=record.soilCode??layer?.code
   const labClassification=lab?classifyLaboratoryRecord(lab):null
   const explicitSoilCode=soilCode!=null&&soilCode.trim().length>0
-  const claySoil=isClaySoilCode(soilCode)||(!explicitSoilCode&&labClassification?.isClay===true)
-  const claySoilSource=claySoil?(isClaySoilCode(soilCode)?`Zemin sınıfı ${soilCode}`:'Laboratuvar Atterberg sınıflandırması'):undefined
+  const codeIsClay=isClaySoilCode(soilCode)
+  const classificationConflict=explicitSoilCode&&labClassification!==null&&codeIsClay!==labClassification.isClay
+  const claySoil=labClassification?.isClay===true||codeIsClay
+  const claySoilSource=claySoil?(labClassification?.isClay===true?'Laboratuvar Atterberg sınıflandırması':`Zemin sınıfı ${soilCode}`):undefined
   const fineContent=lab?.finesContent??lab?.sieve200Passing??layer?.finesContent
   const result=calculateSpt({
     nField,
     ce:cfg.ce,cb:cfg.cb,cs:cfg.cs,
     rodLengthM:record.rodLengthM,
+    sptDepthM:record.depth,
     effectiveStress:stress.effectiveStress,
     fineContent,
     claySoil,
@@ -129,7 +164,11 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
     applyOverburden:true,
     applyDilatancy:false
   })
-  return{...result,verticalStress:stress.verticalStress,porePressure:stress.porePressure,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:stress.effectiveStress!=null||claySoil,n60DilatancyCorrected:result.n1_60_dilatancy}
+  const warnings=classificationConflict
+    ? [...result.warnings,'SPT zemin kodu ile laboratuvar Atterberg sınıflandırması çelişiyor; laboratuvar sınıflandırması CN kararında önceliklendirildi.']
+    : result.warnings
+  const hasAssumptions=result.hasAssumptions||classificationConflict||record.testStressSnapshot===undefined
+  return{...result,warnings,hasAssumptions,verticalStress:stress.verticalStress,porePressure:stress.porePressure,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:stress.effectiveStress!=null||claySoil,n60DilatancyCorrected:result.n1_60_dilatancy}
 }
 export function classifyLaboratoryRecord(record:LaboratoryRecord):SoilClassificationResult|null{return classifyFineSoil(record.liquidLimit,laboratoryPlasticityIndex(record))}
 
