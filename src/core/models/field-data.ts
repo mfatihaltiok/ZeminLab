@@ -18,6 +18,7 @@ export interface SptCorrectionConfig {
   rodLengthM?:number
   hammerType?:'donut'|'safety'|'automatic'|'measured'
   sampler?:'standard'|'without-liner'|'liner'
+  maxCyclicShearStrainPercent?:number
 }
 export interface SptRecord { id:string; depth:number; depthTo?:number; testType:SptTestType; n1?:number; n2?:number; n3?:number; soilCode?:string; soilDescription?:string; correction?:Partial<SptCorrectionConfig>; laboratoryLinked?:boolean; notes?:string; source:FieldDataSource; confirmed:boolean; provenance?:DataProvenance }
 export interface LithologyLayer { id:string; from:number; to:number; code:string; description:string; colorClass:LithologyColorClass; unitWeight?:number; saturatedUnitWeight?:number; cohesion?:number; frictionAngle?:number; finesContent?:number; liquidLimit?:number; plasticLimit?:number; plasticityIndex?:number; userOverride?:boolean; notes?:string; provenance?:DataProvenance }
