@@ -37,18 +37,19 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   if(!finite(N)||!finite(Vx)||!finite(Vy)||!finite(Mx)||!finite(My))missing.push('Temele aktarılan tasarım kuvvetleri')
   let bearing:ReturnType<typeof calculateSurfaceFoundation>|undefined
   let sliding:ReturnType<typeof foundationChecks>|undefined
+  let settlement:IdealizedSettlementResult|undefined
   if(missing.length===0){
     try{
       bearing=calculateSurfaceFoundation({B:fp.footingWidth,L:fp.footingLength,Df:fp.footingDepth,gamma1:sp.unitWeight,gamma2:sp.saturatedUnitWeight,c:sp.cohesion,phi:sp.frictionAngle,verticalLoad:N,horizontalLoad:Math.hypot(Vx,Vy),momentX:Mx,momentY:My,groundSlope:sp.surfaceSlope,baseSlope:sp.foundationBaseSlope,resistanceFactor:fp.resistanceFactorRv,method:'TBDY-2018',safetyFactor:fp.safetyFactor,foundationType:fp.foundationType,groundwaterDepth:sp.groundwaterDepth,layers:input.surfaceLayers,undrainedCu:sp.undrainedCohesion})
       trace.push({check:'Taşıma gücü',status:bearing.adequate&&bearing.finalDesignEligible?'UYGUN':'UYGUN DEĞİL',source:'TBDY 2018 16.8.2–16.8.3',details:'q0='+bearing.qo.toFixed(3)+' kPa; qt='+bearing.qt.toFixed(3)+' kPa'})
       if(!bearing.adequate||!bearing.finalDesignEligible)failed.push('Taşıma gücü')
       warnings.push(...bearing.warnings)
-      const si:FoundationCheckInput={B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,deltaTan:fp.baseFrictionTanDelta,cu:sp.undrainedCohesion,groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,usePassiveResistance:fp.usePassiveResistance,seismic:input.seismicBelowGroundwater??false,interfaceType:input.foundationInterface}
+      const si:FoundationCheckInput={B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,deltaTan:fp.baseFrictionTanDelta,cu:sp.undrainedCohesion,groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,usePassiveResistance:fp.usePassiveResistance,seismic:input.seismicBelowGroundwater ?? fp.seismicBelowGroundwater ?? false,interfaceType:input.foundationInterface ?? fp.foundationInterface}
       sliding=foundationChecks(si)
-      if(input.foundationInterface===undefined) sliding.warnings.push('Temel-zemin ara yüzü seçilmedi; TBDY 16.8.4.3 kapsamında tanδ varsayımı nihai tasarım girdisi olarak kabul edilmemelidir.')
+      if((input.foundationInterface ?? fp.foundationInterface)===undefined) sliding.warnings.push('Temel-zemin ara yüzü seçilmedi; TBDY 16.8.4.3 kapsamında tanδ varsayımı nihai tasarım girdisi olarak kabul edilmemelidir.')
       const slideStatus=sliding.evaluable?(sliding.slidingSafeResultant?'UYGUN':'UYGUN DEĞİL'):'VERİ EKSİK'
       trace.push({check:'Kayma',status:slideStatus,source:'TBDY 2018 16.8.4',details:'Vh='+sliding.horizontalResultant.toFixed(3)+'; R='+sliding.slidingCapacityResultant.toFixed(3)})
-      if(input.foundationInterface===undefined) missing.push('Temel-zemin ara yüzü')
+      if((input.foundationInterface ?? fp.foundationInterface)===undefined) missing.push('Temel-zemin ara yüzü')
       if(!sliding.evaluable)missing.push('Deprem + YASS altında kayma için cu');else if(!sliding.slidingSafeResultant)failed.push('Kayma')
       warnings.push(...sliding.warnings)
     }catch(e){missing.push(e instanceof Error?e.message:'Temel hesabı doğrulanamadı')}
@@ -61,7 +62,6 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       warnings.push(...settlement.warnings)
     }catch(e){missing.push(e instanceof Error?e.message:'Oturma hesabı doğrulanamadı')}
   }
-  let settlement:IdealizedSettlementResult|undefined
   let liquefaction:LiquefactionProfileResult|undefined
   if(input.liquefaction){
     try{
