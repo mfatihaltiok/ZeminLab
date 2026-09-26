@@ -30,6 +30,8 @@ const finiteOr=(x:unknown,d:number)=>finite(x)?x:d
 export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFoundationResult{
   const p=normalizeProjectInfo(input.project),missing:string[]=[],failed:string[]=[],warnings:string[]=[],trace:FinalFoundationResult['trace']=[]
   const soilGroup=p.geophysical.soilGroup??p.soilParameters.classification.code
+  const zfSiteSpecificRequired=soilGroup==='ZF'
+  if(zfSiteSpecificRequired)missing.push('ZF için sahaya özel zemin davranış analizi')
   if(p.geophysical.vs30!=null){const inferred=classifyVs30(p.geophysical.vs30);if(inferred&&soilGroup&&inferred!==soilGroup&&soilGroup!=='ZF')warnings.push('VS30 ile seçilen zemin grubu farklı; kaynak/tercih raporda açıkça gösterilmelidir.')}
   const fp=p.foundationParameters,sp=p.soilParameters
   const N=finiteOr(input.actions?.vertical,fp.verticalLoad),Vx=finiteOr(input.actions?.vx,fp.vtX),Vy=finiteOr(input.actions?.vy,fp.vtY),Mx=finiteOr(input.actions?.mx,fp.momentX),My=finiteOr(input.actions?.my,fp.momentY)
@@ -72,5 +74,5 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   }
   if(!soilGroup)warnings.push('Zemin grubu girilmemiş; taşıma gücü ve oturma hesabı için kullanılan zemin parametreleri ayrıca doğrulanmalıdır.')
   const m=[...new Set(missing)],f=[...new Set(failed)],status:FinalStatus=f.length?'UYGUN DEĞİL':m.length?'VERİ EKSİK':'UYGUN'
-  return{status,evaluable:status!=='VERİ EKSİK',project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired:false},actions,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,settlement,liquefaction}
+  return{status,evaluable:status!=='VERİ EKSİK',project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired},actions,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,settlement,liquefaction}
 }
