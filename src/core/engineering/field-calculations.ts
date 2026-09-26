@@ -82,8 +82,8 @@ function stressAtDepth(
     sourceParts.push('litoloji')
   }else{
     const gamma=labGamma??fallbackGamma
-    const gammaSat=labGamma??fallbackGammaSat??gamma
-    if(gamma==null||gammaSat==null)return{verticalStress:undefined,effectiveStress:undefined,source:'γ/γsat bulunamadı; CN uygulanmadı.'}
+    const gammaSat=fallbackGammaSat??gamma
+    if(gamma==null||gammaSat==null)return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'γ/γsat bulunamadı; CN uygulanmadı.'}
     layers=[{top:0,bottom:Math.max(z,1e-6),gamma:unitWeightToBase(gamma,unitSystem),gammaSat:unitWeightToBase(gammaSat,unitSystem)}]
     sourceParts.push(labGamma!=null?'laboratuvar γ':'proje γ/γsat')
   }
@@ -91,7 +91,7 @@ function stressAtDepth(
   try{
     const result=effectiveStressAtDepth(z,layers,gwt)
     if(result.covered<z-1e-6){
-      return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar sürekli γ/γsat profili yok; CN uygulanmadı.'}
+      return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar sürekli γ/γsat profili yok; CN uygulanmadı.'}
     }
     if(sourceParts[0]==='litoloji')sourceParts.push(labGamma!=null?'LAB yedek değeri':'proje γ/γsat yedek değeri')
     return{
@@ -101,7 +101,7 @@ function stressAtDepth(
       source:'Merkezi σv/σ′v profili · '+sourceParts.join(' + ')
     }
   }catch{
-    return{verticalStress:undefined,effectiveStress:undefined,source:'σv/σ′v profili hesaplanamadı; CN uygulanmadı.'}
+    return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'σv/σ′v profili hesaplanamadı; CN uygulanmadı.'}
   }
 }
 
