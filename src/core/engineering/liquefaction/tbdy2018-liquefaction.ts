@@ -1,4 +1,4 @@
-export interface TBDYLiquefactionInput{depth:number;totalStress:number;effectiveStress:number;rawSPT:number;CE:number;CB:number;CR:number;CS:number;finesContent:number;Mw:number;SDS:number}
+export interface TBDYLiquefactionInput{depth:number;totalStress:number;effectiveStress:number;rawSPT:number;CE:number;CB:number;CR:number;CS:number;finesContent:number;Mw:number;SDS:number;normalizedSpt?:{CN:number;N160:number;N160f:number}}
 export interface TBDYLiquefactionResult{
   N160:number;N160f:number;CN:number;alpha:number;beta:number;CRRM75:number;CM:number;Rtau:number;rd:number;tauEarthquake:number;FS:number
   steps:{symbol:string;formula:string;value:number;source:string}[];warnings:string[]
@@ -14,12 +14,13 @@ export function tbdy2018Liquefaction(i:TBDYLiquefactionInput):TBDYLiquefactionRe
   }
   if(i.CE<=0||i.CB<=0||i.CR<=0||i.CS<=0)throw new Error('SPT düzeltme katsayıları pozitif olmalıdır.')
   if(i.Mw<=0||i.SDS<0||i.finesContent<0||i.finesContent>100)throw new Error('Mw, SDS ve ince dane oranı geçerli aralıkta olmalıdır.')
-  const sv=i.effectiveStress,z=i.depth,CN=Math.min(1.70,9.78/Math.sqrt(sv))
-  const N160=i.rawSPT*CN*i.CE*i.CB*i.CR*i.CS
+  const sv=i.effectiveStress,z=i.depth
+  const CN=i.normalizedSpt?.CN??Math.min(1.70,9.78/Math.sqrt(sv))
+  const N160=i.normalizedSpt?.N160??i.rawSPT*CN*i.CE*i.CB*i.CR*i.CS
   const f=i.finesContent
   let alpha=0,beta=1
-  if(f<=5){alpha=0;beta=1}else if(f<35){alpha=Math.exp(1.76-190/(f*f));beta=.99+Math.pow(f,1.5)/1000}else{alpha=5;beta=1.2}
-  const N160f=alpha+beta*N160
+  if(f<=5){alpha=0;beta=1}else if(f<35){alpha=Math.exp(1.76-190/(f*f));beta=.99+Math.pow(f,1.5)/1000}else{alpha=5,beta=1.2}
+  const N160f=i.normalizedSpt?.N160f??alpha+beta*N160
   const n=N160f
   const CRRM75=n>0&&n<34?1/(34-n)+n/135+50/(10*n+45)**2-1/200:NaN
   const CM=Math.pow(10,2.24)/Math.pow(Math.max(i.Mw,.1),2.56)
