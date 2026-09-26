@@ -2,7 +2,7 @@ import type { IdealizedSoilLayer, IdealizedSoilProfile } from '../models/idealiz
 import type { FoundationType } from '../models/project'
 import { effectiveStressAtDepth as centralEffectiveStressAtDepth } from './stress-profile'
 
-export type IdealizedSettlementMethod='burland-burbidge'|'elasticity'|'2to1-layer'|'janbu'|'schmertmann'
+export type IdealizedSettlementMethod='burland-burbidge'|'elasticity'|'2to1-layer'|'boussinesq'|'janbu'|'schmertmann'
 type SettlementLayerResult={
   layerId:string;order:number;soilName:string;soilCode:string;topDepth:number;bottomDepth:number;thickness:number;midDepth:number
   sigmaV0:number;porePressure:number;sigmaV0Effective:number;deltaSigma:number;sigmaVFinal:number;sigmaVFinalEffective:number;representativeN60?:number
@@ -25,7 +25,43 @@ function isCohesive(layer:IdealizedSoilLayer){
 }
 const effectiveStressAtDepth=centralEffectiveStressAtDepth
 
-function stressIncrement(qNet:number,B:number,L:number,z:number){return qNet*B*L/Math.max((B+z)*(L+z),1e-9)}
+function stressIncrement2to1(qNet:number,B:number,L:number,z:number){return qNet*B*L/Math.max((B+z)*(L+z),1e-9)}
+
+function gaussNodes8(){
+  return [[-0.9602898565,0.1012285363],[-0.7966664774,0.2223810345],[-0.5255324099,0.3137066459],[-0.1834346425,0.3626837834],[0.1834346425,0.3626837834],[0.5255324099,0.3137066459],[0.7966664774,0.2223810345],[0.9602898565,0.1012285363]] as const
+}
+
+/* Average vertical stress increment below the centre of a uniformly loaded rectangle.
+   The Boussinesq point-load kernel is integrated over the loaded area numerically.
+   No m-n chart interpolation is used. */
+function boussinesqRectangularAverage(q:number,B:number,L:number,z:number){
+  if(q<=0)return 0
+  if(z<=0)return Infinity
+  let sum=0
+  for(const [xi,wi] of gaussNodes8()){
+    const x=xi*B/2
+    for(const [eta,wj] of gaussNodes8()){
+      const y=eta*L/2
+      const r2=x*x+y*y+z*z
+      sum += wi*wj*(3*z*z)/(2*Math.PI*Math.pow(r2,2.5))
+    }
+  }
+  return q*(B*L/4)*sum
+}
+
+function boussinesqInfluenceDepth(B:number,L:number,ratio=0.10){
+  let lo=Math.max(0.001,0.01*Math.min(B,L)),hi=20*Math.max(B,L)
+  for(let i=0;i<60;i++){
+    const mid=(lo+hi)/2
+    if(boussinesqRectangularAverage(1,B,L,mid)>ratio)lo=mid
+    else hi=mid
+  }
+  return hi
+}
+
+function stressIncrement(qNet:number,B:number,L:number,z:number,method:IdealizedSettlementMethod){
+  return method==='boussinesq'?boussinesqRectangularAverage(qNet,B,L,z):stressIncrement2to1(qNet,B,L,z)
+}
 function burlandSettlement(layer:IdealizedSoilLayer,qNet:number,B:number,L:number,zTop:number,zBottom:number,influenceDepth:number,midDepth:number,gwt:number){
   const rawN=layer.representativeN60??layer.representativeSptN
   if(!finite(rawN)||rawN<=0)return{value:0,note:'Burland-Burbidge için temsilci N60/SPT yok.'}
@@ -83,7 +119,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSecondary:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve yük girdileri geçerli olmalıdır.'],source:'ZeminLab idealize zemin profili oturma motoru'}
   const baseStress=effectiveStressAtDepth(layers,Df,gwt)
   const ratio=L/Math.max(B,1e-9)
-  const influenceDepth=method==='burland-burbidge'?1.4*Math.pow(B/.3,.75)*.3:method==='schmertmann'?(ratio>=10?4*B:2*B):method==='janbu'?Math.max(B,1):2*B
+  const influenceDepth=method==='burland-burbidge'?1.4*Math.pow(B/.3,.75)*.3:method==='schmertmann'?(ratio>=10?4*B:2*B):method==='boussinesq'?boussinesqInfluenceDepth(B,L,.10):method==='janbu'?Math.max(B,1):2*B
   const coverageLimit=Df+influenceDepth
   let coverageCursor=Df
   let coverageOk=true
@@ -107,7 +143,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     const effectiveTop=Math.max(top,Df),effectiveBottom=Math.min(bottom,Df+influenceDepth)
     if(effectiveBottom<=effectiveTop)continue
     const thickness=effectiveBottom-effectiveTop,zTop=effectiveTop-Df,zBottom=effectiveBottom-Df,zMid=(zTop+zBottom)/2,midDepth=Df+zMid
-    const midStress=effectiveStressAtDepth(layers,midDepth,gwt),deltaSigma=Math.max(0,stressIncrement(qNet,B,L,zMid)),finalEffective=midStress.effective+deltaSigma,cohesive=isCohesive(layer)
+    const midStress=effectiveStressAtDepth(layers,midDepth,gwt),deltaSigma=Math.max(0,stressIncrement(qNet,B,L,zMid,method)),finalEffective=midStress.effective+deltaSigma,cohesive=isCohesive(layer)
     let immediate=0,consolidation=0,secondary=0,status:'HESAPLANDI'|'VERİ EKSİK'='HESAPLANDI',methodName='',note=''
     if(method==='burland-burbidge'){
       if(cohesive){
@@ -125,6 +161,11 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       if(finite(M)&&M>0)immediate=deltaSigma*thickness/M*1000
       else{status='VERİ EKSİK';note='Constrained/oedometric modül gerekir.'}
       if(cohesive){const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective);if(r.ok)consolidation=r.value;else status='VERİ EKSİK'}
+    }else if(method==='boussinesq'){
+      methodName='Boussinesq alan integrasyonu + elastik tabaka'
+      const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
+      if(finite(M)&&M>0)immediate=deltaSigma*thickness/M*1000
+      else{status='VERİ EKSİK';note='Boussinesq tabaka integrasyonu için constrained/oedometric modulus gerekir.'}
     }else if(method==='2to1-layer'){
       methodName='2:1 gerilme yayılımı + elastik tabaka'
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
@@ -158,8 +199,8 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   }
   if(results.some(x=>x.status==='VERİ EKSİK'))warnings.push('Bir veya daha fazla tabakada gerekli oturma parametresi eksik; eksik katkılar sıfır kabul edilmez ve sonuç hazırlıksız işaretlenir.')
   if(method==='schmertmann'&&input.timeYears==null)warnings.push('Schmertmann C2=1 alındı; zaman bilgisi girilmediği için creep düzeltmesi yapılmadı.')
-  if(method==='janbu')warnings.push('Janbu burada M-integrasyonu olarak uygulanır; tam gerilme-bağımlı Janbu parametre seti mevcut değilse sonuç ön tasarım olarak değerlendirilmelidir.')
+  if(method==='janbu')warnings.push('Janbu hesabı mevcut veri modelindeki M/constrained modulus ile yapılır; gerilme-bağımlı M0–M1 parametreleri verilmedikçe sonuç tam gerilme-bağımlı Janbu modeli değildir.')
   if(method==='burland-burbidge')warnings.push('Burland-Burbidge bağıntısı özellikle kum/granüler zemin için ampirik bir yöntemdir; kohezyonlu tabakalarda ayrı konsolidasyon hesabı yapılır.')
   if(finite(input.timeYears)&&input.timeYears!>0&&input.secondaryStartTimeYears==null&&results.some(x=>x.secondarySettlement>0))warnings.push('İkincil oturma için başlangıç zamanı girilmedi; t1=1 yıl referansı kullanıldı. Proje verisi varsa secondaryStartTimeYears girilmelidir.')
-  return{method,layers:results,totalImmediate,totalConsolidation,totalSecondary,totalSettlement:totalImmediate+totalConsolidation+totalSecondary,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,ready:results.length>0&&coverageOk&&!results.some(x=>x.status==='VERİ EKSİK'),warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978), 2:1 ve Janbu M-integrasyonu; yöntem ve parametre kaynakları raporlanır.'}
+  return{method,layers:results,totalImmediate,totalConsolidation,totalSecondary,totalSettlement:totalImmediate+totalConsolidation+totalSecondary,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,ready:results.length>0&&coverageOk&&!results.some(x=>x.status==='VERİ EKSİK'),warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978), Boussinesq alan integrasyonu, 2:1 ve mevcut veri modeliyle Janbu M-integrasyonu.'}
 }
