@@ -59,6 +59,7 @@ function stressAtDepth(
     for(const layer of [...borehole.lithology]
       .filter(x=>x.to>x.from&&x.from<z&&x.to>0)
       .sort((a,b)=>a.from-b.from)){
+      if(layer.from<cursor-eps)return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'SPT derinliğine kadar litoloji katmanları çakışıyor; σ′v0 hesaplanmadı.'}
       const top=Math.max(cursor,Math.max(0,layer.from))
       const bottom=Math.min(z,layer.to)
       if(bottom<=top+eps)continue
