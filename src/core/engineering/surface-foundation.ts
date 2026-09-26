@@ -221,7 +221,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
       representativeC=layerData.c
       representativePhi=layerData.phi
       representativeGamma=layerData.gamma
-      warnings.push('Tabakalı zemin için 2B′ etki derinliğinde eşdeğer parametreler kullanıldı: c ağırlıklı, tanφ ağırlıklı ve γ′ kalınlık ağırlıklı ortalama. TBDY 16.8.3.3 tabakaların etkisinin dikkate alınmasını ister; tek bir tabakalı-zemin bağıntısı tarif etmediği için bu yaklaşım mühendislik modeli olarak raporlanır.')
+      warnings.push('Tabakalı zemin için 2B′ etki derinliğinde eşdeğer parametreler yalnız ön/screening hesap olarak kullanıldı: c ağırlıklı, tanφ ağırlıklı ve γ′ kalınlık ağırlıklı ortalama. TBDY 16.8.3.3 tabakaların etkisinin dikkate alınmasını ister; yönetmelik tek bir eşdeğer-tabaka bağıntısı tarif etmediğinden bu sonuç nihai tasarım sonucu olarak işaretlenmez.')
     }
   }
 
@@ -259,10 +259,10 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(contactState==='NO_CONTACT')warnings.push('Temel tabanında basınçlı temas bulunmadığından q0/qt karşılaştırması nihai uygunluk için kullanılamaz.')
   if(contactState==='PARTIAL')warnings.push('Kısmi temas alanı compression-only lineer basınç dağılımından nümerik olarak çözüldü; qmin=0 ve qmax gerçek temas alanı üzerinden raporlanır.')
   let adequate=qo<=qt&&contactState!=='NO_CONTACT'&&(!i.layers||layeredComplete)
-  const finalDesignEligible=!i.layers?.length||layeredComplete&&false
+  const finalDesignEligible=!i.layers?.length
   const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,Bp,mf,method)
   checks.forEach(x=>x.controlling=false)
-  if(i.layers?.length&&layerData?.complete)warnings.push('Tabaka kontrolleri artık bağımsız min(qk) olarak tasarım direncine indirilmez; eşdeğer parametreli hesap ana sonucu, tabaka listesi ise izlenebilirlik kontrolüdür.')
+  if(i.layers?.length&&layerData?.complete)warnings.push('Tabakalı zemin hesabı nihai tasarım uygunluğu üretmez; tabaka sonuçları screening/izlenebilirlik içindir ve ayrı çok-tabakalı zemin modeli ile doğrulanmalıdır.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: sürşarj ve γ′/ağırlıklı γ dikkate alındı.')
   if(groundSlope>0)warnings.push('Arazi eğimi katsayıları genel kabul görmüş Vesic tipi bağıntılarla uygulanmıştır; β<φ′ koşulu kontrol edildi.')
   if(baseSlope>0)warnings.push('Temel tabanı eğimi katsayıları genel kabul görmüş Vesic tipi bağıntılarla uygulanmıştır.')
