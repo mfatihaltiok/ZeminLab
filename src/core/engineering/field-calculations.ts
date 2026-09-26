@@ -105,7 +105,7 @@ function stressAtDepth(
   }
 }
 
-export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[],unitSystem:UnitSystem='kN-m',fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number},correction:SptCorrectionParameters={ce:1,cb:1,cs:1,cr:1}):SptDerivedValues{
+export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[],unitSystem:UnitSystem='kN-m',fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number},correction:SptCorrectionParameters={ce:1,cb:1,cs:1}):SptDerivedValues{
   const nField=fieldN(record)
   if(nField===undefined)return{nField,ce:1,cb:1,cs:1,cr:1,cn:1,n60:0,n1_60:0,dilatancyApplied:false,trace:[],overburdenCorrection:1,overburdenCorrectionApplied:false,warnings:[],hasAssumptions:false}
   const stress=stressAtDepth(borehole,record.depth,laboratories,unitSystem,fallback)
