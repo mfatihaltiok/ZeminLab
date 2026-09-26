@@ -25,7 +25,7 @@ export function fieldN(record:SptRecord):number|undefined{
   if(Number.isFinite(record.n2)&&Number.isFinite(record.n3))return record.n2!+record.n3!
   return undefined
 }
-export type SptDerivedValues=Omit<SptEngineResult,'nField'>&{nField?:number;verticalStress?:number;effectiveStress?:number;stressSource?:string;overburdenCorrection:number;overburdenCorrectionApplied:boolean;n60DilatancyCorrected?:number}
+export type SptDerivedValues=Omit<SptEngineResult,'nField'>&{nField?:number;verticalStress?:number;porePressure?:number;effectiveStress?:number;stressSource?:string;overburdenCorrection:number;overburdenCorrectionApplied:boolean;n60DilatancyCorrected?:number}
 
 function layerAtDepth(borehole:BoreholeRecord,depth:number){return borehole.lithology.find(layer=>depth>=layer.from&&depth<layer.to)??borehole.lithology.find(layer=>depth>=layer.from&&depth<=layer.to)}
 function linkedLabForSpt(laboratories:LaboratoryRecord[],boreholeId:string,sptId:string,depth:number){
@@ -53,27 +53,32 @@ function stressAtDepth(
   const sourceParts:string[]=[]
   let layers:{top:number;bottom:number;gamma:number;gammaSat:number}[]=[]
   if(borehole.lithology.length){
-    layers=borehole.lithology
-      .filter(x=>x.to>x.from&&x.to>0)
-      .sort((a,b)=>a.from-b.from)
-      .map(layer=>{
-        const localLabGamma=median(boreholeLabs
-          .filter(x=>x.depth>=layer.from&&x.depth<layer.to&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0)
-          .map(x=>x.unitWeight!))
-        const gammaValue=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:localLabGamma??labGamma??fallbackGamma
-        const gammaSatValue=Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0
-          ?layer.saturatedUnitWeight!
-          :localLabGamma??labGamma??fallbackGammaSat??gammaValue
-        return {
-          top:layer.from,
-          bottom:layer.to,
-          gamma:gammaValue==null?NaN:unitWeightToBase(gammaValue,unitSystem),
-          gammaSat:gammaSatValue==null?NaN:unitWeightToBase(gammaSatValue,unitSystem)
-        }
-      })
-    if(layers.some(x=>!Number.isFinite(x.gamma)||x.gamma<=0||!Number.isFinite(x.gammaSat)||x.gammaSat<=0)){
-      return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ/γsat bulunamadı; CN uygulanmadı.'}
+    let cursor=0
+    const eps=1e-9
+    for(const layer of [...borehole.lithology]
+      .filter(x=>x.to>x.from&&x.from<z&&x.to>0)
+      .sort((a,b)=>a.from-b.from)){
+      const top=Math.max(cursor,Math.max(0,layer.from))
+      const bottom=Math.min(z,layer.to)
+      if(bottom<=top+eps)continue
+      if(top>cursor+eps){
+        return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'SPT derinliğine kadar kesintisiz litoloji/γ profili yok; CN uygulanmadı.'}
+      }
+      const localLabGamma=median(boreholeLabs
+        .filter(x=>x.depth>=top&&x.depth<bottom&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0)
+        .map(x=>x.unitWeight!))
+      const gammaValue=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:localLabGamma??labGamma??fallbackGamma
+      const gammaSatValue=Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0
+        ?layer.saturatedUnitWeight!
+        :fallbackGammaSat??gammaValue
+      if(gammaValue==null||gammaSatValue==null||!Number.isFinite(gammaValue)||gammaValue<=0||!Number.isFinite(gammaSatValue)||gammaSatValue<=0){
+        return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'SPT derinliğine kadar γ/γsat bulunamadı; CN uygulanmadı.'}
+      }
+      layers.push({top,bottom,gamma:unitWeightToBase(gammaValue,unitSystem),gammaSat:unitWeightToBase(gammaSatValue,unitSystem)})
+      cursor=bottom
+      if(cursor>=z-eps)break
     }
+    if(cursor<z-eps)return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'SPT derinliğine kadar kesintisiz γ profili yok; CN uygulanmadı.'}
     sourceParts.push('litoloji')
   }else{
     const gamma=labGamma??fallbackGamma
@@ -91,6 +96,7 @@ function stressAtDepth(
     if(sourceParts[0]==='litoloji')sourceParts.push(labGamma!=null?'LAB yedek değeri':'proje γ/γsat yedek değeri')
     return{
       verticalStress:result.sigmaV,
+      porePressure:result.porePressure,
       effectiveStress:result.sigmaVPrime,
       source:'Merkezi σv/σ′v profili · '+sourceParts.join(' + ')
     }
@@ -122,7 +128,7 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
     applyOverburden:true,
     applyDilatancy:false
   })
-  return{...result,verticalStress:stress.verticalStress,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:stress.effectiveStress!=null||claySoil,n60DilatancyCorrected:result.n1_60_dilatancy}
+  return{...result,verticalStress:stress.verticalStress,porePressure:stress.porePressure,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:stress.effectiveStress!=null||claySoil,n60DilatancyCorrected:result.n1_60_dilatancy}
 }
 export function classifyLaboratoryRecord(record:LaboratoryRecord):SoilClassificationResult|null{return classifyFineSoil(record.liquidLimit,laboratoryPlasticityIndex(record))}
 
