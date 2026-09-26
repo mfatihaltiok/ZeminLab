@@ -75,9 +75,9 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   })
   approx(layered.representativeC,20)
   assert.ok(layered.representativePhi>20&&layered.representativePhi<30)
-  assert.equal(layered.finalDesignEligible,true)
+  assert.equal(layered.finalDesignEligible,false)
   assert.equal(layered.layeredScreeningOnly,true)
-  assert.ok(layered.warnings.some(w=>w.includes('eşdeğer parametreler')))
+  assert.ok(layered.warnings.some(w=>w.includes('nihai tasarım')||w.includes('screening')))
 }
 
 
@@ -152,6 +152,23 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(result.layers[0].deltaSigma>0)
 }
 
+
+{
+  const profile={
+    id:'boussinesq',version:1,status:'SABİTLENDİ' as const,targetLayerCount:1,generatedAt:new Date(0).toISOString(),
+    sourceBoreholeIds:[],sourceLaboratoryIds:[],
+    layers:[{
+      id:'L1',order:1,topDepth:0,bottomDepth:8,soilName:'Kum',soilCode:'SA',boreholeIds:[],sptRecordIds:[],laboratoryRecordIds:[],
+      gamma:18,gammaSat:19,constrainedModulus:20000,parameterSources:{},userOverride:false
+    }],
+    methodology:'regression'
+  }
+  const result=calculateIdealizedSettlement({profile,method:'boussinesq',B:2,L:2,Df:0,qGross:100,groundwaterDepth:50})
+  assert.ok(result.influenceDepth>0)
+  assert.ok(result.layers[0].deltaSigma>0)
+  assert.ok(result.totalImmediate>0)
+  assert.equal(result.ready,true)
+}
 
 {
   const profile={
