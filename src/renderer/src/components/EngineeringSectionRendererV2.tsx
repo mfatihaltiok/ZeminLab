@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { normalizeEngineeringRenderModel, type EngineeringRenderLayer, type EngineeringRenderMarker } from './engineering-render-model'
 
 export type { EngineeringRenderLayer, EngineeringRenderMarker }
@@ -26,6 +26,8 @@ function patternFor(code: string | undefined, colorClass: EngineeringRenderLayer
 }
 
 export function EngineeringSectionRenderer(props: Props) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
+  const patternId = (name: string) => 'render-' + uid + '-' + name
   const model = normalizeEngineeringRenderModel({
     variant: props.variant,
     totalDepth: props.totalDepth,
@@ -56,12 +58,12 @@ export function EngineeringSectionRenderer(props: Props) {
     <div className="engineering-render-scroll">
       <svg className="engineering-render-svg" viewBox={'0 0 1180 ' + height} preserveAspectRatio="xMinYMin meet" role="img" aria-label={model.variant === 'profile' ? 'İdealize zemin profili' : 'Sondaj logu'}>
         <defs>
-          <pattern id="render-clay" width="18" height="18" patternUnits="userSpaceOnUse"><rect width="18" height="18" fill="#d8bca5"/><path d="M0 5h18M0 13h18" stroke="#9d765d" strokeWidth="1"/></pattern>
-          <pattern id="render-silt" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#cfd7ce"/><circle cx="4" cy="4" r="1.2" fill="#778176"/><circle cx="12" cy="11" r="1.2" fill="#778176"/></pattern>
-          <pattern id="render-sand" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#e5d19c"/><circle cx="4" cy="5" r="1.1" fill="#a18143"/><circle cx="12" cy="12" r="1.1" fill="#a18143"/></pattern>
-          <pattern id="render-gravel" width="20" height="20" patternUnits="userSpaceOnUse"><rect width="20" height="20" fill="#c7cdd0"/><circle cx="5" cy="6" r="2" fill="#737c81"/><circle cx="15" cy="14" r="2" fill="#737c81"/></pattern>
-          <pattern id="render-rock" width="22" height="22" patternUnits="userSpaceOnUse"><rect width="22" height="22" fill="#b9bec1"/><path d="M2 18L9 5l9 9" fill="none" stroke="#626a6f" strokeWidth="1.3"/></pattern>
-          <pattern id="render-fill" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#d9dde0"/><path d="M0 16L16 0" stroke="#9da5aa"/></pattern>
+          <pattern id={patternId("clay")} width="18" height="18" patternUnits="userSpaceOnUse"><rect width="18" height="18" fill="#d8bca5"/><path d="M0 5h18M0 13h18" stroke="#9d765d" strokeWidth="1"/></pattern>
+          <pattern id={patternId("silt")} width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#cfd7ce"/><circle cx="4" cy="4" r="1.2" fill="#778176"/><circle cx="12" cy="11" r="1.2" fill="#778176"/></pattern>
+          <pattern id={patternId("sand")} width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#e5d19c"/><circle cx="4" cy="5" r="1.1" fill="#a18143"/><circle cx="12" cy="12" r="1.1" fill="#a18143"/></pattern>
+          <pattern id={patternId("gravel")} width="20" height="20" patternUnits="userSpaceOnUse"><rect width="20" height="20" fill="#c7cdd0"/><circle cx="5" cy="6" r="2" fill="#737c81"/><circle cx="15" cy="14" r="2" fill="#737c81"/></pattern>
+          <pattern id={patternId("rock")} width="22" height="22" patternUnits="userSpaceOnUse"><rect width="22" height="22" fill="#b9bec1"/><path d="M2 18L9 5l9 9" fill="none" stroke="#626a6f" strokeWidth="1.3"/></pattern>
+          <pattern id={patternId("fill")} width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#d9dde0"/><path d="M0 16L16 0" stroke="#9da5aa"/></pattern>
         </defs>
 
         <rect width="1180" height={height} fill="#f7f9fa"/>
@@ -89,7 +91,7 @@ export function EngineeringSectionRenderer(props: Props) {
           const y1 = depthY(layer.bottomDepth)
           const h = Math.max(1, y1 - y0)
           return <g key={layer.id}>
-            <rect x={soilX} y={y0} width={soilW} height={h} fill={'url(#' + patternFor(layer.code, layer.colorClass) + ')'} stroke="#707a81"/>
+            <rect x={soilX} y={y0} width={soilW} height={h} fill={'url(#' + patternId(patternFor(layer.code, layer.colorClass).replace('render-', '')) + ')'} stroke="#707a81"/>
             <circle cx={soilX + 18} cy={y0 + 15} r="9" fill="#fff" stroke="#65727a"/>
             <text x={soilX + 18} y={y0 + 18} textAnchor="middle" fontSize="8" fontWeight="700" fill="#35434b">{index + 1}</text>
             {h >= 36 && <>
