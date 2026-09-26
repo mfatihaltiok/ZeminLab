@@ -120,8 +120,8 @@ export function captureSptStressSnapshot(
   unitSystem:UnitSystem='kN-m',
   fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number}
 ):SptStressSnapshot{
-  const groundwaterDepth=borehole.groundwaterDepth??fallback?.groundwaterDepth
-  if(groundwaterDepth===undefined)throw new Error('SPT yapıldığı andaki YASS girilmeden test koşulları sabitlenemez.')
+  const groundwaterDepth=borehole.groundwaterDepth
+  if(groundwaterDepth===undefined)throw new Error('SPT yapıldığı andaki YASS sondaj kaydında girilmeden test koşulları sabitlenemez.')
   const stress=stressAtDepth(borehole,depth,laboratories,unitSystem,fallback)
   if(stress.verticalStress==null||stress.porePressure==null||stress.effectiveStress==null)throw new Error(stress.source)
   return{
@@ -166,9 +166,9 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
     applyOverburden:true,
     applyDilatancy:false
   })
-  const warnings=classificationConflict
-    ? [...result.warnings,'SPT zemin kodu ile laboratuvar Atterberg sınıflandırması çelişiyor; laboratuvar sınıflandırması CN kararında önceliklendirildi.']
-    : result.warnings
+  const warnings=[...result.warnings]
+  if(classificationConflict)warnings.push('SPT zemin kodu ile laboratuvar Atterberg sınıflandırması çelişiyor; laboratuvar sınıflandırması CN kararında önceliklendirildi.')
+  if(record.testStressSnapshot===undefined)warnings.push('SPT test koşulları henüz sabitlenmedi; saha koşullarını kontrol edip SPT satırını Onayla ile kilitleyin.')
   const hasAssumptions=result.hasAssumptions||classificationConflict||record.testStressSnapshot===undefined
   return{...result,warnings,hasAssumptions,verticalStress:stress.verticalStress,porePressure:stress.porePressure,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:stress.effectiveStress!=null||claySoil,n60DilatancyCorrected:result.n1_60_dilatancy}
 }
