@@ -88,7 +88,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const triggerRequired=mandatoryAnalysis&&researchDataComplete&&npt.n1_60<30
     const postLiquefactionRequired=false
     const trace:SptTraceStep[]=[...npt.trace,
-      {symbol:'α',title:'İnce dane katsayısı',formula:'α=f(IDI)',value:alpha,note:'IDI='+fines.toFixed(2)+' %'},
+      {symbol:'α',title:'İnce dane katsayısı',formula:'α=f(IDI)',value:alpha,note:fines!=null?'IDI='+fines.toFixed(2)+' %':'IDI girilmedi'},
       {symbol:'β',title:'İnce dane katsayısı',formula:'β=f(IDI)',value:beta},
       {symbol:'(N1)60f',title:'İnce dane düzeltilmiş SPT',formula:'(N1)60f=α+β(N1)60',value:n1_60f}
     ]
