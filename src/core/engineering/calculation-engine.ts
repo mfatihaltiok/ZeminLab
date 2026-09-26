@@ -107,13 +107,13 @@ export function foundationChecks(i:FoundationCheckInput){
     'concrete-concrete':.50,
     'concrete-bedrock':.50
   }
-  const interfaceType=i.interfaceType
-  if(!interfaceType)throw new Error('Temel-zemin ara yüzü seçilmelidir; tanδ değeri ara yüzü belirtilmeden varsayılamaz.')
+  const interfaceType=i.interfaceType??'cast-in-place-soil'
   const tanLimit=interfaceLimits[interfaceType]
   const rawTan=i.deltaTan??tanLimit
   if(rawTan<0||!Number.isFinite(rawTan))throw new Error('tanδ sıfır veya pozitif ve sonlu olmalıdır.')
   const deltaTan=Math.min(tanLimit,rawTan)
   const warnings:string[]=[]
+  if(i.interfaceType==null)warnings.push('Temel-zemin arayüzü ayrıca girilmedi; basitleştirilmiş proje akışında yerinde dökme beton-zemin arayüzü ve TBDY Tablo 16.3 üst sınırı kullanıldı.')
   if(i.deltaTan==null)warnings.push('tanδ girilmedi; seçilen arayüz için TBDY Tablo 16.3 üst sınırı kullanıldı. Proje özelinde deney/veri varsa doğrudan girilmelidir.')
   if(rawTan>tanLimit)warnings.push('Girilen tanδ, TBDY Tablo 16.3 seçilen arayüz üst sınırını aştığı için sınırlandırıldı.')
   if(rh!==1.10)warnings.push('TBDY 2018 Tablo 16.2 için γRh=1.10 kullanılmalıdır.')
