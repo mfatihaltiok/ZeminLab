@@ -1,5 +1,3 @@
-import type { LiquefactionProfileResult } from './liquefaction/liquefaction-profile'
-
 export interface CyclicSettlementLayerInput {
   topDepth:number
   bottomDepth:number
@@ -84,17 +82,4 @@ export function calculateCyclicSettlement(input:CyclicSettlementInput):CyclicSet
   if(results.some(x=>x.status==='VERİ EKSİK'))warnings.push('Eksik γmax veya (N1)60,CS bulunan tabakalar sıfır oturma kabul edilmedi; sonuç nihai değerlendirme için hazır değildir.')
   if(input.maxDepth!=null&&finite(input.maxDepth)&&results.some(x=>x.bottomDepth>input.maxDepth+1e-9))warnings.push('Hesap derinliği sınırı dışında kalan tabakalar dahil edildi; giriş profilini açıkça sınırlandırın.')
   return{method:'ishihara-yoshimine-1992',layers:results,totalSettlement,ready,warnings,source:'Ishihara & Yoshimine (1992); analitik εv yaklaşımı Idriss & Boulanger kaynaklıdır. Yanal yayılma ve yapı-zemin etkileşimi ayrıca değerlendirilmelidir.'}
-}
-
-export function cyclicSettlementFromLiquefaction(profile:LiquefactionProfileResult,maxCyclicShearStrainByDepth:Map<number,number>):CyclicSettlementResult{
-  const layers=profile.rows.filter(r=>r.liquefactionCheck==='evaluate').map(r=>({
-    topDepth:r.depth,
-    bottomDepth:r.depth,
-    n1_60cs:r.n1_60f,
-    maxCyclicShearStrain:maxCyclicShearStrainByDepth.get(r.depth),
-    saturated:r.saturated,
-    liquefactionFactorOfSafety:r.FS,
-    soilType:r.soil
-  }))
-  return calculateCyclicSettlement({layers})
 }
