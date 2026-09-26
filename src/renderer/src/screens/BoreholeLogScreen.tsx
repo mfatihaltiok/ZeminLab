@@ -3,7 +3,6 @@ import { Card, Field, Frame } from '../workspace/WorkspaceShell'
 import type { BoreholeLogObservation, BoreholeRecord, LaboratoryRecord, LithologyLayer } from '../../../core/models/field-data'
 import { DEFAULT_BOREHOLE_LOG_SETTINGS } from '../../../core/models/field-data'
 import { EngineeringSectionRenderer } from '../components/EngineeringSectionRendererV2'
-import { Soil3DViewport } from '../components/Soil3DViewport'
 import './borehole-log.css'
 
 type Props = { boreholes: BoreholeRecord[]; labs: LaboratoryRecord[]; onBoreholesChange: (rows: BoreholeRecord[]) => void }
