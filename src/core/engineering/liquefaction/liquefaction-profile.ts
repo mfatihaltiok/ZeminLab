@@ -52,7 +52,7 @@ function rdAtDepth(z:number){
 function soilIsPotential(code:string,pi:number|undefined){
   const c=code.trim().toUpperCase().replace(/İ/g,'I')
   if(pi!=null&&pi>=12)return false
-  return c==='SA'||c==='GRSA'||c==='SISA'||c==='CLSA'||c==='SM'||c==='SI'||c==='ML'||c==='SP'||c==='SW'||c.includes('KUM')||c.includes('SAND')
+  return c==='SA'||c==='GRSA'||c==='SISA'||c==='CLSA'||c==='SM'||c==='SC'||c==='SI'||c==='ML'||c==='SP'||c==='SW'||c.includes('KUM')||c.includes('SAND')
 }
 function mandatoryDts(dts:EarthquakeDesignClass|undefined){return dts==='1'||dts==='1a'||dts==='2'||dts==='2a'}
 function mandatorySoilGroup(group:LiquefactionSoilGroup|undefined){return group==='ZD'||group==='ZE'||group==='ZF'}
@@ -80,9 +80,9 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       applyOverburden:true,applyDilatancy:false
     })
     const fines=clamp(fineContent??0,0,100),fc=fineContentCorrection(fines),n1_60f=fc.alpha+fc.beta*npt.n1_60
-    const saturated=record.depth>input.gwt+1e-9,within20=record.depth<=20+1e-9,belowFoundation=record.depth>=(input.foundationDepth??0)+1e-9
+    const saturated=record.depth>=input.gwt-1e-9,within20=record.depth<=20+1e-9
     const classificationDataComplete=soil!=null&&soil.trim().length>0&&fineContent!=null&&pi!=null
-    const potentiallyLiquefiable=classificationDataComplete&&saturated&&within20&&belowFoundation&&soilIsPotential(soil!,pi)
+    const potentiallyLiquefiable=classificationDataComplete&&saturated&&within20&&soilIsPotential(soil!,pi)
     const exceptionA=input.dts==='4'&&clayContent!=null&&pi!=null&&clayContent>20&&pi>10,exceptionB=input.dts==='4'&&fineContent!=null&&fineContent>35&&npt.n1_60>20,exemption=exceptionA||exceptionB
     const mandatoryAnalysis=potentiallyLiquefiable&&mandatoryByProject&&!exemption
     const researchDataComplete=fineContent!=null&&pi!=null&&waterContent!=null
@@ -98,12 +98,12 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       trace.push({symbol:'Kapsama',title:'Katman kapsamı',formula:'ΣΔz=z',value:stress.covered,unit:'m',note:'SPT derinliğine kadar sürekli γ profili yok.'})
       return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
     }
-    if(!classificationDataComplete&&saturated&&within20&&belowFoundation&&!exemption){
+    if(!classificationDataComplete&&saturated&&within20&&!exemption){
       trace.push({symbol:'Veri',title:'Potansiyel sıvılaşabilir zemin sınıflandırması',formula:'16.6.2–16.6.4: zemin türü + IDI + PI + YASS',value:0,note:'Zemin türü, ince dane içeriği ve PI birlikte verilmeden 16.6 kapsamı dışında kabul edilemez.'})
       return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
     }
     if(!saturated||!within20||!potentiallyLiquefiable||exemption){
-      const note=!saturated?'YASS üzerinde':!within20?'20 m dışında':!belowFoundation?'Temel tabanı üzerinde':!potentiallyLiquefiable?'16.6.4 potansiyel zemin tanımına girmiyor':'DTS=4 istisnası'
+      const note=!saturated?'YASS üzerinde':!within20?'20 m dışında':!potentiallyLiquefiable?'16.6.4 potansiyel zemin tanımına girmiyor':'DTS=4 istisnası'
       trace.push({symbol:'Kapsam',title:'TBDY kapsam kontrolü',formula:'16.6.1–16.6.6',value:record.depth,note})
       return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
