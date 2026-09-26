@@ -91,7 +91,7 @@ export function EngineeringSectionRenderer(props:Props){
         <line x1={classX} y1={top} x2={classX} y2={bottom} stroke="#adb5ba" />
         <line x1={dataX} y1={top} x2={dataX} y2={bottom} stroke="#adb5ba" />
 
-        {model.layers.map((layer,index)=>{
+        {model.layers.map((layer)=>{
           const y0=depthY(layer.topDepth)
           const y1=depthY(layer.bottomDepth)
           const h=Math.max(4,y1-y0)
