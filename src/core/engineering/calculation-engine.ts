@@ -166,7 +166,7 @@ export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number
   return{value:{Ac,ratio,composite,allowable:composite/Math.max(i.FS,1e-9),columnLoad:Ac*i.columnStrength/Math.max(i.FS,1e-9)},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio}],method:'Jet Grout ön model',source:'Proje kaynak paketi'}
 }
 
-export { effectiveStressAtDepth as stressAtDepth }
+export function stressAtDepth(depth:number,layers:{top:number;bottom:number;gamma:number;gammaSat:number}[],gwt:number){const r=effectiveStressAtDepth(depth,layers,gwt);return{sigmaV:r.sigmaV,sigmaVPrime:r.sigmaVPrime,u:r.porePressure}}
 export const SOURCE_NOTES={
   investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',
   liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',
