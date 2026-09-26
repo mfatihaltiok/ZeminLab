@@ -39,8 +39,13 @@ function rect(root:Container,x:number,y:number,w:number,h:number,fill:number,str
 
 function line(root:Container,x1:number,y1:number,x2:number,y2:number,color=0xaab4ba,width=1,dash=false):void{
   const g=new Graphics()
-  if(dash)g.moveTo(x1,y1).lineTo(x2,y2).stroke({color,width,dash:[8,6]})
-  else g.moveTo(x1,y1).lineTo(x2,y2).stroke({color,width})
+  if(!dash){g.moveTo(x1,y1).lineTo(x2,y2).stroke({color,width})}
+  else{
+    const length=Math.hypot(x2-x1,y2-y1)
+    const ux=length>0?(x2-x1)/length:0
+    const uy=length>0?(y2-y1)/length:0
+    for(let d=0;d<length;d+=14){const e=Math.min(d+8,length);g.moveTo(x1+ux*d,y1+uy*d).lineTo(x1+ux*e,y1+uy*e).stroke({color,width})}
+  }
   root.addChild(g)
 }
 
