@@ -120,7 +120,7 @@ function consolidationSettlement(layer:IdealizedSoilLayer,thickness:number,sigma
 
 export function calculateIdealizedSettlement(input:IdealizedSettlementInput):IdealizedSettlementResult{
   const {method,B,L,Df,qGross}=input
-  const sourceUnit=input.profileUnitSystem??profile.unitSystem??'kN-m'
+  const sourceUnit=input.profileUnitSystem??input.profile.unitSystem??'kN-m'
   const profile:IdealizedSoilProfile={...input.profile,layers:input.profile.layers.map(layer=>({...layer,
     gamma:layer.gamma==null?undefined:unitWeightToBase(layer.gamma,sourceUnit),
     gammaSat:layer.gammaSat==null?undefined:unitWeightToBase(layer.gammaSat,sourceUnit),
