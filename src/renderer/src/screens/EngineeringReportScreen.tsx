@@ -9,6 +9,7 @@ import { jetGroutEngineering } from '../../../core/engineering/jet-grout-advance
 import type { BoreholeRecord, LaboratoryRecord } from '../../../core/models/field-data'
 import type { IdealizedSoilProfile } from '../../../core/models/idealized-soil-profile'
 import { Frame } from '../workspace/WorkspaceShell'
+import { EngineeringSectionRenderer } from '../components/EngineeringSectionRendererV2'
 import './engineering-report.css'
 
 type Props={boreholes:BoreholeRecord[];labs:LaboratoryRecord[];profile?:IdealizedSoilProfile}
@@ -60,7 +61,7 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
     })
   },[p.jetGrout,N,B,L,H])
   const foundation=useMemo(()=>B>0&&L>0?foundationChecks({
-    B,L,N,Vx,Vy,Mx,My,deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion,
+    B,L,N,Vx,Vy,Mx,My,cu:soil.undrainedCohesion,
     area:undefined,groundwaterDepth:soil.groundwaterDepth,foundationDepth:Df,
     passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance
   }):undefined,[B,L,N,Vx,Vy,Mx,My,f,soil,p.unitSystem,Df])
@@ -107,6 +108,22 @@ export default function EngineeringReportScreen({boreholes,labs,profile}:Props){
         </div>
         {info('TBDY kapsamı','Zemin grubu, DTS, YASS ve temel yükleri ayrı veri kaynakları olarak izlenir.')}{p.geophysical.soilGroup==='ZF'&&!p.geophysical.siteSpecificResponseAnalysisCompleted&&info('ZF uyarısı','TBDY 16.5.1.3 gereği sahaya özel zemin davranış analizi tamamlanmadan bu rapor nihai ZF tasarım girdisi olarak kabul edilmemelidir.')}
       </Section>
+
+      {boreholes.length > 0 && <Section title="Sondaj logları · teknik kesit" landscape>
+        {boreholes.map(b => <div key={b.id} className="report-engineering-render">
+          <div className="report-subheading"><b>{b.name}</b><span>Toplam derinlik {fmt(b.totalDepth)} m · YASS {fmt(b.groundwaterDepth)} m</span></div>
+          <EngineeringSectionRenderer
+            variant="borehole"
+            totalDepth={Math.max(b.totalDepth, 1)}
+            groundwaterDepth={b.groundwaterDepth}
+            layers={b.lithology.map(x => ({id:x.id,topDepth:x.from,bottomDepth:x.to,code:x.code,description:x.description,colorClass:x.colorClass}))}
+            markers={[
+              ...b.spt.filter(x => x.testType === 'SPT').map(x => ({depth:x.depth,label:x.testType,detail:x.n2 != null && x.n3 != null ? 'N=' + (x.n2 + x.n3).toFixed(0) : undefined,kind:'spt' as const})),
+              ...labs.filter(x => x.boreholeId === b.id).map(x => ({depth:x.depth,label:x.sampleId,detail:x.sampleType,kind:'lab' as const}))
+            ]}
+          />
+        </div>)}
+      </Section>}
 
       <Section title="SPT düzeltmeleri">
         <Table head={['Sondaj','z (m)','N','Ce','Cb','Cs','Cr','N60','CN','(N1)60']}>
