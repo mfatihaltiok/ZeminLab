@@ -43,7 +43,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
       const layer=b.lithology.find(x=>record.depth>=x.from&&record.depth<x.to)
       return{
         depth:record.depth,depthTo:record.depthTo,nField:record.n2!+record.n3!,soil:record.soilCode??layer?.code,
-        fineContent:cfg.fineContent??lab?.finesContent??lab?.sieve200Passing??layer?.finesContent,
+        fineContent:lab?.finesContent??lab?.sieve200Passing??layer?.finesContent,
         plasticityIndex:lab?.plasticityIndex??(lab?.liquidLimit!=null&&lab?.plasticLimit!=null?lab.liquidLimit-lab.plasticLimit:undefined)??layer?.plasticityIndex,
         clayContent:lab?.hydrometer002,
         waterContent:lab?.waterContent
