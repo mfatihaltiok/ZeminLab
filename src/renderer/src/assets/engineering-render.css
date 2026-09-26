@@ -5,3 +5,5 @@
 @media(max-width:1200px){.engineering-render-scroll{max-height:620px}.engineering-render-svg{min-width:820px}}
 
 .profile-3d-card{margin-top:14px;background:#f7f9fa;border:1px solid #aeb7bd;overflow:hidden}.profile-3d-card .profile-render-header{display:flex;justify-content:space-between;padding:12px 14px;background:#e8ecee;border-bottom:1px solid #c4cbd0}.profile-3d-card .profile-render-header b{display:block;font-size:11px}.profile-3d-card .profile-render-header span{display:block;margin-top:3px;font-size:9px;color:#68747b}.soil-3d-viewport{width:100%;min-height:420px;background:#f3f5f6;overflow:hidden}.soil-3d-viewport canvas{display:block;width:100%!important;height:auto!important}@media(max-width:900px){.soil-3d-viewport{min-height:300px}}
+
+.log-3d-card{margin:12px 0;background:#f7f9fa;border:1px solid #aeb7bd;overflow:hidden}.log-3d-card .log-preview-header{padding:12px 14px;background:#e8ecee;border-bottom:1px solid #c4cbd0}.log-3d-card .log-preview-header b{display:block;font-size:11px}.log-3d-card .log-preview-header span{display:block;margin-top:3px;font-size:9px;color:#68747b}
