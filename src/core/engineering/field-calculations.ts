@@ -12,8 +12,10 @@ export function classifyFineSoil(liquidLimit?:number,plasticityIndex?:number):So
   return{code,description:`${group} Plastisiteli ${isClay?'Kil':'Silt'} (${code})`,plasticityGroup:group,isClay,aLinePi}
 }
 export function laboratoryPlasticityIndex(record:LaboratoryRecord):number|undefined{
-  if(Number.isFinite(record.plasticityIndex))return record.plasticityIndex
-  if(Number.isFinite(record.liquidLimit)&&Number.isFinite(record.plasticLimit))return record.liquidLimit!-record.plasticLimit!
+  if(Number.isFinite(record.plasticityIndex)&&record.plasticityIndex!>=0)return record.plasticityIndex
+  if(Number.isFinite(record.liquidLimit)&&Number.isFinite(record.plasticLimit)&&record.liquidLimit!>=record.plasticLimit!){
+    return record.liquidLimit!-record.plasticLimit!
+  }
   return undefined
 }
 export function fieldN(record:SptRecord):number|undefined{
