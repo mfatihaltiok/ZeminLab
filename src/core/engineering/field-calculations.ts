@@ -35,34 +35,64 @@ function median(values:number[]):number|undefined{
   const a=[...values].sort((x,y)=>x-y),m=Math.floor(a.length/2)
   return a.length%2?a[m]:(a[m-1]+a[m])/2
 }
-function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:LaboratoryRecord[],unitSystem:UnitSystem,fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number}){
+function stressAtDepth(
+  borehole:BoreholeRecord,
+  depth:number,
+  laboratories:LaboratoryRecord[],
+  unitSystem:UnitSystem,
+  fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number}
+){
   const z=Math.max(0,depth)
-  if(!borehole.lithology.length){
-    const labGammas=laboratories.filter(x=>x.boreholeId===borehole.id&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0).map(x=>x.unitWeight!)
-    const gamma=median(labGammas)??(Number.isFinite(fallback?.unitWeight)&&fallback!.unitWeight!>0?fallback!.unitWeight!:undefined)
-    const gammaSat=median(labGammas)??(Number.isFinite(fallback?.saturatedUnitWeight)&&fallback!.saturatedUnitWeight!>0?fallback!.saturatedUnitWeight!:gamma)
-    if(gamma==null||gammaSat==null)return{verticalStress:undefined,effectiveStress:undefined,source:'γ/γsat bulunamadı; CN hesaplanmadı.'}
-    try{
-      const gwt=borehole.groundwaterDepth??fallback?.groundwaterDepth??1e9
-      const result=effectiveStressAtDepth(z,[{top:0,bottom:Math.max(z,1e-6),gamma:unitWeightToBase(gamma,unitSystem),gammaSat:unitWeightToBase(gammaSat,unitSystem)}],gwt)
-      const source=labGammas.length?'Bağlı laboratuvar γ ile σv/σ′v':'Proje γ/γsat ile ön σv/σ′v'
-      return{verticalStress:result.sigmaV,effectiveStress:result.sigmaVPrime,source}
-    }catch{return{verticalStress:undefined,effectiveStress:undefined,source:'σv/σ′v hesabı yapılamadı; CN uygulanmadı.'}}
+  const boreholeLabs=laboratories.filter(x=>x.boreholeId===borehole.id)
+  const labGamma=median(boreholeLabs.filter(x=>Number.isFinite(x.unitWeight)&&x.unitWeight!>0).map(x=>x.unitWeight!))
+  const fallbackGamma=Number.isFinite(fallback?.unitWeight)&&fallback!.unitWeight!>0?fallback!.unitWeight!:undefined
+  const fallbackGammaSat=Number.isFinite(fallback?.saturatedUnitWeight)&&fallback!.saturatedUnitWeight!>0?fallback!.saturatedUnitWeight!:undefined
+  const gwt=borehole.groundwaterDepth??fallback?.groundwaterDepth??1e9
+
+  const sourceParts:string[]=[]
+  let layers:{top:number;bottom:number;gamma:number;gammaSat:number}[]=[]
+  if(borehole.lithology.length){
+    layers=borehole.lithology
+      .filter(x=>x.to>x.from&&x.to>0)
+      .sort((a,b)=>a.from-b.from)
+      .map(layer=>{
+        const localLabGamma=median(boreholeLabs
+          .filter(x=>x.depth>=layer.from&&x.depth<layer.to&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0)
+          .map(x=>x.unitWeight!))
+        const gammaValue=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:localLabGamma??labGamma??fallbackGamma
+        const gammaSatValue=Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0
+          ?layer.saturatedUnitWeight!
+          :localLabGamma??labGamma??fallbackGammaSat??gammaValue
+        return {
+          top:layer.from,
+          bottom:layer.to,
+          gamma:gammaValue==null?NaN:unitWeightToBase(gammaValue,unitSystem),
+          gammaSat:gammaSatValue==null?NaN:unitWeightToBase(gammaSatValue,unitSystem)
+        }
+      })
+    if(layers.some(x=>!Number.isFinite(x.gamma)||x.gamma<=0||!Number.isFinite(x.gammaSat)||x.gammaSat<=0)){
+      return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ/γsat bulunamadı; CN uygulanmadı.'}
+    }
+    sourceParts.push('litoloji')
+  }else{
+    const gamma=labGamma??fallbackGamma
+    const gammaSat=labGamma??fallbackGammaSat??gamma
+    if(gamma==null||gammaSat==null)return{verticalStress:undefined,effectiveStress:undefined,source:'γ/γsat bulunamadı; CN uygulanmadı.'}
+    layers=[{top:0,bottom:Math.max(z,1e-6),gamma:unitWeightToBase(gamma,unitSystem),gammaSat:unitWeightToBase(gammaSat,unitSystem)}]
+    sourceParts.push(labGamma!=null?'laboratuvar γ':'proje γ/γsat')
   }
-  const layers=borehole.lithology
-    .filter(x=>x.to>x.from&&x.to>0)
-    .sort((a,b)=>a.from-b.from)
-    .map(layer=>{
-      const labGamma=median(laboratories.filter(x=>x.boreholeId===borehole.id&&x.depth>=layer.from&&x.depth<layer.to&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0).map(x=>x.unitWeight!))
-      const gamma=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?unitWeightToBase(layer.unitWeight!,unitSystem):labGamma==null?undefined:unitWeightToBase(labGamma,unitSystem)
-      return{top:layer.from,bottom:layer.to,gamma:gamma??NaN,gammaSat:Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0?unitWeightToBase(layer.saturatedUnitWeight!,unitSystem):gamma??NaN}
-    })
-  if(layers.some(x=>!Number.isFinite(x.gamma)||x.gamma<=0||!Number.isFinite(x.gammaSat)||x.gammaSat<=0))return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ/γsat profili eksik; CN uygulanmadı.'}
+
   try{
-    const result=effectiveStressAtDepth(z,layers,borehole.groundwaterDepth??1e9)
-    const coveredTo=layers.reduce((max,layer)=>layer.top<=max+1e-6?Math.max(max,Math.min(z,layer.bottom)):max,0)
-    if(coveredTo<z-1e-6||result.covered<z-1e-6)return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ/γsat profili eksik; CN uygulanmadı.'}
-    return{verticalStress:result.sigmaV,effectiveStress:result.sigmaVPrime,source:'Merkezi σv/σ′v profili · litoloji + laboratuvar γ'}
+    const result=effectiveStressAtDepth(z,layers,gwt)
+    if(result.covered<z-1e-6){
+      return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar sürekli γ/γsat profili yok; CN uygulanmadı.'}
+    }
+    if(sourceParts[0]==='litoloji')sourceParts.push(labGamma!=null?'LAB yedek değeri':'proje γ/γsat yedek değeri')
+    return{
+      verticalStress:result.sigmaV,
+      effectiveStress:result.sigmaVPrime,
+      source:'Merkezi σv/σ′v profili · '+sourceParts.join(' + ')
+    }
   }catch{
     return{verticalStress:undefined,effectiveStress:undefined,source:'σv/σ′v profili hesaplanamadı; CN uygulanmadı.'}
   }
