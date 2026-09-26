@@ -2,6 +2,7 @@ import { calculateSpt, type SptEngineInput, type SptTraceStep } from '../spt/spt
 import { tbdy2018Liquefaction } from './tbdy2018-liquefaction'
 import { effectiveStressAtDepth as centralEffectiveStressAtDepth } from '../stress-profile'
 import type { EarthquakeDesignClass, SptCorrectionParameters } from '../../models/project'
+import type { SptStressSnapshot } from '../../models/field-data'
 import { isClaySoilCode } from '../field-calculations'
 
 export type LiquefactionSoilGroup='ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF'
@@ -10,7 +11,7 @@ export interface LiquefactionSoilLayer{
 }
 export interface LiquefactionSptRecord{
   depth:number;nField:number;fineContent?:number;energyRatio?:number;hammerType?:SptEngineInput['hammerType'];boreholeDiameterMm?:number
-  sampler?:SptEngineInput['sampler'];samplerCorrection?:number;rodLengthM?:number;plasticityIndex?:number;waterContent?:number;clayContent?:number;soil?:string
+  sampler?:SptEngineInput['sampler'];samplerCorrection?:number;rodLengthM?:number;stressSnapshot?:SptStressSnapshot;plasticityIndex?:number;waterContent?:number;clayContent?:number;soil?:string
 }
 export interface LiquefactionProfileInput{
   Mw:number;Sds:number;gwt:number;layers:LiquefactionSoilLayer[];spt:LiquefactionSptRecord[];gammaW?:number;applyDilatancy?:boolean
@@ -69,7 +70,8 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
   if(input.soilGroup==='ZF')warnings.push('ZF için 16.5.1.3 sahaya özel zemin davranış analizi gerekir; bu ekran o analizi yerine geçmez.')
   const rows=input.spt.filter(x=>finite(x.depth)&&x.depth>=0).sort((a,b)=>a.depth-b.depth).map((record):LiquefactionProfileRow=>{
     const layer=input.layers.find(l=>record.depth>=l.top&&record.depth<l.bottom)
-    const stress=stressAtDepth(record.depth,input.layers,input.gwt,gammaW)
+    const calculatedStress=stressAtDepth(record.depth,input.layers,input.gwt,gammaW)
+    const stress=record.stressSnapshot?{sigmaV:record.stressSnapshot.sigmaV0,porePressure:record.stressSnapshot.porePressureU0,sigmaVPrime:Math.max(.01,record.stressSnapshot.effectiveStressV0),covered:record.depth}:calculatedStress
     const fineContent=record.fineContent??layer?.finesContent,pi=record.plasticityIndex??layer?.plasticityIndex
     const clayContent=record.clayContent??layer?.clayContent,soil=record.soil??layer?.soil
     const claySoil=isClaySoilCode(soil)
@@ -77,7 +79,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const waterContent=record.waterContent
     const npt=calculateSpt({
       nField:record.nField,
-      ...(input.sptCorrection?{ce:input.sptCorrection.ce,cb:input.sptCorrection.cb,cs:input.sptCorrection.cs,rodLengthM:record.rodLengthM}:{
+      ...(input.sptCorrection?{ce:input.sptCorrection.ce,cb:input.sptCorrection.cb,cs:input.sptCorrection.cs,rodLengthM:record.rodLengthM,sptDepthM:record.depth}:{
         energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,
         sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM
       }),
