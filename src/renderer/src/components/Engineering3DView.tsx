@@ -49,15 +49,14 @@ export function Foundation3DView({boreholes=[]}:Props){
 
     const clearRoot=()=>{
       while(root.children.length){
-        const child=root.children.pop()
-        if(child)disposeObject(child)
+        const child=root.children[0]
+        root.remove(child)
+        disposeObject(child)
       }
     }
 
     const render=()=>{
       const current=dataRef.current.foundation
-      const B=Math.max(current.footingWidth,.5)
-      const L=Math.max(current.footingLength,.5)
       const Df=Math.max(current.footingDepth,.3)
       camera.position.set(radius*Math.cos(pitch)*Math.sin(yaw),radius*Math.sin(pitch),radius*Math.cos(pitch)*Math.cos(yaw))
       camera.lookAt(new THREE.Vector3(0,-Df/2,0))
@@ -95,10 +94,16 @@ export function Foundation3DView({boreholes=[]}:Props){
       const H=Number(jet.foundationThickness||0)
       if(d>0&&s>0&&H>0){
         const r=d/2
-        for(let x=-L/2+r;x<=L/2-r+.001;x+=s){
-          for(let z=-B/2+r;z<=B/2-r+.001;z+=s){
+        const nx=Math.max(1,Math.floor((L-d)/s)+1)
+        const nz=Math.max(1,Math.floor((B-d)/s)+1)
+        const total=nx*nz
+        const stride=Math.max(1,Math.ceil(Math.sqrt(total/1200)))
+        for(let ix=0;ix<nx;ix+=stride){
+          const x=-L/2+r+ix*s
+          for(let iz=0;iz<nz;iz+=stride){
+            const z=-B/2+r+iz*s
             const col=new THREE.Mesh(
-              new THREE.CylinderGeometry(r,r,H,24),
+              new THREE.CylinderGeometry(r,r,H,16),
               new THREE.MeshStandardMaterial({color:0x707e87,roughness:.78})
             )
             col.position.set(x,-Df-H/2,z)
