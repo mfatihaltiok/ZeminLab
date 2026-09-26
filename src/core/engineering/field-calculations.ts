@@ -106,15 +106,25 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
   const cfg=correction
   const lab=linkedLabForSpt(laboratories,borehole.id,record.id,record.depth)
   const layer=layerAtDepth(borehole,record.depth)
+  const soilCode=record.soilCode??layer?.code
+  const claySoil=isClaySoilCode(soilCode)
+  const claySoilSource=claySoil?`Zemin sınıfı ${soilCode}`:undefined
   const fineContent=cfg.fineContent??lab?.finesContent??lab?.sieve200Passing??layer?.finesContent
   const result=calculateSpt({
     nField,
     ce:cfg.ce,cb:cfg.cb,cs:cfg.cs,cr:cfg.cr,
     effectiveStress:stress.effectiveStress,
     fineContent,
+    claySoil,
+    claySoilSource,
     applyOverburden:true,
     applyDilatancy:false
   })
-  return{...result,verticalStress:stress.verticalStress,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:stress.effectiveStress!=null,n60DilatancyCorrected:result.n1_60_dilatancy}
+  return{...result,verticalStress:stress.verticalStress,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:stress.effectiveStress!=null||claySoil,n60DilatancyCorrected:result.n1_60_dilatancy}
 }
 export function classifyLaboratoryRecord(record:LaboratoryRecord):SoilClassificationResult|null{return classifyFineSoil(record.liquidLimit,laboratoryPlasticityIndex(record))}
+
+export function isClaySoilCode(code?:string):boolean{
+  const c=(code??'').trim().toUpperCase().replace(/İ/g,'I')
+  return ['CL','CI','CH','CIL','CIM','CIH','CVL','CEH','SACL','GRCL','ANCL'].includes(c)
+}
