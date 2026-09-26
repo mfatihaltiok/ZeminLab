@@ -1,5 +1,6 @@
 import type { IdealizedSoilLayer, IdealizedSoilProfile } from '../models/idealized-soil-profile'
 import type { FoundationType } from '../models/project'
+import { effectiveStressAtDepth as centralEffectiveStressAtDepth } from './stress-profile'
 
 export type IdealizedSettlementMethod='burland-burbidge'|'elasticity'|'2to1-layer'|'janbu'|'schmertmann'
 type SettlementLayerResult={
@@ -22,19 +23,8 @@ function isCohesive(layer:IdealizedSoilLayer){
   const code=(layer.soilCode+' '+layer.soilName).toUpperCase().replace(/İ/g,'I')
   return /(^|[^A-Z])(CI[LHM]|SI[LHM]|CL|CH|ML|MH)([^A-Z]|$)/.test(code)||code.includes('KIL')||code.includes('SILT')||code.includes('CLAY')||code.includes('ORGANIK')||code.includes('TURBA')
 }
-function effectiveStressAtDepth(layers:IdealizedSoilLayer[],depth:number,gwt:number){
-  let total=0
-  for(const layer of [...layers].sort((a,b)=>a.topDepth-b.topDepth)){
-    const top=Math.max(0,layer.topDepth),bottom=Math.min(depth,layer.bottomDepth)
-    if(bottom<=top)continue
-    const above=gwt>=0?Math.max(0,Math.min(bottom,gwt)-top):bottom-top
-    const below=(bottom-top)-above
-    if(above>0&&finite(layer.gamma))total+=above*layer.gamma
-    if(below>0&&finite(layer.gammaSat??layer.gamma))total+=below*(layer.gammaSat??layer.gamma)!
-  }
-  const u=gwt>=0&&depth>gwt?9.81*(depth-gwt):0
-  return{total,porePressure:u,effective:Math.max(0,total-u)}
-}
+const effectiveStressAtDepth=centralEffectiveStressAtDepth
+
 function stressIncrement(qNet:number,B:number,L:number,z:number){return qNet*B*L/Math.max((B+z)*(L+z),1e-9)}
 function burlandSettlement(layer:IdealizedSoilLayer,qNet:number,B:number,L:number,zTop:number,zBottom:number,influenceDepth:number,midDepth:number,gwt:number){
   const rawN=layer.representativeN60??layer.representativeSptN
