@@ -99,16 +99,16 @@ function methodFactors(method:SurfaceFoundationMethod,B:number,L:number,Df:numbe
   return{sc,sq,sg,dc,dq,dg:1,ic,iq,ig,...slope,...base}
 }
 
-function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number,baseQ:number,BearingB:number,mf:ReturnType<typeof methodFactors>,method:SurfaceFoundationMethod){
+function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number,baseQ:number,BearingB:number,Lp:number,H:number,N:number,method:SurfaceFoundationMethod){
   if(!layers?.length)return[]
   const active=layers
     .filter(l=>l.bottomDepth>Df&&l.topDepth<Df+influence&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
     .sort((a,b)=>a.topDepth-b.topDepth)
   return active.map(l=>{
     const top=Math.max(l.topDepth,Df),bottom=Math.min(l.bottomDepth,Df+influence),thickness=Math.max(0,bottom-top)
-    const phi=clamp(l.phi,0,50),ff=factors(phi,method)
-    const gamma=finite(l.gammaSat)?Math.max(l.gammaSat-gammaW,.001):Math.max(l.gamma,.001)
-    const qk=Math.max(0,l.cohesion)*ff.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+baseQ*ff.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+0.5*gamma*Math.max(.01,Math.min(1e3,BearingB))*ff.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
+    const phi=clamp(l.phi,0,50),ff=factors(phi,method),gamma=finite(l.gammaSat)?Math.max(l.gammaSat-gammaW,.001):Math.max(l.gamma,.001)
+    const local=methodFactors(method,BearingB,Lp,Df,phi,ff.Nq,ff.Nc,H,N,l.cohesion,0,0)
+    const qk=Math.max(0,l.cohesion)*ff.Nc*local.sc*local.dc*local.ic*local.gc*local.bc+baseQ*ff.Nq*local.sq*local.dq*local.iq*local.gq*local.bq+0.5*gamma*Math.max(.01,Math.min(1e3,BearingB))*ff.Ngamma*local.sg*local.dg*local.ig*local.gg*local.bg
     return{top:l.topDepth,bottom:l.bottomDepth,c:l.cohesion,phi,gamma,qk,controlling:false}
   })
 }
@@ -245,9 +245,13 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(rf<=0)throw new Error('Direnç katsayısı pozitif olmalıdır.')
   if(method==='TBDY-2018'&&Math.abs(rf-1.4)>1e-9)warnings.push('TBDY 2018 Tablo 16.2 yüzeysel temel taşıma gücü için γRv=1.40 kullanılmalıdır.')
   const ef=factors(representativePhi,method)
-  const qk=representativeC*ef.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+
+  const equivalentQk=representativeC*ef.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+
     water.surcharge*ef.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+
     0.5*representativeGamma*Bp*ef.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
+  const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,Bp,Lp,Vh,N,method)
+  const layerQk=checks.length?Math.min(...checks.map(x=>x.qk)):Infinity
+  const qk=checks.length?Math.min(equivalentQk,layerQk):equivalentQk
+  if(checks.length){for(const x of checks)x.controlling=Math.abs(x.qk-layerQk)<=1e-9}
   const qt=qk/rf
   const qAvg=effectiveArea>0?N/(i.B*i.L):Infinity
   const qo=effectiveArea>0?N/effectiveArea:Infinity
@@ -259,10 +263,8 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(contactState==='NO_CONTACT')warnings.push('Temel tabanında basınçlı temas bulunmadığından q0/qt karşılaştırması nihai uygunluk için kullanılamaz.')
   if(contactState==='PARTIAL')warnings.push('Kısmi temas alanı compression-only lineer basınç dağılımından nümerik olarak çözüldü; qmin=0 ve qmax gerçek temas alanı üzerinden raporlanır.')
   let adequate=qo<=qt&&contactState!=='NO_CONTACT'&&(!i.layers||layeredComplete)
-  const finalDesignEligible=!i.layers?.length
-  const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,Bp,mf,method)
-  checks.forEach(x=>x.controlling=false)
-  if(i.layers?.length&&layerData?.complete)warnings.push('Tabakalı zemin hesabı nihai tasarım uygunluğu üretmez; tabaka sonuçları screening/izlenebilirlik içindir ve ayrı çok-tabakalı zemin modeli ile doğrulanmalıdır.')
+  const finalDesignEligible=!i.layers?.length||Boolean(layeredComplete)
+  if(i.layers?.length&&layerData?.complete)warnings.push('Tabakalı zemin kapasitesi, 2B′ etki derinliğinde eşdeğer parametre hesabı ile her aktif tabakanın yerel kapasite kontrolünün daha küçük değeri alınarak belirlenmiştir. Bu, TBDY 16.8.3.3 tabaka etkisini sayısal olarak muhafazakâr biçimde hesaba katar; çok-tabakalı kayma yüzeyi analizi ayrı bir ileri yöntemdir.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: sürşarj ve γ′/ağırlıklı γ dikkate alındı.')
   if(groundSlope>0)warnings.push('Arazi eğimi katsayıları genel kabul görmüş Vesic tipi bağıntılarla uygulanmıştır; β<φ′ koşulu kontrol edildi.')
   if(baseSlope>0)warnings.push('Temel tabanı eğimi katsayıları genel kabul görmüş Vesic tipi bağıntılarla uygulanmıştır.')
