@@ -45,6 +45,9 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   const convertedActions=actionsToEngineeringSI(input.actions??{},p.unitSystem)
   const N=finiteOr(convertedActions.vertical,fp.verticalLoad),Vx=finiteOr(convertedActions.vx,fp.vtX),Vy=finiteOr(convertedActions.vy,fp.vtY),Mx=finiteOr(convertedActions.mx,fp.momentX),My=finiteOr(convertedActions.my,fp.momentY)
   const actions={N,Vx,Vy,Mx,My,source:input.actions?.source??'Temele aktarılan tasarım kuvvetleri'}
+  if(input.actions && !input.actions.designAction)missing.push('Temele aktarılan kuvvetlerin nihai tasarım etkisi olarak işaretlenmesi')
+  if(input.actions && !input.actions.source?.trim())missing.push('Tasarım kuvvetlerinin kaynağı')
+  if(!input.actions)missing.push('Yapıdan temele aktarılan nihai tasarım etkileri')
   if(!finite(N)||!finite(Vx)||!finite(Vy)||!finite(Mx)||!finite(My))missing.push('Temele aktarılan tasarım kuvvetleri')
   let bearing:ReturnType<typeof calculateSurfaceFoundation>|undefined
   let sliding:ReturnType<typeof foundationChecks>|undefined
@@ -89,7 +92,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       liquefaction=liquefactionProfile(input.liquefaction)
       const bad=liquefaction.rows.some(r=>r.conclusion==='SIVILAŞMA RİSKİ VAR'),incomplete=liquefaction.rows.some(r=>r.status==='VERİ EKSİK'||r.liquefactionCheck==='not-evaluable')
       trace.push({check:'Sıvılaşma',status:bad?'UYGUN DEĞİL':incomplete?'VERİ EKSİK':'UYGUN',source:'TBDY 2018 16.6 + Ek 16B',details:String(liquefaction.rows.length)+' SPT noktası'})
-      if(bad)failed.push('Sıvılaşma');if(incomplete)missing.push('Sıvılaşma için eksik saha/laboratuvar verisi');warnings.push(...liquefaction.warnings)
+      if(bad)failed.push('Sıvılaşma');if(incomplete)missing.push('Sıvılaşma için eksik saha/laboratuvar verisi');if(liquefaction.postLiquefactionRequired&&!p.foundationParameters.postLiquefactionAssessmentCompleted)missing.push('16.6.7–16.6.10 sıvılaşma sonrası değerlendirme');warnings.push(...liquefaction.warnings)
     }catch(e){missing.push(e instanceof Error?e.message:'Sıvılaşma hesabı doğrulanamadı')}
   }
   if(!soilGroup)warnings.push('Zemin grubu girilmemiş; taşıma gücü ve oturma hesabı için kullanılan zemin parametreleri ayrıca doğrulanmalıdır.')
