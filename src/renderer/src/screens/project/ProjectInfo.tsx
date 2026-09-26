@@ -104,7 +104,6 @@ export default function ProjectInfo() {
             <select value={project.unitSystem} onChange={(e) => update('unitSystem', e.target.value as UnitSystem)}>
               <option value="kN-m">kN - m</option>
               <option value="ton-m">ton - m</option>
-              <option value="kPa-m">kPa - m</option>
             </select>
           </div>
         </section>
