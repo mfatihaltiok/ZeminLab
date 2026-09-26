@@ -114,7 +114,7 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
               <label className="spt-check"><input type="checkbox" checked={row.correction?.applyOverburdenCorrection!==false} onChange={e=>updateCorrection(row.id,{applyOverburdenCorrection:e.target.checked})}/> CN</label>
               <label className="spt-check"><input type="checkbox" checked={row.correction?.applyDilatancyCorrection===true} onChange={e=>updateCorrection(row.id,{applyDilatancyCorrection:e.target.checked})}/> Dilatansi</label>
             </div>
-          </td></tr>
+          </td></tr>}
           </Fragment>
         })}</tbody>
       </table>
