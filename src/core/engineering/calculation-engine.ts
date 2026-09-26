@@ -23,7 +23,7 @@ function factors(phiDeg:number,method:BearingMethod){
 }
 function classicalFactors(method:BearingMethod,B:number,L:number,Df:number,phi:number,Nq:number,Nc:number){
   const r=Math.min(B,L)/Math.max(B,L,1e-9),t=Math.tan(rad(phi)),Nphi=Math.tan(Math.PI/4+rad(phi)/2)**2
-  if(method==='Terzaghi')return{sc:Math.abs(B-L)<1e-9?1.3:1,sq:1,sg:Math.abs(B-L)<1e-9?.8:1,dc:1,dq:1,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
+  if(method==='Terzaghi')return{sc:1+.3*r,sq:1,sg:1-.2*r,dc:1,dq:1,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
   const sc=method==='Meyerhof'?1+.2*Nphi*r:1+(Nq/Math.max(Nc,1e-9))*r
   const sq=method==='Meyerhof'?(phi>10?1+.1*Nphi*r:1):1+r*t
   const sg=method==='Meyerhof'?(phi>10?sq:1):Math.max(.6,1-.4*r)
