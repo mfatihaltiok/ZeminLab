@@ -1,3 +1,5 @@
+import type { UnitSystem } from './project'
+
 export type IdealizedProfileStatus = 'TASLAK' | 'SABİTLENDİ'
 export type ParameterSourceType = 'LABORATUVAR' | 'SPT_KORELASYONU' | 'LİTOLOJİ' | 'KULLANICI'
 
