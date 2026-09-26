@@ -44,14 +44,13 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       trace.push({check:'Taşıma gücü',status:bearing.adequate&&bearing.finalDesignEligible?'UYGUN':'UYGUN DEĞİL',source:'TBDY 2018 16.8.2–16.8.3',details:'q0='+bearing.qo.toFixed(3)+' kPa; qt='+bearing.qt.toFixed(3)+' kPa'})
       if(!bearing.adequate||!bearing.finalDesignEligible)failed.push('Taşıma gücü')
       warnings.push(...bearing.warnings)
-      const si:FoundationCheckInput={B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,deltaTan:fp.baseFrictionTanDelta,cu:sp.undrainedCohesion,groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,usePassiveResistance:fp.usePassiveResistance,seismic:input.seismicBelowGroundwater ?? fp.seismicBelowGroundwater ?? false,interfaceType:input.foundationInterface ?? fp.foundationInterface}
-      sliding=foundationChecks(si)
-      if((input.foundationInterface ?? fp.foundationInterface)===undefined) sliding.warnings.push('Temel-zemin ara yüzü seçilmedi; TBDY 16.8.4.3 kapsamında tanδ varsayımı nihai tasarım girdisi olarak kabul edilmemelidir.')
-      const slideStatus=sliding.evaluable?(sliding.slidingSafeResultant?'UYGUN':'UYGUN DEĞİL'):'VERİ EKSİK'
-      trace.push({check:'Kayma',status:slideStatus,source:'TBDY 2018 16.8.4',details:'Vh='+sliding.horizontalResultant.toFixed(3)+'; R='+sliding.slidingCapacityResultant.toFixed(3)})
-      if((input.foundationInterface ?? fp.foundationInterface)===undefined) missing.push('Temel-zemin ara yüzü')
-      if(!sliding.evaluable)missing.push('Deprem + YASS altında kayma için cu');else if(!sliding.slidingSafeResultant)failed.push('Kayma')
-      warnings.push(...sliding.warnings)
+      const resolvedInterface=input.foundationInterface ?? fp.foundationInterface
+      const si:FoundationCheckInput={B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,deltaTan:fp.baseFrictionTanDelta,cu:sp.undrainedCohesion,groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,usePassiveResistance:fp.usePassiveResistance,seismic:input.seismicBelowGroundwater ?? fp.seismicBelowGroundwater ?? false,interfaceType:resolvedInterface}
+      if(!resolvedInterface) missing.push('Temel-zemin ara yüzü')
+      else sliding=foundationChecks(si)
+      const slideStatus=!sliding?'VERİ EKSİK':sliding.evaluable?(sliding.slidingSafeResultant?'UYGUN':'UYGUN DEĞİL'):'VERİ EKSİK'
+      trace.push({check:'Kayma',status:slideStatus,source:'TBDY 2018 16.8.4',details:sliding?('Vh='+sliding.horizontalResultant.toFixed(3)+'; R='+sliding.slidingCapacityResultant.toFixed(3)):'Ara yüzü seçilmedi.'})
+      if(sliding){ if(!sliding.evaluable)missing.push('Deprem + YASS altında kayma için cu');else if(!sliding.slidingSafeResultant)failed.push('Kayma'); warnings.push(...sliding.warnings) }
     }catch(e){missing.push(e instanceof Error?e.message:'Temel hesabı doğrulanamadı')}
   }
   if(input.settlement&&bearing){
