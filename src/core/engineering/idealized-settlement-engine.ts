@@ -1,5 +1,6 @@
 import type { IdealizedSoilLayer, IdealizedSoilProfile } from '../models/idealized-soil-profile'
-import type { FoundationType } from '../models/project'
+import type { FoundationType, UnitSystem } from '../models/project'
+import { stressToBase, unitWeightToBase } from '../units/project-units'
 import { effectiveStressAtDepth as centralEffectiveStressAtDepth } from './stress-profile'
 
 export type IdealizedSettlementMethod='burland-burbidge'|'elasticity'|'2to1-layer'|'boussinesq'|'janbu'|'schmertmann'
@@ -11,7 +12,7 @@ type SettlementLayerResult={
 }
 export interface IdealizedSettlementInput{
   profile:IdealizedSoilProfile;method:IdealizedSettlementMethod;B:number;L:number;Df:number;qGross:number;groundwaterDepth?:number
-  foundationType?:FoundationType;timeYears?:number;secondaryStartTimeYears?:number
+  foundationType?:FoundationType;timeYears?:number;secondaryStartTimeYears?:number;profileUnitSystem?:UnitSystem
 }
 export interface IdealizedSettlementResult{
   method:IdealizedSettlementMethod;layers:SettlementLayerResult[];totalImmediate:number;totalConsolidation:number;totalSecondary:number;totalSettlement:number
@@ -118,7 +119,16 @@ function consolidationSettlement(layer:IdealizedSoilLayer,thickness:number,sigma
 }
 
 export function calculateIdealizedSettlement(input:IdealizedSettlementInput):IdealizedSettlementResult{
-  const {profile,method,B,L,Df,qGross}=input
+  const {method,B,L,Df,qGross}=input
+  const sourceUnit=input.profileUnitSystem??profile.unitSystem??'kN-m'
+  const profile:IdealizedSoilProfile={...input.profile,layers:input.profile.layers.map(layer=>({...layer,
+    gamma:layer.gamma==null?undefined:unitWeightToBase(layer.gamma,sourceUnit),
+    gammaSat:layer.gammaSat==null?undefined:unitWeightToBase(layer.gammaSat,sourceUnit),
+    cohesion:layer.cohesion==null?undefined:stressToBase(layer.cohesion,sourceUnit),
+    constrainedModulus:layer.constrainedModulus==null?undefined:stressToBase(layer.constrainedModulus,sourceUnit),
+    oedometricModulus:layer.oedometricModulus==null?undefined:stressToBase(layer.oedometricModulus,sourceUnit),
+    preconsolidationPressure:layer.preconsolidationPressure==null?undefined:stressToBase(layer.preconsolidationPressure,sourceUnit)
+  })),unitSystem:'kN-m'}
   const warnings:string[]=[]
   const layers=[...profile.layers].sort((a,b)=>a.topDepth-b.topDepth)
   const gwt=finite(input.groundwaterDepth)?input.groundwaterDepth!:-1
