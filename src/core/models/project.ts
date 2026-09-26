@@ -59,13 +59,6 @@ export interface FoundationParameters{
   passiveResistanceCharacteristic:number
   usePassiveResistance:boolean
   foundationInterface?:FoundationInterface
-  seismicBelowGroundwater?:boolean
-  cyclicSettlementAnalysisRequired?:boolean
-  cyclicSettlementAnalysisCompleted?:boolean
-  postLiquefactionAssessmentCompleted?:boolean
-  jetGroutQualityControlCompleted?:boolean
-  nonlinearSoilDeformationAnalysisCompleted?:boolean
-  tallBuilding?:boolean
 }
 
 export interface ProjectInfo{
@@ -82,7 +75,7 @@ export const defaultProjectInfo:ProjectInfo={
   soilParameters:{unitWeight:0,saturatedUnitWeight:0,cohesion:0,frictionAngle:0,undrainedCohesion:undefined,groundwaterDepth:undefined,surfaceSlope:0,foundationBaseSlope:0,finesContent:0,liquefactionContinuousOrThickLens:undefined,classification:{system:'TS EN ISO 14688-2'}},
   foundationParameters:{
     foundationType:'tekil',footingWidth:0,footingLength:0,footingDepth:0,safetyFactor:3,verticalLoad:0,horizontalLoad:0,momentX:0,momentY:0,
-    resistanceFactorRv:1.4,vtX:0,vtY:0,structuralWeight:0,baseFrictionTanDelta:0.6,passiveResistanceCharacteristic:0,usePassiveResistance:false,foundationInterface:undefined,seismicBelowGroundwater:undefined,cyclicSettlementAnalysisRequired:undefined,cyclicSettlementAnalysisCompleted:undefined,postLiquefactionAssessmentCompleted:undefined,jetGroutQualityControlCompleted:undefined,nonlinearSoilDeformationAnalysisCompleted:undefined,tallBuilding:undefined
+    resistanceFactorRv:1.4,vtX:0,vtY:0,structuralWeight:0,baseFrictionTanDelta:0.6,passiveResistanceCharacteristic:0,usePassiveResistance:false,foundationInterface:undefined
   },
   jetGrout:{layout:'square'},
   visualDocuments:{}
