@@ -3,6 +3,7 @@ import { foundationChecks, type FoundationCheckInput } from './calculation-engin
 import { liquefactionProfile, type LiquefactionProfileInput, type LiquefactionProfileResult } from './liquefaction/liquefaction-profile'
 import { calculateIdealizedSettlement, type IdealizedSettlementInput, type IdealizedSettlementResult } from './idealized-settlement-engine'
 import { type ProjectInfo, normalizeProjectInfo, classifyVs30 } from '../models/project'
+import { toEngineeringSI, actionsToEngineeringSI } from '../units/engineering-input-adapter'
 
 export type FinalStatus='UYGUN'|'UYGUN DEĞİL'|'VERİ EKSİK'
 
@@ -33,8 +34,9 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   const zfSiteSpecificRequired=soilGroup==='ZF'
   if(zfSiteSpecificRequired)missing.push('ZF için sahaya özel zemin davranış analizi')
   if(p.geophysical.vs30!=null){const inferred=classifyVs30(p.geophysical.vs30);if(inferred&&soilGroup&&inferred!==soilGroup&&soilGroup!=='ZF')warnings.push('VS30 ile seçilen zemin grubu farklı; kaynak/tercih raporda açıkça gösterilmelidir.')}
-  const fp=p.foundationParameters,sp=p.soilParameters
-  const N=finiteOr(input.actions?.vertical,fp.verticalLoad),Vx=finiteOr(input.actions?.vx,fp.vtX),Vy=finiteOr(input.actions?.vy,fp.vtY),Mx=finiteOr(input.actions?.mx,fp.momentX),My=finiteOr(input.actions?.my,fp.momentY)
+  const eng=toEngineeringSI(p),fp=eng.foundation,sp=eng.soil
+  const convertedActions=actionsToEngineeringSI(input.actions??{},p.unitSystem)
+  const N=finiteOr(convertedActions.vertical,fp.verticalLoad),Vx=finiteOr(convertedActions.vx,fp.vtX),Vy=finiteOr(convertedActions.vy,fp.vtY),Mx=finiteOr(convertedActions.mx,fp.momentX),My=finiteOr(convertedActions.my,fp.momentY)
   const actions={N,Vx,Vy,Mx,My,source:input.actions?.source??'Temele aktarılan tasarım kuvvetleri'}
   if(!finite(N)||!finite(Vx)||!finite(Vy)||!finite(Mx)||!finite(My))missing.push('Temele aktarılan tasarım kuvvetleri')
   let bearing:ReturnType<typeof calculateSurfaceFoundation>|undefined
