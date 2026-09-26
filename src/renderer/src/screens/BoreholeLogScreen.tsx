@@ -3,6 +3,7 @@ import { Card, Field, Frame } from '../workspace/WorkspaceShell'
 import type { BoreholeLogObservation, BoreholeRecord, LaboratoryRecord, LithologyLayer } from '../../../core/models/field-data'
 import { DEFAULT_BOREHOLE_LOG_SETTINGS } from '../../../core/models/field-data'
 import { EngineeringSectionRenderer } from '../components/EngineeringSectionRendererV2'
+import { Soil3DViewport } from '../components/Soil3DViewport'
 import './borehole-log.css'
 
 type Props = { boreholes: BoreholeRecord[]; labs: LaboratoryRecord[]; onBoreholesChange: (rows: BoreholeRecord[]) => void }
@@ -40,6 +41,7 @@ export default function BoreholeLogScreen({ boreholes, labs, onBoreholesChange }
   if (!boreholes.length) return <Frame screen="borehole-log"><div className="empty-state"><b>Henüz sondaj bulunmuyor.</b><span>Sondaj oluşturulduğunda birleşik SPT + laboratuvar logu burada oluşur.</span></div></Frame>
   return <Frame screen="borehole-log">
     <div className="log-toolbar"><label>Sondaj<select value={borehole.id} onChange={(e) => setSelectedId(e.target.value)}>{boreholes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label><div className="log-toolbar-actions"><button onClick={addLayer}>+ Katman</button><button onClick={addObservation}>+ Not</button><button onClick={() => update({ logSettings: { ...(borehole.logSettings ?? DEFAULT_BOREHOLE_LOG_SETTINGS), showSpt: !(borehole.logSettings ?? DEFAULT_BOREHOLE_LOG_SETTINGS).showSpt } })}>SPT görünümü</button></div></div>
+    <div className="log-3d-card"><div className="log-preview-header"><div><b>3D SONDAJ KESİTİ · THREE.JS</b><span>Litoloji katmanlarının hacimsel görünümü</span></div></div><Soil3DViewport totalDepth={Math.max(borehole.totalDepth,1)} layers={renderLayers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,colorClass:x.colorClass,code:x.code}))}/></div>
     <div className="log-workspace">
       <div className="log-preview-card"><div className="log-preview-header"><div><b>{borehole.name}</b><span>SONDAJ LOGU · Ölçek 1:{borehole.logSettings?.scale ?? 100}</span></div><div><span>Toplam {fmt(borehole.totalDepth)} m</span><span>YASS {fmt(borehole.groundwaterDepth)} m</span></div></div>
       <EngineeringSectionRenderer variant="borehole" totalDepth={Math.max(borehole.totalDepth,1)} groundwaterDepth={borehole.groundwaterDepth} layers={renderLayers} markers={renderMarkers} footer={<><span>Litoloji, SPT/UD, laboratuvar ve saha gözlemleri ortak düşey referansa bağlanmıştır.</span><span>{borehole.name} · 0.00 → {fmt(borehole.totalDepth)} m</span></>}/>
