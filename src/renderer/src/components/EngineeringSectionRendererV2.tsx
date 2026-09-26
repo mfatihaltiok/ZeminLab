@@ -16,15 +16,6 @@ type Props={
 
 const fmt=(v:number|undefined,d=2)=>v==null||!Number.isFinite(v)?'—':v.toFixed(d)
 
-const HATCH={
-  clay:'repeating-linear-gradient(0deg,transparent 0 10px,rgba(110,76,54,.34) 10px 11px)',
-  silt:'radial-gradient(circle at 4px 4px,rgba(82,92,82,.45) 0 1.3px,transparent 1.4px),radial-gradient(circle at 12px 11px,rgba(82,92,82,.35) 0 1px,transparent 1.1px)',
-  sand:'radial-gradient(circle at 4px 5px,rgba(132,101,45,.48) 0 1.3px,transparent 1.4px),radial-gradient(circle at 12px 12px,rgba(132,101,45,.38) 0 .9px,transparent 1px)',
-  gravel:'radial-gradient(circle at 6px 7px,transparent 0 3px,rgba(86,94,100,.50) 3px 4px,transparent 4.2px)',
-  rock:'repeating-linear-gradient(130deg,transparent 0 17px,rgba(73,79,84,.34) 17px 18px)',
-  fill:'repeating-linear-gradient(135deg,transparent 0 12px,rgba(104,112,118,.24) 12px 13px)'
-} as const
-
 function soilCss(code:string|undefined,colorClass:EngineeringRenderLayer['colorClass']|undefined){
   return layerColor(code,colorClass)
 }
@@ -74,18 +65,14 @@ export function EngineeringSectionRenderer(props:Props){
     <div className="engineering-render-scroll">
       <svg className="engineering-render-canvas" viewBox={`0 0 ${width} ${bottom+92}`} role="img" aria-label={model.variant==='profile'?'İdealize zemin profili teknik kesiti':'Sondaj logu teknik kesiti'}>
         <defs>
-          {Object.entries(HATCH).map(([kind,value])=><pattern key={kind} id={`${uid}-${kind}`} width="18" height="18" patternUnits="userSpaceOnUse"><rect width="18" height="18" fill="url(#${uid}-base-${kind})"/></pattern>)}
           <linearGradient id={`${uid}-header`} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#eef1f3"/><stop offset="1" stopColor="#dde2e5"/></linearGradient>
-          {(['clay','silt','sand','gravel','rock','fill'] as const).map((kind)=><pattern key={`${kind}-base`} id={`${uid}-base-${kind}`} width="18" height="18" patternUnits="userSpaceOnUse"><rect width="18" height="18" fill={kind==='clay'?'#d8b89f':kind==='silt'?'#d2d8d0':kind==='sand'?'#e7d19a':kind==='gravel'?'#c7cdd1':kind==='rock'?'#bcc1c4':'#d9dde0'}/></pattern>)}
-          {(['clay','silt','sand','gravel','rock','fill'] as const).map(kind=>
-            <pattern key={`h-${kind}`} id={`${uid}-h-${kind}`} width="18" height="18" patternUnits="userSpaceOnUse">
-              <rect width="18" height="18" fill={kind==='clay'?'#d8b89f':kind==='silt'?'#d2d8d0':kind==='sand'?'#e7d19a':kind==='gravel'?'#c7cdd1':kind==='rock'?'#bcc1c4':'#d9dde0'}/>
-              <foreignObject x="0" y="0" width="18" height="18"><div xmlns="http://www.w3.org/1999/xhtml" style={{width:'18px',height:'18px',background:HATCH[kind]}} /></foreignObject>
-            </pattern>
-          )}
-        </defs>
-
-        <rect x="0" y="0" width={width} height={bottom+92} fill="#f7f9fa"/>
+          <pattern id={`${uid}-clay`} width="18" height="14" patternUnits="userSpaceOnUse"><path d="M0 7H18" stroke="#9b725b" strokeWidth="1"/></pattern>
+          <pattern id={`${uid}-silt`} width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="1.2" fill="#748074"/><circle cx="13" cy="13" r=".9" fill="#7e877e"/></pattern>
+          <pattern id={`${uid}-sand`} width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="4" cy="5" r="1.25" fill="#987943"/><circle cx="12" cy="12" r=".9" fill="#987943"/></pattern>
+          <pattern id={`${uid}-gravel`} width="24" height="22" patternUnits="userSpaceOnUse"><circle cx="7" cy="7" r="3" fill="none" stroke="#687177" strokeWidth="1"/><circle cx="18" cy="15" r="2.3" fill="none" stroke="#687177" strokeWidth="1"/></pattern>
+          <pattern id={`${uid}-rock`} width="28" height="22" patternUnits="userSpaceOnUse"><path d="M-2 20L18 2M12 24L30 7" stroke="#626a6f" strokeWidth="1"/></pattern>
+          <pattern id={`${uid}-fill`} width="18" height="18" patternUnits="userSpaceOnUse"><path d="M-3 15L15 -3M3 21L21 3" stroke="#9ba3a8" strokeWidth="1"/></pattern>
+        </defs>       <rect x="0" y="0" width={width} height={bottom+92} fill="#f7f9fa"/>
         <rect x="0" y="0" width={width} height="50" fill={`url(#${uid}-header)`} stroke="#aab4ba"/>
         <text x="18" y="20" fontFamily="Arial" fontSize="15" fontWeight="700" fill="#263640">FALUZMN</text>
         <text x="105" y="20" fontFamily="Arial" fontSize="14" fontWeight="700" fill="#334650">{model.variant==='profile'?'İDEALİZE ZEMİN PROFİLİ':'SONDAJ LOGU'}</text>
@@ -109,7 +96,7 @@ export function EngineeringSectionRenderer(props:Props){
           const y1=depthY(layer.bottomDepth)
           const h=Math.max(4,y1-y0)
           const fill=soilCss(layer.code,layer.colorClass)
-          const hatchId=`${uid}-h-${layer.colorClass??'fill'}`
+          const hatchId=`${uid}-${layer.colorClass??'fill'}`
           const mid=(y0+y1)/2
           return <g key={layer.id}>
             <rect x={soilX} y={y0} width={soilW} height={h} fill={fill} stroke="#737e85" strokeWidth=".8"/>
