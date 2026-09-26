@@ -99,7 +99,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(calculateSpt({nField:10,boreholeDiameterMm:150,effectiveStress:100,rodLengthM:5}).cb,1.05,1e-12)
   approx(calculateSpt({nField:10,boreholeDiameterMm:200,effectiveStress:100,rodLengthM:5}).cb,1.15,1e-12)
   assert.throws(() => calculateSpt({nField:10,boreholeDiameterMm:120,effectiveStress:100,rodLengthM:5}), /CB için yalnız/)
-  assert.throws(() => calculateSpt({nField:10,energyRatio:20,hammerType:'safety',effectiveStress:100,rodLengthM:5}), /safety tokmak/)
+  assert.throws(() => calculateSpt({nField:10,energyRatio:50,hammerType:'safety',effectiveStress:100,rodLengthM:5}), /safety tokmak/)
   assert.throws(() => calculateSpt({nField:10,cs:1.05,effectiveStress:100,rodLengthM:5}), /CS için yalnız/)
   assert.throws(() => calculateSpt({nField:10,cs:1.2,sampler:'standard',effectiveStress:100,rodLengthM:5}), /Standart numune alıcı/)
   assert.throws(() => calculateSpt({nField:10,energyRatio:100,hammerType:'measured',effectiveStress:100,rodLengthM:5}), /ER %45–%160/)
