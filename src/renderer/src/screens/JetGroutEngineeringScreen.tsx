@@ -12,7 +12,7 @@ const num=(value:string)=>value===''?undefined:Number(value)
 export function JetGroutEngineeringScreen(){
   const p=useProjectInfo(),f=p.foundationParameters,j=p.jetGrout,units=projectUnits(p.unitSystem)
   const projectArea=Math.max(0,f.footingWidth*f.footingLength)
-  const projectLoad=forceToBase(f.structuralWeight,p.unitSystem)
+  const projectLoad=forceToBase(f.verticalLoad,p.unitSystem)
   const projectH=Math.hypot(forceToBase(f.vtX,p.unitSystem),forceToBase(f.vtY,p.unitSystem))
   const set=(key:keyof typeof j,value:number|undefined|string)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
   const d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=j.qSoil?.toString()??'',column=j.qColumn?.toString()??''
