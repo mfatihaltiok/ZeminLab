@@ -8,9 +8,22 @@ import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
 import { toEngineeringSI } from '../src/core/units/engineering-input-adapter.ts'
+import { normalizeEngineeringRenderModel } from '../src/renderer/src/components/engineering-render-model.ts'
 
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(Math.abs(actual-expected)<=tolerance,`expected ${expected}, got ${actual}`)
+}
+
+{
+  const render=normalizeEngineeringRenderModel({variant:'profile',totalDepth:10,layers:[
+    {id:'b',topDepth:4,bottomDepth:8,code:'SM'},
+    {id:'a',topDepth:0,bottomDepth:4,code:'CL'},
+    {id:'c',topDepth:8,bottomDepth:12,code:'GW'}
+  ],markers:[]})
+  assert.equal(render.layers[0].id,'a')
+  assert.equal(render.layers[2].bottomDepth,10)
+  assert.equal(render.layers[2].topDepth,8)
+  assert.equal(render.layers[0].topDepth,0)
 }
 
 {
