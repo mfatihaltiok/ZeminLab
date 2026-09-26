@@ -77,7 +77,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const waterContent=record.waterContent
     const npt=calculateSpt({
       nField:record.nField,
-      ...(input.sptCorrection?{ce:input.sptCorrection.ce,cb:input.sptCorrection.cb,cs:input.sptCorrection.cs,cr:input.sptCorrection.cr}:{
+      ...(input.sptCorrection?{ce:input.sptCorrection.ce,cb:input.sptCorrection.cb,cs:input.sptCorrection.cs,rodLengthM:record.rodLengthM}:{
         energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,
         sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM
       }),
