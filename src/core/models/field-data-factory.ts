@@ -22,6 +22,7 @@ export function createEmptySpt(depth: number): SptRecord {
     depth,
     depthTo: depth + 0.45,
     testType: 'SPT',
+    rodLengthM: undefined,
     laboratoryLinked: true,
     source: 'manual',
     confirmed: false
