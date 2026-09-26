@@ -123,6 +123,84 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
+  const sandyBorehole={
+    id:'SAND-CN',
+    name:'SK-SAND',
+    firstSptDepth:1.5,
+    totalDepth:8,
+    groundwaterDepth:2,
+    lithology:[
+      {id:'L1',from:0,to:2,code:'Sa',description:'Kum',colorClass:'sand' as const,unitWeight:18,saturatedUnitWeight:19},
+      {id:'L2',from:2,to:8,code:'Sa',description:'Kum',colorClass:'sand' as const,unitWeight:19,saturatedUnitWeight:20},
+      {id:'L3',from:8,to:15,code:'Sa',description:'Kum',colorClass:'sand' as const}
+    ],
+    spt:[]
+  }
+  const sandyRecord={id:'SPT-SAND',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,soilCode:'Sa',source:'manual' as const,confirmed:false}
+  const sandyDerived=deriveSptValues(sandyBorehole,sandyRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
+  approx(sandyDerived.verticalStress!,96,1e-12)
+  approx(sandyDerived.porePressure!,29.43,1e-12)
+  approx(sandyDerived.effectiveStress!,66.57,1e-12)
+  approx(sandyDerived.cn,9.78/Math.sqrt(66.57),1e-12)
+  approx(sandyDerived.n60,20,1e-12)
+  approx(sandyDerived.n1_60,20*sandyDerived.cn,1e-12)
+}
+
+{
+  const shallowSandyBorehole={
+    id:'SAND-SHALLOW',
+    name:'SK-SHALLOW',
+    firstSptDepth:1.5,
+    totalDepth:20,
+    groundwaterDepth:30,
+    lithology:[
+      {id:'L1',from:0,to:10,code:'Sa',description:'Kum',colorClass:'sand' as const,unitWeight:18,saturatedUnitWeight:19},
+      {id:'L2',from:10,to:20,code:'Sa',description:'Kum',colorClass:'sand' as const,unitWeight:18,saturatedUnitWeight:19}
+    ],
+    spt:[]
+  }
+  const shallowRecord={id:'SPT-SHALLOW',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,soilCode:'Sa',source:'manual' as const,confirmed:false}
+  const shallowDerived=deriveSptValues(shallowSandyBorehole,shallowRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:30})
+  approx(shallowDerived.effectiveStress!,90,1e-12)
+  approx(shallowDerived.cn,9.78/Math.sqrt(90),1e-12)
+}
+
+{
+  const clayBorehole={
+    id:'CLAY-CN-2',
+    name:'SK-CLAY-2',
+    firstSptDepth:1.5,
+    totalDepth:10,
+    groundwaterDepth:2,
+    lithology:[
+      {id:'L1',from:0,to:10,code:'CIM',description:'Orta Plastisiteli Kil',colorClass:'clay' as const,unitWeight:18,saturatedUnitWeight:19}
+    ],
+    spt:[]
+  }
+  const clayRecord={id:'SPT-CLAY-2',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,soilCode:'CIM',source:'manual' as const,confirmed:false}
+  const clayDerived=deriveSptValues(clayBorehole,clayRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
+  approx(clayDerived.effectiveStress!,66.57,1e-12)
+  approx(clayDerived.cn,1,1e-12)
+  approx(clayDerived.n1_60,clayDerived.n60,1e-12)
+}
+
+{
+  const claySandBorehole={
+    id:'CLAY-SAND-CN',
+    name:'SK-CLAY-SAND',
+    firstSptDepth:1.5,
+    totalDepth:8,
+    groundwaterDepth:2,
+    lithology:[{id:'L1',from:0,to:8,code:'clSa',description:'Killi Kum',colorClass:'sand' as const,unitWeight:18,saturatedUnitWeight:19}],
+    spt:[]
+  }
+  const claySandRecord={id:'SPT-CLAY-SAND',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,soilCode:'clSa',source:'manual' as const,confirmed:false}
+  const claySandDerived=deriveSptValues(claySandBorehole,claySandRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
+  assert.notEqual(claySandDerived.cn,1)
+  approx(claySandDerived.cn,9.78/Math.sqrt(claySandDerived.effectiveStress!),1e-12)
+}
+
+{
   const level=calculateSurfaceFoundation({
     B:2,L:3,Df:1,gamma1:18,gamma2:19,c:10,phi:30,verticalLoad:1000,
     horizontalLoad:0,momentX:0,momentY:0,groundSlope:0,baseSlope:0,resistanceFactor:1.4,method:'TBDY-2018'
