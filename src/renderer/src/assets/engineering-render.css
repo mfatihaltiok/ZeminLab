@@ -4,8 +4,4 @@
 .engineering-render-footer{display:flex;justify-content:space-between;gap:12px;padding:7px 10px;border-top:1px solid #c4cbd0;background:#f2f4f5;font-size:9px;color:#68737a}
 @media(max-width:1200px){.engineering-render-scroll{max-height:620px}.engineering-render-canvas{min-width:820px}}
 
-.profile-3d-card{margin-top:14px;background:#f7f9fa;border:1px solid #aeb7bd;overflow:hidden}.profile-3d-card .profile-render-header{display:flex;justify-content:space-between;padding:12px 14px;background:#e8ecee;border-bottom:1px solid #c4cbd0}.profile-3d-card .profile-render-header b{display:block;font-size:11px}.profile-3d-card .profile-render-header span{display:block;margin-top:3px;font-size:9px;color:#68747b}.soil-3d-viewport{width:100%;min-height:420px;background:#f3f5f6;overflow:hidden}.soil-3d-viewport canvas{display:block;width:100%!important;height:auto!important}@media(max-width:900px){.soil-3d-viewport{min-height:300px}}
-
-.log-3d-card{margin:12px 0;background:#f7f9fa;border:1px solid #aeb7bd;overflow:hidden}.log-3d-card .log-preview-header{padding:12px 14px;background:#e8ecee;border-bottom:1px solid #c4cbd0}.log-3d-card .log-preview-header b{display:block;font-size:11px}.log-3d-card .log-preview-header span{display:block;margin-top:3px;font-size:9px;color:#68747b}
-
-.engineering-render-canvas{display:block;width:100%;height:auto;min-width:980px}.engineering-render-scroll{width:100%;height:100%;overflow:auto}.soil-3d-canvas{display:block;width:100%;height:100%}.soil-3d-viewport{width:100%;height:420px;background:#f3f5f6;overflow:hidden}.profile-3d-card{margin-top:14px}.log-3d-card{margin:12px 0}.engineering-3d-help{padding:7px 10px;font-size:9px;color:#68747b;background:#eef1f3}
+.engineering-render-canvas{display:block;width:1280px;height:auto;max-width:none}.engineering-render-scroll{width:100%;max-height:820px;overflow:auto}
