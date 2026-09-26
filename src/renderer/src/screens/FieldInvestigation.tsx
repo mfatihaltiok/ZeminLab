@@ -73,7 +73,7 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
     onChange({ ...borehole, spt: borehole.spt.map(r => r.id === id ? next : r).sort((a,b) => a.depth-b.depth) })
   }
   const updateUdDepth = (id: string, value: string) => { const n = Number(value); if (Number.isFinite(n)) updateRow(id, { depth: n, depthTo: n + 0.5 }) }
-  const updateCorrection=(id:string,patch:Partial<SptRecord['correction']>)=>{const current=borehole.spt.find(row=>row.id===id);if(!current)return;updateRow(id,{correction:{...(current.correction??{}),...patch}})}
+  const updateCorrection=(id:string,patch:Partial<NonNullable<SptRecord['correction']>>)=>{const current=borehole.spt.find(row=>row.id===id);if(!current)return;updateRow(id,{correction:{...(current.correction??{}),...patch}})}
   const add = () => { const next = appendSpt(borehole); if (next) onChange(next) }
   return <>
     <div className="field-meta-strip">
@@ -89,7 +89,7 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
         <thead><tr><th>Derinlik</th><th>Deney Tipi</th><th>n1</th><th>n2</th><th>n3</th><th>N30</th><th>Zemin Sınıfı</th><th>Zemin Açıklaması</th><th>Kaynak</th><th>Onay</th><th>Lab</th><th>Düzeltme</th><th/></tr></thead>
         <tbody>{borehole.spt.map(row => {
           const n30 = row.testType === 'SPT' && row.n2 !== undefined && row.n3 !== undefined ? row.n2 + row.n3 : undefined
-          return <tr key={row.id}>
+          return <><tr key={row.id}>
             <td>{row.testType === 'UD' ? <div className="depth-range"><input className="depth-input" type="number" value={row.depth} min="0" step="0.01" onChange={e=>updateUdDepth(row.id,e.target.value)}/><span>– {fmt(experimentDepthTo(row))}</span></div> : <span className="depth-range locked-cell"><span>{fmt(row.depth)}</span><span>– {fmt(experimentDepthTo(row))}</span></span>}</td>
             <td><select className={`test-type ${row.testType === 'UD' ? 'ud' : 'spt'}`} value={row.testType} onChange={e => updateRow(row.id,{testType:e.target.value as SptRecord['testType'],n1:e.target.value==='UD'?undefined:row.n1,n2:e.target.value==='UD'?undefined:row.n2,n3:e.target.value==='UD'?undefined:row.n3, laboratoryLinked:e.target.value==='SPT'?row.laboratoryLinked:true})}><option value="SPT">SPT</option><option value="UD">UD</option></select></td>
             <td><input className="n-input" type="number" value={row.n1 ?? ''} disabled={row.testType==='UD'} onChange={e=>updateRow(row.id,{n1:e.target.value===''?undefined:Number(e.target.value)})}/></td>
@@ -115,6 +115,7 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
               <label className="spt-check"><input type="checkbox" checked={row.correction?.applyDilatancyCorrection===true} onChange={e=>updateCorrection(row.id,{applyDilatancyCorrection:e.target.checked})}/> Dilatansi</label>
             </div>
           </td></tr>
+          </>
         })}</tbody>
       </table>
     </div>
