@@ -157,6 +157,8 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
   const result=calculateSpt({
     nField,
     ce:cfg.ce,cb:cfg.cb,cs:cfg.cs,
+    hammerType:cfg.hammerType,
+    sampler:cfg.samplerType,
     rodLengthM:record.rodLengthM,
     sptDepthM:record.depth,
     effectiveStress:stress.effectiveStress,
