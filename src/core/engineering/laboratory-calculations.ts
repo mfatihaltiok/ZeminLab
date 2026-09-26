@@ -16,7 +16,7 @@ export type LaboratoryDerivedValues = {
 
 export function calculatePlasticityIndex(liquidLimit?: number, plasticLimit?: number): number | undefined {
   if (liquidLimit === undefined || plasticLimit === undefined) return undefined
-  if (!Number.isFinite(liquidLimit) || !Number.isFinite(plasticLimit)) return undefined
+  if (!Number.isFinite(liquidLimit) || !Number.isFinite(plasticLimit) || liquidLimit < plasticLimit) return undefined
   return liquidLimit - plasticLimit
 }
 
