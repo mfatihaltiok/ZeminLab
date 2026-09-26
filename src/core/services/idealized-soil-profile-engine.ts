@@ -104,8 +104,10 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
     const borehole = boreholes.find(b => b.id === x.boreholeId)
     if (!borehole) return undefined
     const derived = deriveSptValues(borehole, x, laboratories)
-    return derived.overburdenCorrectionApplied && Number.isFinite(derived.n1_60) && derived.n1_60 > 0 ? derived.n1_60 : undefined
-  }).filter((x): x is number => x != null && Number.isFinite(x) && x > 0)
+    return derived.overburdenCorrectionApplied && Number.isFinite(derived.n1_60) && derived.n1_60 > 0 && Number.isFinite(derived.n60) && derived.n60 > 0
+      ? { n60: derived.n60, n1_60: derived.n1_60 }
+      : undefined
+  }).filter((x): x is { n60:number; n1_60:number } => x != null && Number.isFinite(x.n60) && x.n60 > 0 && Number.isFinite(x.n1_60) && x.n1_60 > 0)
   const gamma = median(lithology.map(x => x.unitWeight).filter((x): x is number => x != null).concat(labs.map(x => x.unitWeight).filter((x): x is number => x != null)))
   const gammaSat = median(lithology.map(x => x.saturatedUnitWeight).filter((x): x is number => x != null))
   const firstDefined = (values: Array<number | undefined>) => values.find(x => x != null)
@@ -115,14 +117,14 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
   const sources = buildSources(lithology, spt, labs)
 
   if (gamma != null && sources.gamma?.type === 'LİTOLOJİ' && labs.some(x => x.unitWeight != null)) sources.gamma = { type: 'LABORATUVAR', sampleIds: labs.map(x => x.id) }
-  if (correctedNValues.length) sources.representativeN1_60 = { type: 'SPT_KORELASYONU', boreholeIds: [...new Set(spt.map(x => x.boreholeId))], note: 'TBDY Ek 16B düzeltmeleri uygulanmış (N1)60; eksik gerilme/enerji girdilerinde değer üretilmez.' }
+  if (correctedNValues.length) sources.representativeN60 = { type: 'SPT_KORELASYONU', boreholeIds: [...new Set(spt.map(x => x.boreholeId))], note: 'TBDY Ek 16B düzeltmeleri uygulanmış (N1)60; eksik gerilme/enerji girdilerinde değer üretilmez.' }
 
   return {
     id: crypto.randomUUID(), order, topDepth: top, bottomDepth: bottom,
     soilName: mode(descriptions) ?? 'Tanımlanmamış zemin', soilCode: mode(codes) ?? '',
     boreholeIds: [...new Set([...lithology.flatMap(() => boreholes.filter(b => b.lithology.some(x => overlap(x.from, x.to, top, bottom))).map(b => b.id)), ...spt.map(x => x.boreholeId), ...labs.map(x => x.boreholeId)])],
     sptRecordIds: spt.map(x => x.id), laboratoryRecordIds: labs.map(x => x.id),
-    representativeSptN: median(nValues), representativeN1_60: median(correctedNValues),
+    representativeSptN: median(nValues), representativeN60: median(correctedNValues.map(x => x.n60)), representativeN1_60: median(correctedNValues.map(x => x.n1_60)),
     gamma: gamma == null ? undefined : unitWeightToBase(gamma, unitSystem),
     gammaSat: gammaSat == null ? undefined : unitWeightToBase(gammaSat, unitSystem),
     waterContent: labMedian(labs.map(x => x.waterContent)), liquidLimit: labMedian(labs.map(x => x.liquidLimit)),
