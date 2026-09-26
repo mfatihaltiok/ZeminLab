@@ -208,6 +208,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 
 {
   const integrated=evaluateFoundationSystem({
+    settlement:{profile:{id:'S',version:1,status:'SABİTLENDİ' as const,targetLayerCount:1,generatedAt:new Date(0).toISOString(),sourceBoreholeIds:[],sourceLaboratoryIds:[],layers:[{id:'S1',order:1,topDepth:0,bottomDepth:10,soilName:'Kum',soilCode:'SA',boreholeIds:[],sptRecordIds:[],laboratoryRecordIds:[],gamma:18,gammaSat:19,constrainedModulus:20000,parameterSources:{},userOverride:false}],methodology:'regression'},method:'2to1-layer'},
     project:{
       id:'integrated',title:'',projectNo:'',date:'',location:'',province:'',district:'',address:'',parcelInfo:'',pafta:'',ada:'',parsel:'',zoningStatus:'',
       engineer:'',clientName:'',firmName:'',buildingType:'',basementCount:0,normalFloorCount:1,unitSystem:'kN-m',
