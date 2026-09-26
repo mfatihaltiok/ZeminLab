@@ -102,7 +102,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.throws(() => calculateSpt({nField:10,energyRatio:50,hammerType:'safety',effectiveStress:100,rodLengthM:5}), /safety tokmak/)
   assert.throws(() => calculateSpt({nField:10,cs:1.05,effectiveStress:100,rodLengthM:5}), /CS için yalnız/)
   assert.throws(() => calculateSpt({nField:10,cs:1.2,sampler:'standard',effectiveStress:100,rodLengthM:5}), /Standart numune alıcı/)
-  assert.throws(() => calculateSpt({nField:10,energyRatio:100,hammerType:'measured',effectiveStress:100,rodLengthM:5}), /ER %45–%160/)
+  assert.throws(() => calculateSpt({nField:10,energyRatio:40,hammerType:'measured',effectiveStress:100,rodLengthM:5}), /ER %45–%160/)
   const noStress=calculateSpt({nField:10,fineContent:20,rodLengthM:5})
   assert.equal(noStress.n1_60f,undefined)
   assert.equal(noStress.hasAssumptions,true)
