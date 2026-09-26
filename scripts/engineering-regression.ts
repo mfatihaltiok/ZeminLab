@@ -7,6 +7,7 @@ import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-
 import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
+import { deriveSptValues } from '../src/core/engineering/field-calculations.ts'
 import { toEngineeringSI } from '../src/core/units/engineering-input-adapter.ts'
 import { normalizeEngineeringRenderModel } from '../src/renderer/src/components/engineering-render-model.ts'
 
@@ -64,6 +65,23 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(corrected.cn,0.978,1e-12)
   approx(corrected.n1_60,20.94876,1e-11)
   assert.equal(corrected.hasAssumptions,false)
+}
+
+{
+  const borehole={
+    id:'CN-FALLBACK',
+    name:'SK-01',
+    firstSptDepth:1.5,
+    totalDepth:6,
+    groundwaterDepth:20,
+    lithology:[{id:'L1',from:0,to:6,code:'Sa',description:'Kum',colorClass:'sand' as const}],
+    spt:[],
+  }
+  const record={id:'SPT-1',depth:3,testType:'SPT' as const,n1:5,n2:10,n3:10,source:'manual' as const,confirmed:false}
+  const derived=deriveSptValues(borehole,record,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:20})
+  assert.equal(derived.overburdenCorrectionApplied,true)
+  assert.ok(derived.effectiveStress!=null&&derived.effectiveStress>0)
+  approx(derived.cn,Math.min(1.70,9.78/Math.sqrt(54)),1e-12)
 }
 
 {
