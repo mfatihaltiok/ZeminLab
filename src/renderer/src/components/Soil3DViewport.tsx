@@ -18,7 +18,7 @@ export function Soil3DViewport({layers,totalDepth}:Props){
  const base=new THREE.Mesh(new THREE.BoxGeometry(5,.12,3),new THREE.MeshStandardMaterial({color:0x70777b}));base.position.y=-4;group.add(base)
  scene.add(new THREE.HemisphereLight(0xffffff,0x5f6870,2.2));const light=new THREE.DirectionalLight(0xffffff,2.5);light.position.set(6,10,8);scene.add(light)
  let raf=0;const animate=()=>{raf=requestAnimationFrame(animate);group.rotation.y+=.002;renderer.render(scene,camera)};animate()
- return()=>{cancelAnimationFrame(raf);renderer.dispose();scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;m.dispose()}})}
+ return()=>{cancelAnimationFrame(raf);renderer.dispose() }
  },[layers,totalDepth])
  return <div ref={ref} className="soil-3d-viewport" aria-label="Three.js üç boyutlu zemin profili"/>
 }
