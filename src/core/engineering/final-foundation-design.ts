@@ -34,9 +34,11 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   const zfSiteSpecificRequired=soilGroup==='ZF'
   if(zfSiteSpecificRequired && !p.geophysical.siteSpecificResponseAnalysisCompleted)missing.push('ZF için sahaya özel zemin davranış analizi')
   const dtsNeedsNonlinear = p.seismic.dts==='1'||p.seismic.dts==='1a'||p.seismic.dts==='2'||p.seismic.dts==='2a'
-  const soilNeedsNonlinear = soilGroup!=null && soilGroup!=='ZA' && soilGroup!=='ZB' && (p.seismic.dts==='1'||p.seismic.dts==='1a'||p.seismic.dts==='2'||p.seismic.dts==='2a')
-  const tallBuildingNonlinear = false
+  const soilNeedsNonlinear = soilGroup!=null && soilGroup!=='ZA' && soilGroup!=='ZB' && dtsNeedsNonlinear
+  const tallBuildingScopeKnown = p.foundationParameters.tallBuilding!==undefined
+  const tallBuildingNonlinear = p.foundationParameters.tallBuilding===true && soilGroup!=null && soilGroup!=='ZA' && soilGroup!=='ZB'
   const nonlinearRequired = tallBuildingNonlinear || soilNeedsNonlinear
+  if(!tallBuildingScopeKnown) missing.push('Bölüm 13 kapsamındaki yüksek bina durumu')
   if(nonlinearRequired && !p.foundationParameters.nonlinearSoilDeformationAnalysisCompleted) missing.push('16.8.3.4(b) doğrusal olmayan zemin davranışı ve kalıcı şekil değiştirme analizi')
   if(p.geophysical.vs30!=null){const inferred=classifyVs30(p.geophysical.vs30);if(inferred&&soilGroup&&inferred!==soilGroup&&soilGroup!=='ZF')warnings.push('VS30 ile seçilen zemin grubu farklı; kaynak/tercih raporda açıkça gösterilmelidir.')}
   const eng=toEngineeringSI(p),fp=eng.foundation,sp=eng.soil
