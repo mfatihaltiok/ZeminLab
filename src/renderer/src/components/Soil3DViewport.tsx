@@ -9,6 +9,7 @@ const color=(x:Layer['colorClass'])=>x==='clay'?0xb88968:x==='silt'?0x9ca99c:x==
 export function Soil3DViewport({layers,totalDepth}:Props){
   const host=useRef<HTMLDivElement>(null)
   const dataRef=useRef({layers,totalDepth})
+  const rebuildRef=useRef<(()=>void)|null>(null)
   dataRef.current={layers,totalDepth}
 
   useEffect(()=>{
@@ -108,27 +109,25 @@ export function Soil3DViewport({layers,totalDepth}:Props){
 
     const observer=new ResizeObserver(resize)
     observer.observe(el)
+    rebuildRef.current=rebuild
     rebuild()
 
     return()=>{
+
       observer.disconnect()
       renderer.domElement.removeEventListener('pointerdown',down)
       renderer.domElement.removeEventListener('pointermove',move)
       renderer.domElement.removeEventListener('pointerup',up)
       renderer.domElement.removeEventListener('pointercancel',up)
       renderer.domElement.removeEventListener('wheel',wheel)
+      rebuildRef.current=null
       disposeGroup()
       renderer.dispose()
     }
   },[])
 
   useEffect(()=>{
-    const el=host.current
-    if(!el)return undefined
-    // The stable renderer reads the newest dataRef on each rebuild trigger.
-    const event=new Event('faluzmn-soil-data-refresh')
-    el.dispatchEvent(event)
-    return undefined
+    rebuildRef.current?.()
   },[layers,totalDepth])
 
   return <div ref={host} className="soil-3d-viewport" aria-label="Three.js üç boyutlu zemin profili"/>
