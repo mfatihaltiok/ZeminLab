@@ -19,7 +19,8 @@ export interface SptCorrectionConfig {
   hammerType?:'donut'|'safety'|'automatic'|'measured'
   sampler?:'standard'|'without-liner'|'liner'
 }
-export interface SptRecord { id:string; depth:number; depthTo?:number; testType:SptTestType; n1?:number; n2?:number; n3?:number; soilCode?:string; soilDescription?:string; rodLengthM?:number; correction?:Partial<SptCorrectionConfig>; laboratoryLinked?:boolean; notes?:string; source:FieldDataSource; confirmed:boolean; provenance?:DataProvenance }
+export interface SptStressSnapshot { sigmaV0:number; porePressureU0:number; effectiveStressV0:number; groundwaterDepth:number; capturedAt:string }
+export interface SptRecord { id:string; depth:number; depthTo?:number; testType:SptTestType; n1?:number; n2?:number; n3?:number; soilCode?:string; soilDescription?:string; rodLengthM?:number; testStressSnapshot?:SptStressSnapshot; correction?:Partial<SptCorrectionConfig>; laboratoryLinked?:boolean; notes?:string; source:FieldDataSource; confirmed:boolean; provenance?:DataProvenance }
 export interface LithologyLayer { id:string; from:number; to:number; code:string; description:string; colorClass:LithologyColorClass; unitWeight?:number; saturatedUnitWeight?:number; cohesion?:number; frictionAngle?:number; finesContent?:number; liquidLimit?:number; plasticLimit?:number; plasticityIndex?:number; userOverride?:boolean; notes?:string; provenance?:DataProvenance }
 export interface BoreholeLogObservation { id:string; depth:number; depthTo?:number; type:'sample'|'water'|'drilling'|'remark'|'refusal'|'rock'; text:string; source:FieldDataSource; confirmed:boolean; provenance?:DataProvenance }
 export interface BoreholeLogSettings { scale:50|100|200; showSpt:boolean; showLaboratory:boolean; showGroundwater:boolean; showSamples:boolean; showRemarks:boolean }
