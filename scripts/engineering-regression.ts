@@ -42,11 +42,17 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(s.cn,0.978)
   approx(s.n1_60,19.56)
   approx(s.trace.find(x=>x.symbol==='CN')!.value!,0.978)
+  approx(s.alpha!,Math.exp(1.76-190/(30*30)),1e-12)
+  approx(s.beta!,.99+Math.pow(30,1.5)/1000,1e-12)
+  approx(s.n1_60f!,s.alpha!+s.beta!*s.n1_60,1e-12)
   assert.equal(s.warnings.length,0)
 }
 
 {
   assert.throws(() => calculateSpt({nField:10,energyRatio:60,rodLengthM:2.9,effectiveStress:100}), /rod boyu 3 m’den küçük/)
+  const automatic=calculateSpt({nField:10,hammerType:'automatic',effectiveStress:100})
+  approx(automatic.ce,.9)
+  assert.ok(automatic.hasAssumptions)
 }
 
 {
@@ -61,6 +67,12 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.equal(level.gc,1)
   assert.equal(level.gq,1)
   assert.ok(sloped.gq<1)
+  const terzaghi=calculateSurfaceFoundation({
+    B:2,L:4,Df:1,gamma1:18,gamma2:19,c:10,phi:30,verticalLoad:1000,
+    resistanceFactor:1.4,method:'Terzaghi'
+  })
+  approx(terzaghi.sc,1.15)
+  approx(terzaghi.sg,.9)
 }
 
 
