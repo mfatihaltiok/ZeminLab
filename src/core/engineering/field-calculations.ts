@@ -69,7 +69,7 @@ function stressAtDepth(
       const localLabGamma=median(boreholeLabs
         .filter(x=>x.depth>=top&&x.depth<bottom&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0)
         .map(x=>x.unitWeight!))
-      const gammaValue=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:localLabGamma??labGamma??fallbackGamma
+      const gammaValue=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:localLabGamma??fallbackGamma
       const needsSaturatedGamma=bottom>gwt
       const gammaSatValue=Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0
         ?layer.saturatedUnitWeight!
