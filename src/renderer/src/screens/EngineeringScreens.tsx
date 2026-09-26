@@ -3,7 +3,7 @@ import { foundationChecks } from '../../core/engineering/calculation-engine'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { useProjectInfo } from '../../core/state/project-store'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
-import { forceToBase, momentToBase } from '../../core/units/project-units'
+import { forceToBase, momentToBase, stressToBase } from '../../core/units/project-units'
 import { Card, Frame, Metric, Source, type ScreenId } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
 
@@ -75,11 +75,12 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
 
 export function Foundation(){
   const p=useProjectInfo(),f=p.foundationParameters,soil=p.soilParameters
+  const cu=soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem)
   const N=forceToBase(f.verticalLoad,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
   const ready=f.footingWidth>0&&f.footingLength>0&&N>=0&&f.foundationInterface!==undefined&&f.seismicBelowGroundwater!==undefined
   const r=ready&&f.foundationInterface?foundationChecks({
     B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,
-    deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
+    deltaTan:f.baseFrictionTanDelta,cu,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
     passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance,
     seismic:f.seismicBelowGroundwater??false,
     interfaceType:f.foundationInterface
