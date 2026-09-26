@@ -121,7 +121,7 @@ export function normalizeProjectInfo(value:Partial<ProjectInfo>):ProjectInfo{
     geophysical:{...defaultProjectInfo.geophysical,...(value.geophysical??{})},
     seismic:{...seismic,sds,sd1,dts},
     soilParameters:{...soil,classification:{...defaultProjectInfo.soilParameters.classification,...(soil.classification??{})}},
-    foundationParameters:{...foundation,foundationType,structuralWeight,verticalLoad:structuralWeight},
+    foundationParameters:{...foundation,foundationType,structuralWeight},
     jetGrout:{...defaultProjectInfo.jetGrout,...(value.jetGrout??{})},
     visualDocuments:value.visualDocuments??{}
   }
