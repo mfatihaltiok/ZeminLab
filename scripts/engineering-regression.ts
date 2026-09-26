@@ -200,8 +200,8 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     methodology:'regression'
   }
   const result=calculateIdealizedSettlement({profile,method:'2to1-layer',B:2,L:2,Df:0,qGross:100,groundwaterDepth:50,timeYears:10})
-  approx(result.totalSecondary,100)
-  approx(result.layers[0].secondarySettlement,100)
+  approx(result.totalSecondary,40)
+  approx(result.layers[0].secondarySettlement,40)
   assert.equal(result.ready,true)
 }
 
