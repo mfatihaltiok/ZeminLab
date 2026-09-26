@@ -5,7 +5,7 @@ import { effectiveStressAtDepth as centralEffectiveStressAtDepth } from './stres
 export type IdealizedSettlementMethod='burland-burbidge'|'elasticity'|'2to1-layer'|'boussinesq'|'janbu'|'schmertmann'
 type SettlementLayerResult={
   layerId:string;order:number;soilName:string;soilCode:string;topDepth:number;bottomDepth:number;thickness:number;midDepth:number
-  sigmaV0:number;porePressure:number;sigmaV0Effective:number;deltaSigma:number;sigmaVFinal:number;sigmaVFinalEffective:number;representativeN60?:number
+  sigmaV0:number;porePressure:number;sigmaV0Effective:number;deltaSigma:number;sigmaVFinal:number;sigmaVFinalEffective:number;representativeN60?:number;representativeN1_60?:number
   Es?:number;poissonRatio?:number;immediateSettlement:number;consolidationSettlement:number;secondarySettlement:number;totalSettlement:number;method:string
   status:'HESAPLANDI'|'VERİ EKSİK';note?:string
 }
@@ -70,7 +70,7 @@ function stressIncrement(qNet:number,B:number,L:number,z:number,method:Idealized
   return method==='boussinesq'?boussinesqRectangularAverage(qNet,B,L,z):stressIncrement2to1(qNet,B,L,z)
 }
 function burlandSettlement(layer:IdealizedSoilLayer,qNet:number,B:number,L:number,zTop:number,zBottom:number,influenceDepth:number,midDepth:number,gwt:number){
-  const rawN=layer.representativeN60??layer.representativeSptN
+  const rawN=layer.representativeN60
   if(!finite(rawN)||rawN<=0)return{value:0,note:'Burland-Burbidge için temsilci N60/SPT yok.'}
   let n60=rawN
   const code=(layer.soilCode+' '+layer.soilName).toUpperCase().replace(/İ/g,'I')
@@ -202,7 +202,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     totalImmediate+=immediate
     totalConsolidation+=consolidation
     totalSecondary+=secondary
-    results.push({layerId:layer.id,order:layer.order,soilName:layer.soilName,soilCode:layer.soilCode,topDepth:top,bottomDepth:bottom,thickness,midDepth,sigmaV0:midStress.total,porePressure:midStress.porePressure,sigmaV0Effective:midStress.effective,deltaSigma,sigmaVFinal:midStress.total+deltaSigma,sigmaVFinalEffective:finalEffective,representativeN60:layer.representativeN60??layer.representativeSptN,Es:layer.constrainedModulus??layer.oedometricModulus,poissonRatio:layer.poissonRatio,immediateSettlement:immediate,consolidationSettlement:consolidation,secondarySettlement:secondary,totalSettlement:immediate+consolidation+secondary,method:methodName,status,note})
+    results.push({layerId:layer.id,order:layer.order,soilName:layer.soilName,soilCode:layer.soilCode,topDepth:top,bottomDepth:bottom,thickness,midDepth,sigmaV0:midStress.total,porePressure:midStress.porePressure,sigmaV0Effective:midStress.effective,deltaSigma,sigmaVFinal:midStress.total+deltaSigma,sigmaVFinalEffective:finalEffective,representativeN60:layer.representativeN60,representativeN1_60:layer.representativeN1_60,Es:layer.constrainedModulus??layer.oedometricModulus,poissonRatio:layer.poissonRatio,immediateSettlement:immediate,consolidationSettlement:consolidation,secondarySettlement:secondary,totalSettlement:immediate+consolidation+secondary,method:methodName,status,note})
   }
   if(results.some(x=>x.status==='VERİ EKSİK'))warnings.push('Bir veya daha fazla tabakada gerekli oturma parametresi eksik; eksik katkılar sıfır kabul edilmez ve sonuç hazırlıksız işaretlenir.')
   if(method==='schmertmann'&&input.timeYears==null)warnings.push('Schmertmann C2=1 alındı; zaman bilgisi girilmediği için creep düzeltmesi yapılmadı.')
