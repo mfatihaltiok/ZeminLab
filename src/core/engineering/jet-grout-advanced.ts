@@ -128,8 +128,9 @@ export interface JetGroutEngineeringInput extends JetGroutAdvancedInput {
   horizontalLoad?: number
   shearNormalStress?: number
   axial?: JetGroutAxialInput
+  qualityControlCompleted?: boolean
 }
-export interface JetGroutEngineeringResult extends JetGroutAdvancedResult { stressConcentrationFactor: number; virtualRaft?: VirtualRaftResult; shearSafety?: ShearSafetyResult; priebeScreening?: PriebeScreeningResult; axial?: JetGroutAxialResult }
+export interface JetGroutEngineeringResult extends JetGroutAdvancedResult { stressConcentrationFactor: number; virtualRaft?: VirtualRaftResult; shearSafety?: ShearSafetyResult; priebeScreening?: PriebeScreeningResult; axial?: JetGroutAxialResult; screeningOnly:boolean; designEligible:boolean; warnings:string[] }
 
 export function jetGroutEngineering(i: JetGroutEngineeringInput): JetGroutEngineeringResult {
   const base = jetGroutAdvanced(i)
@@ -140,5 +141,8 @@ export function jetGroutEngineering(i: JetGroutEngineeringInput): JetGroutEngine
     ? jetGroutShearSafety({ verticalLoad: i.verticalLoad, horizontalLoad: i.horizontalLoad, area: i.foundationArea, cohesion: i.cohesion, frictionAngle: i.frictionAngle, effectiveNormalStress: i.shearNormalStress }) : undefined
   const priebe = i.columnFrictionAngle != null ? priebeScreening({ areaReplacementRatio: base.areaReplacementRatio, columnFrictionAngle: i.columnFrictionAngle, soilPoissonRatio: i.soilPoissonRatio, columnModulus: i.EsColumn, soilModulus: i.EsSoil }) : undefined
   const axial = i.axial ? jetGroutAxialCapacity(i.axial) : undefined
-  return { ...base, stressConcentrationFactor: beta, virtualRaft, shearSafety, priebeScreening: priebe, axial }
+  const warnings=['Jet Grout kompozit sonuçları ön tasarım/screening niteliğindedir. Nihai kapasite ve oturma için saha deneyleri, kolon sürekliliği, dayanım/kalite kontrolü ve uygun grup/blok kontrolü ayrıca doğrulanmalıdır.']
+  if(!i.qualityControlCompleted)warnings.push('Jet Grout kalite kontrol/doğrulama tamamlanmadı; sonuç nihai tasarım uygunluğu olarak işaretlenemez.')
+  const designEligible=Boolean(i.qualityControlCompleted&&axial)
+  return { ...base, stressConcentrationFactor: beta, virtualRaft, shearSafety, priebeScreening: priebe, axial, screeningOnly:true, designEligible, warnings }
 }
