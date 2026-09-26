@@ -7,6 +7,7 @@ import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-
 import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
+import { toEngineeringSI } from '../src/core/units/engineering-input-adapter.ts'
 
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(Math.abs(actual-expected)<=tolerance,`expected ${expected}, got ${actual}`)
@@ -78,6 +79,23 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.equal(layered.finalDesignEligible,false)
   assert.equal(layered.layeredScreeningOnly,true)
   assert.ok(layered.warnings.some(w=>w.includes('nihai tasarım')||w.includes('screening')))
+}
+
+
+{
+  const project = {
+    ...{
+      id:'units',title:'',projectNo:'',date:'',location:'',province:'',district:'',address:'',parcelInfo:'',pafta:'',ada:'',parsel:'',zoningStatus:'',
+      engineer:'',clientName:'',firmName:'',buildingType:'',basementCount:0,normalFloorCount:0,unitSystem:'ton-m' as const,
+      geophysical:{},seismic:{},
+      soilParameters:{unitWeight:1.8,saturatedUnitWeight:2.0,cohesion:0.1,frictionAngle:30,groundwaterDepth:2,surfaceSlope:0,foundationBaseSlope:0,finesContent:10,classification:{system:'TS EN ISO 14688-2' as const}},
+      foundationParameters:{foundationType:'tekil' as const,footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:10,horizontalLoad:1,momentX:1,momentY:1,resistanceFactorRv:1.4,vtX:1,vtY:1,structuralWeight:10,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:5,usePassiveResistance:true},
+      jetGrout:{},visualDocuments:{}
+    }
+  }
+  const eng = toEngineeringSI(project)
+  approx(eng.foundation.passiveResistanceCharacteristic, 5*9.80665)
+  approx(eng.foundation.verticalLoad, 10*9.80665)
 }
 
 
