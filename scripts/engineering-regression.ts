@@ -169,7 +169,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
-  assert.throws(() => calculateSpt({nField:10,energyRatio:60,rodLengthM:2.9,effectiveStress:100}), /rod boyu 3 m’den küçük/)
+  assert.throws(() => calculateSpt({nField:10,energyRatio:60,rodLengthM:2.9,effectiveStress:100}), /toplam tij boyu 3 m veya daha büyük/)
   const automatic=calculateSpt({nField:10,hammerType:'automatic',effectiveStress:100})
   approx(automatic.ce,1.5)
   assert.ok(automatic.hasAssumptions)
