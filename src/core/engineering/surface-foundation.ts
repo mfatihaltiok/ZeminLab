@@ -115,45 +115,40 @@ function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influen
 
 function compressionContact(B:number,L:number,N:number,Mx:number,My:number){
   if(N<=0)return{area:0,qMax:Infinity,qMin:0,contactState:'NO_CONTACT' as const}
-  const fullA=B*L
-  const fullQ=N/fullA
-  const ex=My/N,ey=Mx/N
-  if(Math.abs(ex)<=B/6+1e-12&&Math.abs(ey)<=L/6+1e-12){
-    return{area:fullA,qMax:fullQ*(1+6*Math.abs(ex)/B+6*Math.abs(ey)/L),qMin:Math.max(0,fullQ*(1-6*Math.abs(ex)/B-6*Math.abs(ey)/L)),contactState:'FULL' as const}
+  const fullA=B*L,fullQ=N/fullA,ex=My/N,ey=Mx/N
+  if(Math.abs(ex)<=B/6+1e-12&&Math.abs(ey)<=L/6+1e-12)
+    return{area:fullA,qMax:fullQ*(1+6*ex/B+6*ey/L),qMin:Math.max(0,fullQ*(1-6*ex/B-6*ey/L)),contactState:'FULL' as const}
+
+  const nx=80,ny=80,dx=B/nx,dy=L/ny
+  const cells:Array<[number,number]>=[]
+  for(let ix=0;ix<nx;ix++){const x=-B/2+(ix+.5)*dx;for(let iy=0;iy<ny;iy++){const y=-L/2+(iy+.5)*dy;cells.push([x,y])}}
+  const integrate=(a:number,b:number,cc:number)=>{
+    let f0=0,fy=0,fx=0,fyy=0,fxx=0,fxy=0,area=0,qMax=0
+    for(const [x,y] of cells){
+      const p=Math.max(0,a+b*x+cc*y),w=dx*dy
+      f0+=p*w
+      if(p>0){area+=w;qMax=Math.max(qMax,p)}
+      fy+=p*x*w; fx+=p*y*w
+      fyy+=p*x*x*w; fxx+=p*y*y*w; fxy+=p*x*y*w
+    }
+    return{f0,fx,fy,fxx,fyy,fxy,area,qMax}
   }
-  // p(x,y)=max(0,a+b*x+c*y), with x in [-B/2,B/2], y in [-L/2,L/2].
-  // Newton solve enforces resultant N and moments My=N*ex, Mx=N*ey.
-  let a=Math.max(fullQ,1e-6),b=12*My/(Math.max(B**3*L,1e-12)),cc=12*Mx/(Math.max(L**3*B,1e-12))
-  const integrate=(aa:number,bb:number,cc0:number)=>{
-    const nx=32,ny=32,dx=B/nx,dy=L/ny
-    let f0=0,area=0,fx=0,fy=0,fxx=0,fyy=0,fxy=0
-    for(let ix=0;ix<nx;ix++){const x=-B/2+(ix+.5)*dx
-      for(let iy=0;iy<ny;iy++){const y=-L/2+(iy+.5)*dy,p=Math.max(0,aa+bb*x+cc0*y),w=dx*dy
-        f0+=p*w;fx+=p*y*w;fy+=p*x*w;fxx+=p*y*y*w;fyy+=p*x*x*w;fxy+=p*x*y*w
-      }}
-    return{f0,area,fx,fy,fxx,fyy,fxy}
-  }
-  for(let it=0;it<30;it++){
-    const f=integrate(a,b,cc),r0=f.f0-N,r1=f.fx-Mx,r2=f.fy-My
-    if(Math.max(Math.abs(r0),Math.abs(r1),Math.abs(r2))<=Math.max(1e-7*N,1e-7))break
-    const j00=Math.max(f.area,1e-12),j01=f.fy,j02=f.fx
-    const j10=f.fy,j11=f.fxx,j12=f.fxy
-    const j20=f.fx,j21=f.fxy,j22=f.fyy
+  let a=fullQ,b=12*My/(B**3*L),cc=12*Mx/(L**3*B)
+  for(let it=0;it<40;it++){
+    const f=integrate(a,b,cc)
+    const r0=f.f0-N,r1=f.fx-Mx,r2=f.fy-My
+    if(Math.max(Math.abs(r0)/Math.max(N,1),Math.abs(r1)/Math.max(Math.abs(Mx),N*B/2,1),Math.abs(r2)/Math.max(Math.abs(My),N*L/2,1))<1e-6)break
+    const j00=f.area,j01=f.fy,j02=f.fx,j10=f.fy,j11=f.fxx,j12=f.fxy,j20=f.fx,j21=f.fxy,j22=f.fyy
     const det=j00*(j11*j22-j12*j21)-j01*(j10*j22-j12*j20)+j02*(j10*j21-j11*j20)
     if(Math.abs(det)<1e-18)break
     const d0=(r0*(j11*j22-j12*j21)-j01*(r1*j22-j12*r2)+j02*(r1*j21-j11*r2))/det
     const d1=(j00*(r1*j22-j12*r2)-r0*(j10*j22-j12*j20)+j02*(j10*r2-r1*j20))/det
     const d2=(j00*(j11*r2-r1*j21)-j01*(j10*r2-r1*j20)+r0*(j10*j21-j11*j20))/det
-    a-=d0;b-=d1;cc-=d2
+    const scale=Math.max(Math.abs(a),Math.abs(b)*B/2,Math.abs(cc)*L/2,1)
+    a=Math.max(-scale*100,a-d0); b=Math.max(-scale*100,Math.min(scale*100,b-d1)); cc=Math.max(-scale*100,Math.min(scale*100,cc-d2))
   }
   const f=integrate(a,b,cc)
-  let area=0,qMax=0,nx=64,ny=64,dx=B/nx,dy=L/ny
-  for(let ix=0;ix<nx;ix++){const x=-B/2+(ix+.5)*dx
-    for(let iy=0;iy<ny;iy++){const y=-L/2+(iy+.5)*dy,p=Math.max(0,a+b*x+cc*y)
-      if(p>0)area+=dx*dy
-      qMax=Math.max(qMax,p)
-    }}
-  return{area,qMax,qMin:0,contactState:'PARTIAL' as const}
+  return{area:f.area,qMax:f.qMax,qMin:0,contactState:'PARTIAL' as const}
 }
 
 function equivalentLayerParameters(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number){
