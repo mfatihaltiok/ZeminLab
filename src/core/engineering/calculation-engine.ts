@@ -70,9 +70,11 @@ export function settlement(i:SettlementInput):CalculationResult<{immediate:numbe
 
 export interface LiquefactionInput{Mw:number;Sds:number;depth:number;N160f:number;sigmaV:number;sigmaVPrime:number}
 export function liquefaction(i:LiquefactionInput):CalculationResult<any>{
-  const z=Math.max(i.depth,.01),rd=z<=9.15?1-.00765*z:z<=23?1.174-.0267*z:z<=30?.744-.008*z:.5,N=clamp(i.N160f,.1,33.9)
-  const CRRM75=N>=29.9?2:1/(34-N)+N/135+50/(10*N+45)**2-.005
-  const CM=10**2.24/Math.max(i.Mw,1)**2.56,Rtau=CRRM75*CM*Math.max(i.sigmaVPrime,0),tau=.65*.4*Math.max(i.Sds,0)*Math.max(i.sigmaV,0)*Math.max(rd,0),ratio=Rtau/Math.max(tau,1e-9)
+  if(!Number.isFinite(i.depth)||i.depth<0||!Number.isFinite(i.N160f)||i.N160f<=0||i.N160f>=34)throw new Error('N1,60f değeri Ek 16B CRR bağıntısının 0<N1,60f<34 geçerlilik aralığında olmalıdır.')
+  if(!Number.isFinite(i.Mw)||i.Mw<=0||!Number.isFinite(i.Sds)||i.Sds<0||!Number.isFinite(i.sigmaV)||i.sigmaV<0||!Number.isFinite(i.sigmaVPrime)||i.sigmaVPrime<=0)throw new Error('Sıvılaşma gerilme ve deprem girdileri geçerli olmalıdır.')
+  const z=i.depth,rd=z<=9.15?1-.00765*z:z<=23?1.174-.0267*z:z<=30?.744-.008*z:.5,N=i.N160f
+  const CRRM75=1/(34-N)+N/135+50/(10*N+45)**2-1/200
+  const CM=10**2.24/i.Mw**2.56,Rtau=CRRM75*CM*i.sigmaVPrime,tau=.65*.4*i.Sds*i.sigmaV*rd,ratio=tau>0?Rtau/tau:Infinity
   return{value:{rd,CRRM75,CM,Rtau,tau,ratio,safe:ratio>=1.1},method:'TBDY 2018 Ek 16B',source:'Ek 16B tetiklenme zinciri; ana uygulama liquefaction-profile.ts üzerinden yapılmalıdır.',steps:[
     {symbol:'rd',title:'Gerilme azaltma',formula:'Ek 16B derinlik bağıntısı',value:rd},
     {symbol:'CRR7.5',title:'Çevrimsel dayanım',formula:'Ek 16B',value:CRRM75},
