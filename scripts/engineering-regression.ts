@@ -82,11 +82,11 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 
 
 {
-  const withoutPassive=foundationChecks({B:2,L:2,N:1000,V:600,Vx:600,Vy:0,Mx:0,My:0,deltaTan:.6,passiveResistanceCharacteristic:500,usePassiveResistance:false})
-  const withPassive=foundationChecks({B:2,L:2,N:1000,V:600,Vx:600,Vy:0,Mx:0,My:0,deltaTan:.6,passiveResistanceCharacteristic:500,usePassiveResistance:true})
+  const withoutPassive=foundationChecks({B:2,L:2,N:1000,V:600,Vx:600,Vy:0,Mx:0,My:0,deltaTan:.6,passiveResistanceCharacteristic:500,usePassiveResistance:false,interfaceType:'cast-in-place-soil'})
+  const withPassive=foundationChecks({B:2,L:2,N:1000,V:600,Vx:600,Vy:0,Mx:0,My:0,deltaTan:.6,passiveResistanceCharacteristic:500,usePassiveResistance:true,interfaceType:'cast-in-place-soil'})
   assert.ok(withoutPassive.slidingUtilizationX>withPassive.slidingUtilizationX)
   assert.equal(withPassive.passiveResistanceDesign,500/1.4)
-  const resultant=foundationChecks({B:2,L:2,N:1000,Vx:300,Vy:400,Mx:0,My:0,deltaTan:.6})
+  const resultant=foundationChecks({B:2,L:2,N:1000,Vx:300,Vy:400,Mx:0,My:0,deltaTan:.6,interfaceType:'cast-in-place-soil'})
   approx(resultant.horizontalResultant,500)
   approx(resultant.slidingFS,resultant.slidingCapacityResultant/500)
 }
@@ -95,7 +95,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 {
   const missingCu=foundationChecks({
     B:2,L:2,N:1000,Vx:500,Vy:0,Mx:0,My:0,
-    groundwaterDepth:0,foundationDepth:1,seismic:true
+    groundwaterDepth:0,foundationDepth:1,seismic:true,interfaceType:'cast-in-place-soil'
   })
   assert.equal(missingCu.slidingMode,'data-missing')
   assert.equal(missingCu.evaluable,false)
@@ -105,7 +105,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 {
   const seismicCu=foundationChecks({
     B:2,L:2,N:1000,Vx:500,Vy:0,Mx:0,My:0,
-    groundwaterDepth:0,foundationDepth:1,seismic:true,cu:100
+    groundwaterDepth:0,foundationDepth:1,seismic:true,cu:100,interfaceType:'cast-in-place-soil'
   })
   approx(seismicCu.slidingCapacityResultant,4*100/1.1)
   assert.equal(seismicCu.slidingMode,'undrained-cu')
@@ -196,7 +196,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
       geophysical:{soilGroup:'ZD',soilGroupSource:'USER',siteSpecificResponseAnalysisCompleted:false},
       seismic:{ss:.5,fs:1,sds:.5,bks:2},
       soilParameters:{unitWeight:18,saturatedUnitWeight:19,cohesion:10,frictionAngle:30,groundwaterDepth:10,surfaceSlope:0,foundationBaseSlope:0,finesContent:10,classification:{system:'TBDY 2018',code:'ZD'}},
-      foundationParameters:{foundationType:'tekil',footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:1000,horizontalLoad:0,momentX:0,momentY:0,resistanceFactorRv:1.4,vtX:100,vtY:0,structuralWeight:1000,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:0,usePassiveResistance:false},
+      foundationParameters:{foundationType:'tekil',footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:1000,horizontalLoad:0,momentX:0,momentY:0,resistanceFactorRv:1.4,vtX:100,vtY:0,structuralWeight:1000,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:0,usePassiveResistance:false,foundationInterface:'cast-in-place-soil'},
       jetGrout:{layout:'square'},visualDocuments:{}
     }
   })
