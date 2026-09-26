@@ -263,8 +263,8 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(contactState==='NO_CONTACT')warnings.push('Temel tabanında basınçlı temas bulunmadığından q0/qt karşılaştırması nihai uygunluk için kullanılamaz.')
   if(contactState==='PARTIAL')warnings.push('Kısmi temas alanı compression-only lineer basınç dağılımından nümerik olarak çözüldü; qmin=0 ve qmax gerçek temas alanı üzerinden raporlanır.')
   let adequate=qo<=qt&&contactState!=='NO_CONTACT'&&(!i.layers||layeredComplete)
-  const finalDesignEligible=!i.layers?.length||Boolean(layeredComplete)
-  if(i.layers?.length&&layerData?.complete)warnings.push('Tabakalı zemin kapasitesi, 2B′ etki derinliğinde eşdeğer parametre hesabı ile her aktif tabakanın yerel kapasite kontrolünün daha küçük değeri alınarak belirlenmiştir. Bu, TBDY 16.8.3.3 tabaka etkisini sayısal olarak muhafazakâr biçimde hesaba katar; çok-tabakalı kayma yüzeyi analizi ayrı bir ileri yöntemdir.')
+  const finalDesignEligible=!i.layers?.length && contactState!=='NO_CONTACT'
+  if(i.layers?.length&&layerData?.complete)warnings.push('Tabakalı zemin için 2B′ etki derinliğinde eşdeğer parametre + aktif tabaka yerel kontrolleri yalnız muhafazakâr ön değerlendirmedir. TBDY 16.8.3.3 tabakaların etkisinin dikkate alınmasını ister; çok-tabakalı kayma yüzeyi yöntemi bu modülde uygulanmadığından sonuç nihai tasarım uygunluğu olarak işaretlenmez.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: sürşarj ve γ′/ağırlıklı γ dikkate alındı.')
   if(groundSlope>0)warnings.push('Arazi eğimi katsayıları genel kabul görmüş Vesic tipi bağıntılarla uygulanmıştır; β<φ′ koşulu kontrol edildi.')
   if(baseSlope>0)warnings.push('Temel tabanı eğimi katsayıları genel kabul görmüş Vesic tipi bağıntılarla uygulanmıştır.')
