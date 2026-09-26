@@ -50,7 +50,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
       }
     })
     return liquefactionProfile({
-      Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:unitWeightToBase(l.unitWeight??0,p.unitSystem),gammaSat:unitWeightToBase(l.saturatedUnitWeight??l.unitWeight??0,p.unitSystem),soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex})),
+      Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:unitWeightToBase(l.unitWeight??p.soilParameters.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(l.saturatedUnitWeight??l.unitWeight??p.soilParameters.saturatedUnitWeight??p.soilParameters.unitWeight,p.unitSystem),soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex})),
       spt:rows,sptCorrection:p.sptCorrections,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth
     })
   },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,p.geophysical.soilGroup,p.soilParameters.liquefactionContinuousOrThickLens,p.sptCorrections,validSpt])
