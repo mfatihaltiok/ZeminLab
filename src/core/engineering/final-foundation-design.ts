@@ -24,6 +24,7 @@ export interface FinalFoundationResult{
   failedChecks:string[];missingData:string[];warnings:string[]
   trace:Array<{check:string;status:FinalStatus;source:string;details:string}>
 }
+const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 const finiteOr=(x:unknown,d:number)=>finite(x)?x:d
 
 export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFoundationResult{
