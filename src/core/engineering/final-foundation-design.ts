@@ -15,6 +15,7 @@ export interface FinalFoundationInput{
   surfaceLayers?:SurfaceFoundationLayer[]
   settlement?:Omit<IdealizedSettlementInput,'profile'|'B'|'L'|'Df'|'qGross'|'groundwaterDepth'> & {profile:IdealizedSettlementInput['profile']}
   liquefaction?:LiquefactionProfileInput
+  combinationInput?:FoundationLoadCombinationInput
   seismicBelowGroundwater?:boolean
 }
 export interface FinalFoundationResult{
@@ -22,6 +23,7 @@ export interface FinalFoundationResult{
   project:{dts?:string;bks?:number;sds?:number;soilGroup?:string;vs30?:number;zfSiteSpecificRequired:boolean}
   actions:{N:number;Vx:number;Vy:number;Mx:number;My:number;source:string}
   bearing?:ReturnType<typeof calculateSurfaceFoundation>;sliding?:ReturnType<typeof foundationChecks>;settlement?:IdealizedSettlementResult;liquefaction?:LiquefactionProfileResult
+  combinations:FoundationLoadCombination[]
   failedChecks:string[];missingData:string[];warnings:string[]
   trace:Array<{check:string;status:FinalStatus;source:string;details:string}>
 }
@@ -44,11 +46,16 @@ export function buildTBDYSeismicCombinations(i:FoundationLoadCombinationInput):F
 
 export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFoundationResult{
   const p=normalizeProjectInfo(input.project),missing:string[]=[],failed:string[]=[],warnings:string[]=[],trace:FinalFoundationResult['trace']=[]
+  const combinations=input.combinationInput?[
+    ...buildTBDYSeismicCombinations({...input.combinationInput,direction:'+'}),
+    ...buildTBDYSeismicCombinations({...input.combinationInput,direction:'-'})
+  ]:[]
   const soilGroup=p.geophysical.soilGroup??p.soilParameters.classification.code
   const zf=soilGroup==='ZF'
   if(zf&&!p.geophysical.siteSpecificResponseAnalysisCompleted)missing.push('ZF için sahaya özel zemin davranış analizi')
   if(p.geophysical.vs30!=null){const inferred=classifyVs30(p.geophysical.vs30);if(inferred&&soilGroup&&inferred!==soilGroup&&soilGroup!=='ZF')warnings.push('VS30 ile seçilen zemin grubu farklı; kaynak/tercih raporda açıkça gösterilmelidir.')}
   const fp=p.foundationParameters,sp=p.soilParameters
+  if(combinations.length>0)warnings.push('4.11/4.12 yük birleşimleri denetlenmiştir. Temel tasarım kuvvetleri, 4.10.3 kapsamında üstyapı analizinden temele aktarılmış tasarım etkileri olarak kullanılmalıdır; bu motor üstyapı analizini yeniden üretmez.')
   const N=finiteOr(input.actions?.vertical,fp.verticalLoad),Vx=finiteOr(input.actions?.vx,fp.vtX),Vy=finiteOr(input.actions?.vy,fp.vtY),Mx=finiteOr(input.actions?.mx,fp.momentX),My=finiteOr(input.actions?.my,fp.momentY)
   const actions={N,Vx,Vy,Mx,My,source:input.actions?.source??'Temele aktarılan tasarım kuvvetleri'}
   if(!finite(N)||!finite(Vx)||!finite(Vy)||!finite(Mx)||!finite(My))missing.push('Temele aktarılan tasarım kuvvetleri')
@@ -90,5 +97,5 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   if(!p.seismic.bks)missing.push('BKS')
   if(!soilGroup)missing.push('Zemin grubu')
   const m=[...new Set(missing)],f=[...new Set(failed)],status:FinalStatus=f.length?'UYGUN DEĞİL':m.length?'VERİ EKSİK':'UYGUN'
-  return{status,evaluable:status!=='VERİ EKSİK',project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired:zf},actions,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,liquefaction}
+  return{status,evaluable:status!=='VERİ EKSİK',project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired:zf},actions,combinations,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,liquefaction}
 }
