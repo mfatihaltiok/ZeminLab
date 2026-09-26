@@ -126,6 +126,12 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(snapshot.effectiveStressV0,66.57,1e-12)
   approx(derived.effectiveStress!,66.57,1e-12)
   assert.equal(derived.hasAssumptions,false)
+  borehole.groundwaterDepth=10
+  borehole.lithology[1].unitWeight=25
+  const locked=deriveSptValues(borehole,{...record,testStressSnapshot:snapshot},[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:10})
+  approx(locked.verticalStress!,snapshot.sigmaV0,1e-12)
+  approx(locked.porePressure!,snapshot.porePressureU0,1e-12)
+  approx(locked.effectiveStress!,snapshot.effectiveStressV0,1e-12)
 }
 
 
@@ -191,6 +197,39 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(sandyDerived.cn,9.78/Math.sqrt(66.57),1e-12)
   approx(sandyDerived.n60,20,1e-12)
   approx(sandyDerived.n1_60,20*sandyDerived.cn,1e-12)
+  assert.equal(sandyDerived.hasAssumptions,true)
+}
+
+{
+  const noGroundwaterBorehole={
+    id:'NO-GWT',
+    name:'SK-NOGWT',
+    firstSptDepth:1.5,
+    totalDepth:6,
+    lithology:[{id:'L1',from:0,to:6,code:'Sa',description:'Kum',colorClass:'sand' as const,unitWeight:18,saturatedUnitWeight:19}],
+    spt:[]
+  }
+  const noGroundwater=deriveSptValues(noGroundwaterBorehole,{id:'SPT-NOGWT',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'Sa',source:'manual' as const,confirmed:false},[],'kN-m',{unitWeight:18,saturatedUnitWeight:19})
+  assert.equal(noGroundwater.effectiveStress,undefined)
+  assert.equal(noGroundwater.hasAssumptions,true)
+}
+
+{
+  const overlappingBorehole={
+    id:'OVERLAP',
+    name:'SK-OVERLAP',
+    firstSptDepth:1.5,
+    totalDepth:6,
+    groundwaterDepth:2,
+    lithology:[
+      {id:'L1',from:0,to:4,code:'Sa',description:'Kum',colorClass:'sand' as const,unitWeight:18,saturatedUnitWeight:19},
+      {id:'L2',from:3,to:6,code:'Sa',description:'Kum',colorClass:'sand' as const,unitWeight:19,saturatedUnitWeight:20}
+    ],
+    spt:[]
+  }
+  const overlap=deriveSptValues(overlappingBorehole,{id:'SPT-OVERLAP',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'Sa',source:'manual' as const,confirmed:false},[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
+  assert.equal(overlap.effectiveStress,undefined)
+  assert.ok(overlap.stressSource?.includes('katmanları çakışıyor'))
 }
 
 {
