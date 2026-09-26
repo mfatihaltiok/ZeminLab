@@ -32,7 +32,12 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   const p=normalizeProjectInfo(input.project),missing:string[]=[],failed:string[]=[],warnings:string[]=[],trace:FinalFoundationResult['trace']=[]
   const soilGroup=p.geophysical.soilGroup??p.soilParameters.classification.code
   const zfSiteSpecificRequired=soilGroup==='ZF'
-  if(zfSiteSpecificRequired)missing.push('ZF için sahaya özel zemin davranış analizi')
+  if(zfSiteSpecificRequired && !p.geophysical.siteSpecificResponseAnalysisCompleted)missing.push('ZF için sahaya özel zemin davranış analizi')
+  const dtsNeedsNonlinear = p.seismic.dts==='1'||p.seismic.dts==='1a'||p.seismic.dts==='2'||p.seismic.dts==='2a'
+  const soilNeedsNonlinear = soilGroup!=null && soilGroup!=='ZA' && soilGroup!=='ZB' && (p.seismic.dts==='1'||p.seismic.dts==='1a'||p.seismic.dts==='2'||p.seismic.dts==='2a')
+  const tallBuildingNonlinear = false
+  const nonlinearRequired = tallBuildingNonlinear || soilNeedsNonlinear
+  if(nonlinearRequired && !p.foundationParameters.nonlinearSoilDeformationAnalysisCompleted) missing.push('16.8.3.4(b) doğrusal olmayan zemin davranışı ve kalıcı şekil değiştirme analizi')
   if(p.geophysical.vs30!=null){const inferred=classifyVs30(p.geophysical.vs30);if(inferred&&soilGroup&&inferred!==soilGroup&&soilGroup!=='ZF')warnings.push('VS30 ile seçilen zemin grubu farklı; kaynak/tercih raporda açıkça gösterilmelidir.')}
   const eng=toEngineeringSI(p),fp=eng.foundation,sp=eng.soil
   const convertedActions=actionsToEngineeringSI(input.actions??{},p.unitSystem)
@@ -60,6 +65,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       if(sliding){ if(!sliding.evaluable)missing.push('Deprem + YASS altında kayma için cu');else if(!sliding.slidingSafeResultant)failed.push('Kayma'); warnings.push(...sliding.warnings) }
     }catch(e){missing.push(e instanceof Error?e.message:'Temel hesabı doğrulanamadı')}
   }
+  if(!input.settlement) missing.push('Temel altında yerdeğiştirme/oturma kontrolü')
   if(input.settlement&&bearing){
     try{
       settlement=calculateIdealizedSettlement({...input.settlement,profile:input.settlement.profile,B:fp.footingWidth,L:fp.footingLength,Df:fp.footingDepth,qGross:bearing.qAvg,groundwaterDepth:sp.groundwaterDepth})
@@ -69,6 +75,10 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
     }catch(e){missing.push(e instanceof Error?e.message:'Oturma hesabı doğrulanamadı')}
   }
   let liquefaction:LiquefactionProfileResult|undefined
+  const liquefactionScopeKnown = p.seismic.dts!==undefined && soilGroup!==undefined && p.soilParameters.liquefactionContinuousOrThickLens!==undefined
+  const liquefactionMandatory = liquefactionScopeKnown && (p.seismic.dts==='1'||p.seismic.dts==='1a'||p.seismic.dts==='2'||p.seismic.dts==='2a') && (soilGroup==='ZD'||soilGroup==='ZE'||soilGroup==='ZF') && p.soilParameters.liquefactionContinuousOrThickLens===true
+  if(liquefactionMandatory && !input.liquefaction) missing.push('16.6 kapsamında zorunlu sıvılaşma değerlendirmesi')
+  if(!liquefactionScopeKnown) missing.push('16.6.1 sıvılaşma kapsamı için DTS, zemin grubu ve sürekli tabaka/kalın mercek bilgisi')
   if(input.liquefaction){
     try{
       liquefaction=liquefactionProfile(input.liquefaction)
