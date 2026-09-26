@@ -130,9 +130,6 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       trace.push({check:'Sıvılaşma',status:bad?'UYGUN DEĞİL':incomplete?'VERİ EKSİK':'UYGUN',source:'TBDY 2018 16.6 + Ek 16B',details:String(liquefaction.rows.length)+' SPT noktası'})
       if(bad)failed.push('Sıvılaşma')
       if(incomplete)missing.push('Sıvılaşma için eksik saha/laboratuvar verisi')
-      if(liquefaction.postLiquefactionRequired){
-        trace.push({check:'Sıvılaşma sonrası değerlendirme',status:bad?'UYGUN DEĞİL':'UYGUN',source:'TBDY 2018 16.6.7–16.6.10',details:bad?'İyileştirme değerlendirmesi tetiklendi.':'Ek değerlendirme tetiklenmedi.'})
-      }
       warnings.push(...liquefaction.warnings)
     }catch(e){
       missing.push(e instanceof Error?e.message:'Sıvılaşma hesabı doğrulanamadı')

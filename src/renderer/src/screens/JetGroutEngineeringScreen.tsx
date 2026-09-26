@@ -63,7 +63,7 @@ export function JetGroutEngineeringScreen(){
         <Metric label="Kolon yük payı" value={(r.columnLoadShare*100).toFixed(1)} unit="%"/>
         <Metric label="β" value={r.stressConcentrationFactor.toFixed(2)}/>
       </div>
-      <Card title="TASARIM DURUMU"><div className="inline-empty">{r.designEligible?'Nihai değerlendirmeye aktarılabilir: kalite kontrol + eksenel kapasite kanıtı mevcut.':'Yalnızca ön tasarım/screening. Nihai tasarım uygunluğu olarak kullanılmamalıdır.'}</div>{r.warnings.map((w,i)=><div className="inline-empty" key={i}>{w}</div>)}</Card><Card title="KOMPOZİT BİRİM HÜCRE"><CalculationTrace title="Hesap zinciri" source={r.source} rows={[
+      <Card title="TASARIM DURUMU"><div className="inline-empty">Sonuçlar ön tasarım ve temel/oturma yeniden değerlendirme akışında kullanılır; nihai mühendislik kararı proje verileriyle ayrıca doğrulanır.</div>{r.warnings.map((w,i)=><div className="inline-empty" key={i}>{w}</div>)}</Card><Card title="KOMPOZİT BİRİM HÜCRE"><CalculationTrace title="Hesap zinciri" source={r.source} rows={[
         {symbol:'Ac',title:'Kolon alanı',formula:'πd²/4',value:r.areaColumn,unit:'m²'},
         {symbol:'Acell',title:'Hücre alanı',formula:layout==='square'?'s²':'√3·s²/2',value:r.cellArea,unit:'m²'},
         {symbol:'ar',title:'Alan değiştirme oranı',formula:'Ac/Acell',value:r.areaReplacementRatio},

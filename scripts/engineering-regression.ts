@@ -168,7 +168,6 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(result.rows[0].n1_60,12.266276470940088,1e-10)
   approx(result.rows[0].beta,1.1543167672515497,1e-12)
   assert.ok(result.rows[0].FS !== undefined)
-  assert.equal(result.rows[0].postLiquefactionRequired,true)
   assert.equal(result.rows[0].conclusion,'SIVILAŞMA RİSKİ VAR')
 }
 
@@ -257,7 +256,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     project:{
       foundationParameters:{
         foundationType:'tekil',footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:1000,horizontalLoad:0,momentX:0,momentY:0,
-        resistanceFactorRv:1.4,vtX:100,vtY:0,structuralWeight:1000,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:0,usePassiveResistance:false
+        resistanceFactorRv:1.4,vtX:100,vtY:0,structuralWeight:1000,passiveResistanceCharacteristic:0,usePassiveResistance:false
       }
     }
   })

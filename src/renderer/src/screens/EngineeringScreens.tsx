@@ -49,7 +49,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
         clayContent:lab?.hydrometer002,
         waterContent:lab?.waterContent,
         energyRatio:cfg.energyRatio,hammerType:cfg.hammerType,boreholeDiameterMm:b.drillingDiameter,
-        sampler:cfg.sampler,samplerCorrection:cfg.samplerCorrection,rodLengthM:cfg.rodLengthM,maxCyclicShearStrainPercent:cfg.maxCyclicShearStrainPercent
+        sampler:cfg.sampler,samplerCorrection:cfg.samplerCorrection,rodLengthM:cfg.rodLengthM
       }
     })
     return liquefactionProfile({
@@ -64,9 +64,9 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
       <><Card title="HESAP KAPSAMI"><div className="form-grid"><label>Sondaj<select value={b.id} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><Metric label="DTS" value={p.seismic.dts??'—'}/><Metric label="SDS" value={sds?.toFixed(3)??'—'}/><Metric label="Mw" value={p.seismic.magnitude??'—'}/><Metric label="YASS" value={b.groundwaterDepth??'—'}/><Metric label="SPT" value={validSpt.length}/></div></Card>
         {!profileInput?
           <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">YASS, SDS, Mw ve geçerli SPT kayıtları birlikte bulunmalıdır. YASS bilinmiyorsa 16.6.2 kapsamında sıvılaşma değerlendirmesi başlatılmaz.</div></Card>:
-          <><div className="metric-strip"><Metric label="TBDY zorunluluğu" value={profileInput.mandatoryByProject?'EVET':'DTS/zemin koşuluna bağlı'}/><Metric label="Post-liquefaction" value={profileInput.postLiquefactionRequired?'GEREKLİ':'Tetiklenmedi'}/></div>
+          <><div className="metric-strip"><Metric label="TBDY zorunluluğu" value={profileInput.mandatoryByProject?'EVET':'DTS/zemin koşuluna bağlı'}/></div>
             {profileInput.warnings.length>0&&<Card title="TBDY UYARILARI"><div className="inline-empty">{profileInput.warnings.join(' ')}</div></Card>}
-            <Card title="SPT · SIVILAŞMA DERİNLİK TABLOSU"><div className="table-wrap"><table><thead><tr><th>z</th><th>Zemin</th><th>FC%</th><th>PI</th><th>σ′v</th><th>N60</th><th>(N1)60</th><th>(N1)60f</th><th>CRR7.5</th><th>CSR</th><th>FS</th><th>γmax %</th><th>Çevrimsel oturma</th><th>Sonuç</th></tr></thead><tbody>{profileInput.rows.map((row,i)=><tr key={i}><td>{row.depth.toFixed(2)}</td><td>{row.soil??'—'}</td><td>{row.fineContent?.toFixed(1)??'—'}</td><td>{row.plasticityIndex?.toFixed(1)??'—'}</td><td>{row.sigmaVPrime.toFixed(2)}</td><td>{row.n60.toFixed(2)}</td><td>{row.n1_60.toFixed(2)}</td><td>{row.n1_60f.toFixed(2)}</td><td>{row.crrM75?.toFixed(4)??'—'}</td><td>{row.tauEarthquake?.toFixed(2)??'—'}</td><td>{row.FS?.toFixed(3)??'—'}</td><td>{row.maxCyclicShearStrainPercent?.toFixed(2)??'—'}</td><td>{row.depthTo!=null&&row.maxCyclicShearStrainPercent!=null&&row.n1_60f>0?((row.depthTo-row.depth)*1.5*Math.exp(-0.369*Math.sqrt(row.n1_60f))*Math.min(0.08,row.maxCyclicShearStrainPercent/100)*10).toFixed(2)+' mm':'—'}</td><td>{row.conclusion}</td></tr>)}</tbody></table></div></Card>
+            <Card title="SPT · SIVILAŞMA DERİNLİK TABLOSU"><div className="table-wrap"><table><thead><tr><th>z</th><th>Zemin</th><th>FC%</th><th>PI</th><th>σ′v</th><th>N60</th><th>(N1)60</th><th>(N1)60f</th><th>CRR7.5</th><th>CSR</th><th>FS</th><th>Sonuç</th></tr></thead><tbody>{profileInput.rows.map((row,i)=><tr key={i}><td>{row.depth.toFixed(2)}</td><td>{row.soil??'—'}</td><td>{row.fineContent?.toFixed(1)??'—'}</td><td>{row.plasticityIndex?.toFixed(1)??'—'}</td><td>{row.sigmaVPrime.toFixed(2)}</td><td>{row.n60.toFixed(2)}</td><td>{row.n1_60.toFixed(2)}</td><td>{row.n1_60f.toFixed(2)}</td><td>{row.crrM75?.toFixed(4)??'—'}</td><td>{row.tauEarthquake?.toFixed(2)??'—'}</td><td>{row.FS?.toFixed(3)??'—'}</td><td>{row.conclusion}</td></tr>)}</tbody></table></div></Card>
             {profileInput.rows.length>0&&<CalculationTrace title="İlk SPT hesap izi" source={profileInput.source} rows={profileInput.rows[0].trace}/>}
           </>}
       </>}

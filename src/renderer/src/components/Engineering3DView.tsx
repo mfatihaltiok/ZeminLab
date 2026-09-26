@@ -1,29 +1,30 @@
-import type { BoreholeRecord } from '../../../core/models/field-data'
+import { useEffect, useRef } from 'react'
+import * as THREE from 'three'
 import { useProjectInfo } from '../../../core/state/project-store'
+import type { BoreholeRecord } from '../../../core/models/field-data'
 import './engineering-3d-view.css'
 
-type Props = { boreholes?: BoreholeRecord[] }
+type Props={boreholes?:BoreholeRecord[]}
 
-export function Foundation3DView({ boreholes = [] }: Props) {
-  const project = useProjectInfo()
-  const f = project.foundationParameters
-  const width = Math.max(f.footingWidth || 2.5, 1)
-  const length = Math.max(f.footingLength || 2.5, 1)
-  const depth = Math.max(f.footingDepth || 0.6, 0.3)
-  const scale = Math.min(230 / length, 150 / width)
-  const bx = 360
-  const by = 155
-  const lx = length * scale
-  const wy = width * scale * 0.55
-  const h = Math.max(30, depth * 45)
-  const p1 = `${bx},${by}`
-  const p2 = `${bx + lx},${by - wy}`
-  const p3 = `${bx + lx + wy},${by + 28}`
-  const p4 = `${bx + wy},${by + wy + 28}`
-  const z = h
-  const c1 = `${bx},${by + z}`
-  const c2 = `${bx + lx},${by - wy + z}`
-  const c3 = `${bx + lx + wy},${by + 28 + z}`
-  const c4 = `${bx + wy},${by + wy + 28 + z}`
-  return <section className="engineering-3d-card"><div className="engineering-3d-header"><div><span>GEOMETRİK GÖRÜNÜM</span><h3>Temel ve zemin modeli</h3></div><div className="engineering-3d-meta"><b>{width.toFixed(2)} × {length.toFixed(2)} m</b><span>Df = {depth.toFixed(2)} m</span></div></div><div className="engineering-3d-stage"><svg viewBox="0 0 760 330" role="img" aria-label="Temel geometrisinin izometrik mühendislik görünümü"><defs><pattern id="soil-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="currentColor" strokeOpacity=".12" /></pattern></defs><rect x="0" y="0" width="760" height="330" fill="url(#soil-grid)"/><polygon points={`${c1} ${c2} ${c3} ${c4}`} fill="#d6dde2" stroke="#71808a" strokeWidth="1.5"/><polygon points={`${p1} ${p2} ${c2} ${c1}`} fill="#eef1f3" stroke="#71808a" strokeWidth="1.5"/><polygon points={`${p2} ${p3} ${c3} ${c2}`} fill="#dfe5e8" stroke="#71808a" strokeWidth="1.5"/><polygon points={`${p4} ${p3} ${c3} ${c4}`} fill="#cbd4d9" stroke="#71808a" strokeWidth="1.5"/><polygon points={`${p1} ${p4} ${c4} ${c1}`} fill="#e6eaed" stroke="#71808a" strokeWidth="1.5"/><polygon points={`${p1} ${p2} ${p3} ${p4}`} fill="#f8fafb" stroke="#4f626e" strokeWidth="2"/>{[0,1,2,3].map((i)=><circle key={i} cx={bx + lx * (i%2 ? .72 : .28) + wy * (i>1 ? .55 : .1)} cy={by + wy * (i>1 ? .72 : .25) + 28 * (i%2) + 8} r="7" fill="#536e80" opacity=".9"/>)}<text x="36" y="34" className="engineering-3d-label">İZOMETRİK GÖRÜNÜM</text><text x="36" y="58" className="engineering-3d-note">Görsel kontrol içindir; hesap motorunun yerine geçmez.</text><line x1={bx} y1={by + wy + 58} x2={bx + lx} y2={by - wy + wy + 58} className="dimension-line"/><text x={bx + lx/2 - 18} y={by + wy + 76} className="dimension-text">L = {length.toFixed(2)} m</text><line x1={bx + lx + wy + 18} y1={by + 28} x2={bx + lx + wy + 18} y2={by + 28 + z} className="dimension-line"/><text x={bx + lx + wy + 25} y={by + 45 + z/2} className="dimension-text">Df</text><g className="borehole-markers">{boreholes.slice(0,6).map((borehole, index)=><g key={borehole.id}><circle cx={90 + index * 95} cy={270 - (index%2)*18} r="5"/><text x={77 + index * 95} y={290 - (index%2)*18}>{borehole.name}</text></g>)}</g></svg></div></section>
+const soilColor=(code:string|undefined,colorClass:string|undefined)=>colorClass==='clay'||code?.toLowerCase().includes('cl')?0xb88968:colorClass==='sand'||code?.toLowerCase().includes('sa')?0xd2b46d:colorClass==='gravel'?0x858f95:colorClass==='rock'?0x6d7478:0xa7b0b5
+
+export function Foundation3DView({boreholes=[]}:Props){
+ const host=useRef<HTMLDivElement>(null);const p=useProjectInfo();const f=p.foundationParameters;const j=p.jetGrout
+ useEffect(()=>{const el=host.current;if(!el)return
+  const scene=new THREE.Scene();scene.background=new THREE.Color(0xf3f5f6)
+  const camera=new THREE.PerspectiveCamera(42,1,.1,250);const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));el.replaceChildren(renderer.domElement)
+  const root=new THREE.Group();scene.add(root)
+  const B=Math.max(f.footingWidth,.5),L=Math.max(f.footingLength,.5),Df=Math.max(f.footingDepth,.3),foundation=new THREE.Mesh(new THREE.BoxGeometry(L,.65,B),new THREE.MeshStandardMaterial({color:0xd9dde0,roughness:.75}));foundation.position.y=-Df+.33;root.add(foundation)
+  const first=boreholes[0];let y=-Df-.5
+  const soilLayers=first?.lithology?.length?first.lithology:[];soilLayers.forEach(layer=>{const h=Math.max(.25,(layer.to-layer.from));const mesh=new THREE.Mesh(new THREE.BoxGeometry(L+6,h,B+6),new THREE.MeshStandardMaterial({color:soilColor(layer.code,layer.colorClass),transparent:true,opacity:.52,roughness:1}));mesh.position.y=-(Df+layer.from+h/2);root.add(mesh)})
+  const d=Number(j.columnDiameter||0),s=Number(j.spacing||0),H=Number(j.foundationThickness||0);if(d>0&&s>0&&H>0){const r=d/2;for(let x=-L/2+r;x<=L/2-r+.001;x+=s)for(let z=-B/2+r;z<=B/2-r+.001;z+=s){const col=new THREE.Mesh(new THREE.CylinderGeometry(r, r, H, 24),new THREE.MeshStandardMaterial({color:0x707e87,roughness:.78}));col.position.set(x,-Df-H/2,z);root.add(col)}} 
+  scene.add(new THREE.HemisphereLight(0xffffff,0x5f6870,2.1));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(8,12,10);scene.add(light)
+  let yaw=.65,pitch=.35,radius=14,drag=false,lx=0,ly=0
+  const resize=()=>{const w=Math.max(360,el.clientWidth),h=Math.max(320,el.clientHeight||420);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);render()}
+  const render=()=>{camera.position.set(radius*Math.cos(pitch)*Math.sin(yaw),radius*Math.sin(pitch),radius*Math.cos(pitch)*Math.cos(yaw));camera.lookAt(new THREE.Vector3(0,-Df/2,0));renderer.render(scene,camera)}
+  const down=(e:PointerEvent)=>{drag=true;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)},move=(e:PointerEvent)=>{if(!drag)return;yaw-=(e.clientX-lx)*.01;pitch=Math.max(-1.1,Math.min(1.1,pitch+(e.clientY-ly)*.008));lx=e.clientX;ly=e.clientY;render()},up=()=>{drag=false},wheel=(e:WheelEvent)=>{e.preventDefault();radius=Math.max(7,Math.min(30,radius*(e.deltaY>0?1.08:.92)));render()}
+  renderer.domElement.addEventListener('pointerdown',down);renderer.domElement.addEventListener('pointermove',move);renderer.domElement.addEventListener('pointerup',up);renderer.domElement.addEventListener('pointercancel',up);renderer.domElement.addEventListener('wheel',wheel,{passive:false});const ro=new ResizeObserver(resize);ro.observe(el);resize()
+  return()=>{ro.disconnect();renderer.domElement.removeEventListener('pointerdown',down);renderer.domElement.removeEventListener('pointermove',move);renderer.domElement.removeEventListener('pointerup',up);renderer.domElement.removeEventListener('pointercancel',up);renderer.domElement.removeEventListener('wheel',wheel);renderer.dispose();scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose()}})}
+ },[boreholes,f.footingWidth,f.footingLength,f.footingDepth,j.columnDiameter,j.spacing,j.foundationThickness])
+ return <section className="engineering-3d-card"><div className="engineering-3d-header"><div><span>GPU MÜHENDİSLİK GÖRÜNÜMÜ</span><h3>Temel · Zemin · Jet Grout</h3></div><div className="engineering-3d-meta"><b>{f.footingWidth.toFixed(2)} × {f.footingLength.toFixed(2)} m</b><span>Df = {f.footingDepth.toFixed(2)} m</span></div></div><div ref={host} className="engineering-3d-stage" aria-label="Three.js temel ve zemin 3D görünümü"/><div className="engineering-3d-help">Sürükle: döndür · Tekerlek: yakınlaştır / uzaklaştır</div></section>
 }

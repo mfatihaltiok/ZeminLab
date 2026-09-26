@@ -1,24 +1,31 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 
-type Layer={topDepth:number;bottomDepth:number;colorClass?:string;code?:string}
+type Layer={topDepth:number;bottomDepth:number;colorClass?:'fill'|'clay'|'silt'|'sand'|'gravel'|'rock';code?:string}
 type Props={layers:Layer[];totalDepth:number}
 
-const color=(x:string|undefined)=>x==='clay'?0xb88968:x==='silt'?0x9ca99c:x==='sand'?0xd2b46d:x==='gravel'?0x858f95:x==='rock'?0x6d7478:0xb8bec2
+const color=(x:Layer['colorClass'])=>x==='clay'?0xb88968:x==='silt'?0x9ca99c:x==='sand'?0xd2b46d:x==='gravel'?0x858f95:x==='rock'?0x6d7478:0xb8bec2
 
 export function Soil3DViewport({layers,totalDepth}:Props){
- const ref=useRef<HTMLDivElement>(null)
- useEffect(()=>{const host=ref.current;if(!host)return
- const scene=new THREE.Scene();scene.background=new THREE.Color(0xf3f5f6)
- const camera=new THREE.PerspectiveCamera(38,1,.1,200);camera.position.set(10,8,12)
- const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.setSize(900,420);host.replaceChildren(renderer.domElement)
- const group=new THREE.Group();scene.add(group)
- const depthScale=8/Math.max(totalDepth,1)
- layers.forEach(layer=>{const h=Math.max(.08,(layer.bottomDepth-layer.topDepth)*depthScale);const geo=new THREE.BoxGeometry(5,h,3);const mat=new THREE.MeshStandardMaterial({color:color(layer.colorClass),roughness:.88,metalness:.02});const mesh=new THREE.Mesh(geo,mat);mesh.position.y=4-layer.topDepth*depthScale-h/2;group.add(mesh)})
- const base=new THREE.Mesh(new THREE.BoxGeometry(5,.12,3),new THREE.MeshStandardMaterial({color:0x70777b}));base.position.y=-4;group.add(base)
- scene.add(new THREE.HemisphereLight(0xffffff,0x5f6870,2.2));const light=new THREE.DirectionalLight(0xffffff,2.5);light.position.set(6,10,8);scene.add(light)
- let raf=0;const animate=()=>{raf=requestAnimationFrame(animate);group.rotation.y+=.002;renderer.render(scene,camera)};animate()
- return()=>{cancelAnimationFrame(raf);renderer.dispose() }
+ const host=useRef<HTMLDivElement>(null)
+ useEffect(()=>{const el=host.current;if(!el)return
+  const scene=new THREE.Scene();scene.background=new THREE.Color(0xf3f5f6)
+  const camera=new THREE.PerspectiveCamera(38,1,.1,200);const target=new THREE.Vector3(0,0,0)
+  const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));el.replaceChildren(renderer.domElement);renderer.domElement.className='soil-3d-canvas'
+  const group=new THREE.Group();scene.add(group);const scale=8/Math.max(totalDepth,1)
+  layers.forEach(layer=>{const h=Math.max(.08,(layer.bottomDepth-layer.topDepth)*scale),mesh=new THREE.Mesh(new THREE.BoxGeometry(5,h,3),new THREE.MeshStandardMaterial({color:color(layer.colorClass),roughness:.9,metalness:0}));mesh.position.y=4-layer.topDepth*scale-h/2;group.add(mesh)})
+  const floor=new THREE.Mesh(new THREE.BoxGeometry(5,.12,3),new THREE.MeshStandardMaterial({color:0x70777b,roughness:1}));floor.position.y=-4;group.add(floor)
+  scene.add(new THREE.HemisphereLight(0xffffff,0x5f6870,2.2));const light=new THREE.DirectionalLight(0xffffff,2.6);light.position.set(6,10,8);scene.add(light)
+  let yaw=.65,pitch=.45,radius=15,drag=false,lastX=0,lastY=0
+  const resize=()=>{const w=Math.max(320,el.clientWidth),h=Math.max(280,el.clientHeight||420);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);render()}
+  const render=()=>{camera.position.set(radius*Math.cos(pitch)*Math.sin(yaw),radius*Math.sin(pitch),radius*Math.cos(pitch)*Math.cos(yaw));camera.lookAt(target);renderer.render(scene,camera)}
+  const down=(e:PointerEvent)=>{drag=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)}
+  const move=(e:PointerEvent)=>{if(!drag)return;yaw-=(e.clientX-lastX)*.01;pitch=Math.max(-1.1,Math.min(1.1,pitch+(e.clientY-lastY)*.008));lastX=e.clientX;lastY=e.clientY;render()}
+  const up=()=>{drag=false}
+  const wheel=(e:WheelEvent)=>{e.preventDefault();radius=Math.max(7,Math.min(30,radius*(e.deltaY>0?1.08:.92)));render()}
+  renderer.domElement.addEventListener('pointerdown',down);renderer.domElement.addEventListener('pointermove',move);renderer.domElement.addEventListener('pointerup',up);renderer.domElement.addEventListener('pointercancel',up);renderer.domElement.addEventListener('wheel',wheel,{passive:false})
+  const observer=new ResizeObserver(resize);observer.observe(el);resize()
+  return()=>{observer.disconnect();renderer.domElement.removeEventListener('pointerdown',down);renderer.domElement.removeEventListener('pointermove',move);renderer.domElement.removeEventListener('pointerup',up);renderer.domElement.removeEventListener('pointercancel',up);renderer.domElement.removeEventListener('wheel',wheel);renderer.dispose();scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose()}})}
  },[layers,totalDepth])
- return <div ref={ref} className="soil-3d-viewport" aria-label="Three.js üç boyutlu zemin profili"/>
+ return <div ref={host} className="soil-3d-viewport" aria-label="Three.js üç boyutlu zemin profili"/>
 }

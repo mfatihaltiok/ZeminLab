@@ -10,24 +10,23 @@ export interface LiquefactionSoilLayer{
 export interface LiquefactionSptRecord{
   depth:number;nField:number;fineContent?:number;energyRatio?:number;hammerType?:SptEngineInput['hammerType'];boreholeDiameterMm?:number
   sampler?:SptEngineInput['sampler'];samplerCorrection?:number;rodLengthM?:number;plasticityIndex?:number;waterContent?:number;clayContent?:number;soil?:string
-  depthTo?:number;maxCyclicShearStrainPercent?:number
 }
 export interface LiquefactionProfileInput{
   Mw:number;Sds:number;gwt:number;layers:LiquefactionSoilLayer[];spt:LiquefactionSptRecord[];gammaW?:number;applyDilatancy?:boolean
   dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup;continuousOrThickLens?:boolean;foundationDepth?:number
 }
 export interface LiquefactionProfileRow{
-  depth:number;depthTo?:number;soil?:string;fineContent?:number;plasticityIndex?:number;clayContent?:number;waterContent?:number;maxCyclicShearStrainPercent?:number;cyclicSettlementMm?:number
+  depth:number;soil?:string;fineContent?:number;plasticityIndex?:number;clayContent?:number;waterContent?:number
   sigmaV:number;porePressure:number;sigmaVPrime:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number;alpha:number;beta:number;n1_60f:number
   crrM75?:number;CM?:number;tauResistance?:number;rd:number;tauEarthquake?:number;FS?:number
-  saturated:boolean;potentiallyLiquefiable:boolean;mandatoryAnalysis:boolean;triggerRequired:boolean;postLiquefactionRequired:boolean;postLiquefactionTrigger:'FS<1.10'|'none'
+  saturated:boolean;potentiallyLiquefiable:boolean;mandatoryAnalysis:boolean;triggerRequired:boolean
   status:'ANALİZ GEREKLİ'|'ANALİZ GEREKMİYOR'|'TETİKLENME DEĞERLENDİRMESİ'|'VERİ EKSİK'
   conclusion:'SIVILAŞMA RİSKİ VAR'|'SIVILAŞMA RİSKİ YOK'|'DEĞERLENDİRİLMEDİ'|'VERİ EKSİK'
   liquefactionCheck:'evaluate'|'not-evaluable';trace:SptTraceStep[]
 }
 export interface LiquefactionProfileResult{
   rows:LiquefactionProfileRow[];method:string;source:string;warnings:string[]
-  mandatoryByProject:boolean;postLiquefactionRequired:boolean
+  mandatoryByProject:boolean
 }
 
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
@@ -86,16 +85,12 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const mandatoryAnalysis=potentiallyLiquefiable&&mandatoryByProject&&!exemption
     const researchDataComplete=fineContent!=null&&fineContent>=0&&fineContent<=100&&pi!=null&&pi>=0&&waterContent!=null&&waterContent>=0
     const triggerRequired=mandatoryAnalysis&&researchDataComplete&&npt.n1_60<30
-    const postLiquefactionRequired=false
     const trace:SptTraceStep[]=[...npt.trace,
       {symbol:'α',title:'İnce dane katsayısı',formula:'α=f(IDI)',value:alpha,note:fines!=null?'IDI='+fines.toFixed(2)+' %':'IDI girilmedi'},
       {symbol:'β',title:'İnce dane katsayısı',formula:'β=f(IDI)',value:beta},
       {symbol:'(N1)60f',title:'İnce dane düzeltilmiş SPT',formula:'(N1)60f=α+β(N1)60',value:n1_60f}
     ]
-    const cyclicSettlementMm=saturated&&potentiallyLiquefiable&&record.depthTo!=null&&record.depthTo>record.depth&&record.maxCyclicShearStrainPercent!=null&&record.maxCyclicShearStrainPercent>=0&&finite(n1_60f)&&n1_60f>0
-      ?(record.depthTo-record.depth)*1.5*Math.exp(-0.369*Math.sqrt(n1_60f))*Math.min(0.08,record.maxCyclicShearStrainPercent/100)*10
-      :undefined
-    const base={depth:record.depth,depthTo:record.depthTo,soil,fineContent,plasticityIndex:pi,clayContent:clayContent,waterContent,maxCyclicShearStrainPercent:record.maxCyclicShearStrainPercent,cyclicSettlementMm,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha,beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionRequired,postLiquefactionTrigger:'none'}
+    const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent:clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha,beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired}
     if(npt.hasAssumptions){ warnings.push(...npt.warnings); return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace} }
     if(stress.covered<Math.max(0,record.depth)-1e-9){
       trace.push({symbol:'Kapsama',title:'Katman kapsamı',formula:'ΣΔz=z',value:stress.covered,unit:'m',note:'SPT derinliğine kadar sürekli γ profili yok.'})
@@ -143,7 +138,6 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace}
     }
     const crrM75=core.CRRM75,tauResistance=core.Rtau,tauEarthquake=core.tauEarthquake,FS=core.FS
-    const postRequired=FS<1.10
     trace.push(
       {symbol:'CRR7.5',title:'Çevrimsel dayanım oranı',formula:'Ek 16B',value:crrM75},
       {symbol:'CM',title:'Deprem büyüklüğü düzeltmesi',formula:'CM=10^2.24/Mw^2.56',value:core.CM},
@@ -152,10 +146,9 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       {symbol:'τdeprem',title:'Deprem kayma gerilmesi',formula:'0.65·(0.4SDS)·σv0·rd',value:tauEarthquake,unit:'kPa'},
       {symbol:'FS',title:'Sıvılaşmaya karşı güvenlik',formula:'Rτ/τdeprem',value:FS,note:'TBDY 16.6.9: FS≥1.10'}
     )
-    return{...base,crrM75,CM:core.CM,tauResistance,tauEarthquake,FS,postLiquefactionRequired:postRequired,postLiquefactionTrigger:postRequired?'FS<1.10':'none',status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:FS<1.10?'SIVILAŞMA RİSKİ VAR':'SIVILAŞMA RİSKİ YOK',liquefactionCheck:'evaluate',trace}
+    return{...base,crrM75,CM:core.CM,tauResistance,tauEarthquake,FS,status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:FS<1.10?'SIVILAŞMA RİSKİ VAR':'SIVILAŞMA RİSKİ YOK',liquefactionCheck:'evaluate',trace}
   })
   if(!input.spt.length)warnings.push('SPT kaydı bulunmadığı için profil hesabı üretilemedi.')
   if(!input.layers.length)warnings.push('Zemin katmanı yok; düşey gerilme hesabı yapılamaz.')
-  if(rows.some(x=>x.postLiquefactionRequired))warnings.push('16.6.7–16.6.10: FS<1.10 olan tabakalarda sıvılaşma sonrası dayanım/rijitlik kaybı, taşıma gücü kaybı, oturma ve yanal yayılma ayrıca değerlendirilmelidir.')
-  return{rows,method:'TBDY 2018 Bölüm 16.6 + Ek 16B SPT tabanlı sıvılaşma değerlendirmesi',source:'TBDY 2018 16.6.1–16.6.10 ve Ek 16B.2–16B.4',warnings,mandatoryByProject,postLiquefactionRequired:rows.some(x=>x.postLiquefactionRequired)}
+  return{rows,method:'TBDY 2018 Bölüm 16.6 + Ek 16B SPT tabanlı sıvılaşma değerlendirmesi',source:'TBDY 2018 16.6.1–16.6.6 ve Ek 16B.2–16B.4',warnings,mandatoryByProject}
 }
