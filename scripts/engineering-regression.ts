@@ -100,6 +100,9 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(calculateSpt({nField:10,boreholeDiameterMm:200,effectiveStress:100,rodLengthM:5}).cb,1.15,1e-12)
   assert.throws(() => calculateSpt({nField:10,boreholeDiameterMm:120,effectiveStress:100,rodLengthM:5}), /CB için yalnız/)
   assert.throws(() => calculateSpt({nField:10,energyRatio:20,hammerType:'safety',effectiveStress:100,rodLengthM:5}), /safety tokmak/)
+  assert.throws(() => calculateSpt({nField:10,cs:1.05,effectiveStress:100,rodLengthM:5}), /CS için yalnız/)
+  assert.throws(() => calculateSpt({nField:10,cs:1.2,sampler:'standard',effectiveStress:100,rodLengthM:5}), /Standart numune alıcı/)
+  assert.throws(() => calculateSpt({nField:10,energyRatio:100,hammerType:'measured',effectiveStress:100,rodLengthM:5}), /ER %27–%96/)
 }
 
 {
@@ -348,7 +351,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     Mw:7.5,Sds:1,gwt:2,
     soilGroup:'ZE',dts:'1',continuousOrThickLens:true,foundationDepth:2,
     layers:[{top:0,bottom:10,gamma:18,gammaSat:19,soil:'SA',finesContent:30,plasticityIndex:5}],
-    spt:[{depth:5,nField:10,fineContent:30,plasticityIndex:5,waterContent:20,soil:'SA',energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10}]
+    spt:[{depth:5,nField:10,fineContent:30,plasticityIndex:5,waterContent:20,soil:'SA',energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10,stressSnapshot:{sigmaV0:93,porePressureU0:29.43,effectiveStressV0:63.57,groundwaterDepth:2,capturedAt:new Date(0).toISOString()}}]
   })
   assert.equal(result.mandatoryByProject,true)
   assert.equal(result.rows[0].mandatoryAnalysis,true)
@@ -363,7 +366,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     Mw:7.5,Sds:1,gwt:2,
     soilGroup:'ZE',dts:'1',continuousOrThickLens:true,foundationDepth:2,
     layers:[{top:0,bottom:10,gamma:18,gammaSat:19,soil:'CIM',finesContent:50,plasticityIndex:15}],
-    spt:[{depth:5,nField:10,fineContent:50,plasticityIndex:15,waterContent:25,soil:'CIM',energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10}]
+    spt:[{depth:5,nField:10,fineContent:50,plasticityIndex:15,waterContent:25,soil:'CIM',energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10,stressSnapshot:{sigmaV0:93,porePressureU0:29.43,effectiveStressV0:63.57,groundwaterDepth:2,capturedAt:new Date(0).toISOString()}}]
   })
   approx(clayLiquefaction.rows[0].cn,1,1e-12)
   approx(clayLiquefaction.rows[0].n1_60,clayLiquefaction.rows[0].n60,1e-12)
