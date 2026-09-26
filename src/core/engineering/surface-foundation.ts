@@ -152,7 +152,7 @@ export function compressionContact(B:number,L:number,N:number,Mx:number,My:numbe
   return{area:f.area,qMax:f.qMax,qMin:0,contactState:'PARTIAL' as const}
 }
 
-function equivalentLayerParameters(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number){
+function equivalentLayerParameters(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number,groundwaterDepth?:number){
   if(!layers?.length)return null
   const active=layers
     .filter(l=>l.bottomDepth>Df&&l.topDepth<Df+influence&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
@@ -166,7 +166,12 @@ function equivalentLayerParameters(layers:SurfaceFoundationLayer[]|undefined,Df:
     covered+=h
     cWeighted+=l.cohesion*h
     tanPhiWeighted+=Math.tan(rad(clamp(l.phi,0,50)))*h
-    const gammaEff=finite(l.gammaSat)?Math.max(l.gammaSat-gammaW,.001):Math.max(l.gamma,.001)
+    const gwt=finite(groundwaterDepth)?groundwaterDepth!:Infinity
+    const gammaNatural=Math.max(l.gamma,.001)
+    const gammaSubmerged=finite(l.gammaSat)?Math.max(l.gammaSat-gammaW,.001):gammaNatural
+    let gammaEff=gammaNatural
+    if(gwt<=top)gammaEff=gammaSubmerged
+    else if(gwt<bottom)gammaEff=(gammaNatural*Math.max(gwt-top,0)+gammaSubmerged*Math.max(bottom-gwt,0))/h
     gammaWeighted+=gammaEff*h
     segments.push({...l,topDepth:top,bottomDepth:bottom,gamma:gammaEff})
   }
@@ -207,7 +212,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   let layerData:ReturnType<typeof equivalentLayerParameters>=null
   let layeredComplete=true
   if(i.layers?.length){
-    layerData=equivalentLayerParameters(i.layers,i.Df,2*Bp)
+    layerData=equivalentLayerParameters(i.layers,i.Df,2*Bp,i.groundwaterDepth)
     if(!layerData){
       layeredComplete=false
       warnings.push('Tabakalı zemin verisi mevcut ancak temel tabanı ile 2B′ etki bölgesini tanımlayan geçerli tabaka bulunamadı.')
