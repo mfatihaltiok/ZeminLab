@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { layerColor, normalizeEngineeringRenderModel, type EngineeringRenderLayer, type EngineeringRenderMarker } from './engineering-render-model'
+import { normalizeEngineeringRenderModel, type EngineeringRenderLayer, type EngineeringRenderMarker } from './engineering-render-model'
 
 export type { EngineeringRenderLayer, EngineeringRenderMarker }
 
