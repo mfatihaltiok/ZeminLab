@@ -34,7 +34,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   const zfSiteSpecificRequired=soilGroup==='ZF'
   if(zfSiteSpecificRequired && !p.geophysical.siteSpecificResponseAnalysisCompleted)missing.push('ZF için sahaya özel zemin davranış analizi')
   const dtsNeedsNonlinear = p.seismic.dts==='1'||p.seismic.dts==='1a'||p.seismic.dts==='2'||p.seismic.dts==='2a'
-  const soilNeedsNonlinear = soilGroup!=null && soilGroup!=='ZA' && soilGroup!=='ZB' && dtsNeedsNonlinear
+  const soilNeedsNonlinear = soilGroup!=null && soilGroup!=='ZA' && soilGroup!=='ZB' && soilGroup!=='ZC' && dtsNeedsNonlinear
   const tallBuildingScopeKnown = p.foundationParameters.tallBuilding!==undefined
   const tallBuildingNonlinear = p.foundationParameters.tallBuilding===true && soilGroup!=null && soilGroup!=='ZA' && soilGroup!=='ZB'
   const nonlinearRequired = tallBuildingNonlinear || soilNeedsNonlinear
