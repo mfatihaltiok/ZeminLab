@@ -104,13 +104,14 @@ export function foundationChecks(i:FoundationCheckInput){
     'concrete-concrete':.50,
     'concrete-bedrock':.50
   }
-  const interfaceType=i.interfaceType??'cast-in-place-soil'
+  const interfaceType=i.interfaceType
+  if(!interfaceType)throw new Error('Temel-zemin ara yüzü seçilmelidir; tanδ değeri ara yüzü belirtilmeden varsayılamaz.')
   const tanLimit=interfaceLimits[interfaceType]
   const rawTan=i.deltaTan??tanLimit
   if(rawTan<0||!Number.isFinite(rawTan))throw new Error('tanδ sıfır veya pozitif ve sonlu olmalıdır.')
   const deltaTan=Math.min(tanLimit,rawTan)
   const warnings:string[]=[]
-  if(i.deltaTan==null)warnings.push('tanδ girilmedi; TBDY Tablo 16.3 arayüz üst sınırı seçilen arayüze göre kullanıldı. Proje özelinde deney/veri varsa doğrudan girilmelidir.')
+  if(i.deltaTan==null)warnings.push('tanδ girilmedi; seçilen arayüz için TBDY Tablo 16.3 üst sınırı kullanıldı. Proje özelinde deney/veri varsa doğrudan girilmelidir.')
   if(rawTan>tanLimit)warnings.push('Girilen tanδ, TBDY Tablo 16.3 seçilen arayüz üst sınırını aştığı için sınırlandırıldı.')
   if(rh!==1.10)warnings.push('TBDY 2018 Tablo 16.2 için γRh=1.10 kullanılmalıdır.')
   if(rp!==1.40)warnings.push('TBDY 2018 Tablo 16.2 için γRp=1.40 kullanılmalıdır.')
@@ -143,7 +144,7 @@ export function foundationChecks(i:FoundationCheckInput){
   const safeX=designResistance>0&&Math.abs(vx)<=designResistance,safeY=designResistance>0&&Math.abs(vy)<=designResistance
   const safeResultant=designResistance>0&&vh<=designResistance
   if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
-  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; qmin<0 olabilir. Kayma kontrolü için düşey kuvvetin temas basıncı dağılımı ayrıca incelenmelidir.')
+  if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; kayma için sürtünme direncinde yalnızca gerçek basınçlı temas alanı esas alınmalıdır.')
   if(contactArea<=0)warnings.push('Temas alanı sıfırdır; sürtünme direnci ve temel temas kontrolleri geçersizdir.')
   const requiredData=slidingMode==='data-missing'||(i.usePassiveResistance&&rpk<=0)
   return{
