@@ -1,5 +1,5 @@
 import { updateProjectInfo, useProjectInfo } from '../../../core/state/project-store'
-import { classifyVs30, determineDts, calculateSdsSeismic, type SoilClassificationCode, type FoundationType, type UnitSystem, type BuildingUseClass } from '../../../core/models/project'
+import { classifyVs30, determineDts, calculateSdsSeismic, type SoilClassificationCode, type FoundationType, type UnitSystem, type BuildingUseClass, type FoundationInterface } from '../../../core/models/project'
 import { projectUnits } from '../../../core/units/project-units'
 import { Card, Field, Frame, Metric } from '../workspace/WorkspaceShell'
 
@@ -101,7 +101,24 @@ export function ProjectInfoScreenV2(){
           <Field label={"Karakteristik pasif direnç Rpk ("+units.force+")"} value={f.passiveResistanceCharacteristic??0} onChange={v=>setFoundation({passiveResistanceCharacteristic:num(v)})}/>
           <label>Pasif direnç kredisi<select value={f.usePassiveResistance?'yes':'no'} onChange={e=>setFoundation({usePassiveResistance:e.target.value==='yes'})}><option value="no">Kullanma</option><option value="yes">Kullan</option></select></label>
           <Field label={"Drenajsız Cu ("+units.stress+")"} value={soil.undrainedCohesion??''} onChange={v=>setSoil({undrainedCohesion:v===''?undefined:num(v)})}/>
-          <Field label="Klasik taşıma FS" value={f.safetyFactor||''} onChange={v=>setFoundation({safetyFactor:num(v)})}/><Metric label="γRv" value="1.40"/>
+          <Field label="Klasik taşıma FS" value={f.safetyFactor||''} onChange={v=>setFoundation({safetyFactor:num(v)})}/>
+          <label>Temel-zemin ara yüzü
+            <select value={f.foundationInterface??''} onChange={e=>setFoundation({foundationInterface:(e.target.value||undefined) as FoundationInterface|undefined})}>
+              <option value="">Seçiniz</option>
+              <option value="cast-in-place-soil">Yerinde dökme beton – zemin</option>
+              <option value="precast-soil">Prefabrik beton – zemin</option>
+              <option value="concrete-concrete">Beton – beton</option>
+              <option value="concrete-bedrock">Beton – kaya</option>
+            </select>
+          </label>
+          <label>Deprem kayma kontrolü · YASS altında
+            <select value={f.seismicBelowGroundwater===undefined?'unknown':f.seismicBelowGroundwater?'yes':'no'} onChange={e=>setFoundation({seismicBelowGroundwater:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
+              <option value="unknown">Belirtilmedi</option>
+              <option value="no">Hayır</option>
+              <option value="yes">Evet</option>
+            </select>
+          </label>
+          <Metric label="γRv" value="1.40"/>
           <Metric label="γRh" value="1.10"/>
           <Metric label="γRp" value="1.40"/>
         </div>
