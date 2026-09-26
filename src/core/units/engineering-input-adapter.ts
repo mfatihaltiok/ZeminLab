@@ -8,7 +8,7 @@ export function toEngineeringSI(project:ProjectInfo){
   const fp=project.foundationParameters
   return {
     soil:{...soil,unitWeight:unitWeightToBase(soil.unitWeight,u),saturatedUnitWeight:unitWeightToBase(soil.saturatedUnitWeight,u),cohesion:stressToBase(soil.cohesion,u),undrainedCohesion:soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,u)},
-    foundation:{...fp,verticalLoad:forceToBase(fp.verticalLoad,u),horizontalLoad:forceToBase(fp.horizontalLoad,u),momentX:momentToBase(fp.momentX,u),momentY:momentToBase(fp.momentY,u),structuralWeight:forceToBase(fp.structuralWeight,u),vtX:forceToBase(fp.vtX,u),vtY:forceToBase(fp.vtY,u),passiveResistanceCharacteristic:stressToBase(fp.passiveResistanceCharacteristic,u)},
+    foundation:{...fp,verticalLoad:forceToBase(fp.verticalLoad,u),horizontalLoad:forceToBase(fp.horizontalLoad,u),momentX:momentToBase(fp.momentX,u),momentY:momentToBase(fp.momentY,u),structuralWeight:forceToBase(fp.structuralWeight,u),vtX:forceToBase(fp.vtX,u),vtY:forceToBase(fp.vtY,u),passiveResistanceCharacteristic:forceToBase(fp.passiveResistanceCharacteristic,u)},
     unitSystem:'kN-m' as const
   }
 }
