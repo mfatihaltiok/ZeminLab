@@ -1,4 +1,4 @@
-import { calculateSurfaceFoundation } from './surface-foundation'
+import { calculateSurfaceFoundation, compressionContact } from './surface-foundation'
 
 export type BearingMethod='Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
 export interface CalculationStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string;source?:string}
@@ -93,11 +93,11 @@ export function foundationChecks(i:FoundationCheckInput){
   if(!Number.isFinite(i.N)||i.N<0)throw new Error('Düşey temel yükü N sıfır veya pozitif olmalıdır.')
   const N=i.N,ex=N>0?i.My/N:0,ey=N>0?i.Mx/N:0
   const qAvg=N/(i.B*i.L)
-  const qMax=qAvg*(1+6*Math.abs(ex)/i.B+6*Math.abs(ey)/i.L)
-  const qMin=qAvg*(1-6*Math.abs(ex)/i.B-6*Math.abs(ey)/i.L)
+  const contact=compressionContact(i.B,i.L,N,i.Mx,i.My)
+  const qMax=contact.qMax,qMin=contact.qMin
   const effectiveLength=Math.max(0,i.L-2*Math.abs(ey)),effectiveWidth=Math.max(0,i.B-2*Math.abs(ex))
   const geometricEffectiveArea=effectiveWidth*effectiveLength
-  const contactArea=i.area!=null?Math.max(0,i.area):geometricEffectiveArea
+  const contactArea=i.area!=null?Math.max(0,i.area):contact.area
   const rh=i.gammaRh??1.10,rp=i.gammaRp??1.40
   if(rh<=0||rp<=0)throw new Error('γRh ve γRp pozitif olmalıdır.')
   const interfaceLimits:Record<FoundationInterface,number>={
