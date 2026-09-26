@@ -15,7 +15,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
   const B=Number(f.footingWidth),L=Number(f.footingLength),Df=Number(f.footingDepth)
   const gamma1=unitWeightToBase(Number(soil.unitWeight),p.unitSystem),gamma2=unitWeightToBase(Number(soil.saturatedUnitWeight),p.unitSystem)
   const c=stressToBase(Number(soil.cohesion),p.unitSystem),phi=Number(soil.frictionAngle)
-  const N=forceToBase(Number(f.structuralWeight),p.unitSystem)
+  const N=forceToBase(Number(f.structuralWeight),p.unitSystem),cu=soil.undrainedCohesion==null?undefined:stressToBase(Number(soil.undrainedCohesion),p.unitSystem)
   const Vx=forceToBase(Number(f.vtX),p.unitSystem),Vy=forceToBase(Number(f.vtY),p.unitSystem),H=Math.hypot(Vx,Vy)
   const Mx=momentToBase(Number(f.momentX),p.unitSystem),My=momentToBase(Number(f.momentY),p.unitSystem)
   const valid=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<50&&Number.isFinite(N)&&N>=0&&Number.isFinite(FS)&&FS>0
@@ -26,10 +26,10 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
       return {result:tbdyBearingCapacity({
         B,L,Df,gamma1,gamma2,c,phi,verticalLoad:N,horizontalLoad:H,momentX:Mx,momentY:My,
         groundSlope:soil.surfaceSlope,baseSlope:soil.foundationBaseSlope,resistanceFactor:1.4,
-        foundationType:f.foundationType,groundwaterDepth:soil.groundwaterDepth,layers:layered,undrainedCu:soil.undrainedCohesion
+        foundationType:f.foundationType,groundwaterDepth:soil.groundwaterDepth,layers:layered,undrainedCu:cu
       }),error:null}
     }catch(e){return{result:null,error:e instanceof Error?e.message:String(e)}}
-  },[valid,B,L,Df,gamma1,gamma2,c,phi,N,H,Mx,My,soil.surfaceSlope,soil.foundationBaseSlope,f.foundationType,soil.groundwaterDepth,soil.undrainedCohesion,layered])
+  },[valid,B,L,Df,gamma1,gamma2,c,phi,N,H,Mx,My,soil.surfaceSlope,soil.foundationBaseSlope,f.foundationType,soil.groundwaterDepth,cu,layered])
   const generic=useMemo(()=>valid?(['Terzaghi','Meyerhof','Hansen','Vesic'] as BearingMethod[]).map(m=>({method:m,result:bearingCapacityEngine({B,L,Df,gamma:gamma1,c,phi,FS,method:m}).value})):[],[valid,B,L,Df,gamma1,c,phi,FS])
   const r=calculation.result?.value
   const stress=(v:number)=>stressFromBase(v,p.unitSystem)
