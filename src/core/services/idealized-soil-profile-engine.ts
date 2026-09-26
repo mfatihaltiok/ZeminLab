@@ -99,7 +99,9 @@ function makeLayer(boreholes: BoreholeRecord[], laboratories: LaboratoryRecord[]
   const nValues = spt.map(x => x.n2 != null && x.n3 != null ? x.n2 + x.n3 : undefined).filter((x): x is number => x != null)
   const correctedNValues = spt.map(x => {
     const borehole = boreholes.find(b => b.id === x.boreholeId)
-    return borehole ? deriveSptValues(borehole,x,laboratories).n1_60 : undefined
+    if (!borehole) return undefined
+    const derived = deriveSptValues(borehole, x, laboratories)
+    return derived.overburdenCorrectionApplied && Number.isFinite(derived.n1_60) && derived.n1_60 > 0 ? derived.n1_60 : undefined
   }).filter((x): x is number => x != null && Number.isFinite(x) && x > 0)
   const gamma = median(lithology.map(x => x.unitWeight).filter((x): x is number => x != null).concat(labs.map(x => x.unitWeight).filter((x): x is number => x != null)))
   const gammaSat = median(lithology.map(x => x.saturatedUnitWeight).filter((x): x is number => x != null))
