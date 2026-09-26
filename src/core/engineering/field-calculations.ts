@@ -59,7 +59,7 @@ function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:Laborat
 
 export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[],unitSystem:UnitSystem='kN-m'):SptDerivedValues{
   const nField=fieldN(record)
-  if(nField===undefined)return{nField,ce:1,cb:1,cs:1,cr:1,cn:1,n60:0,n1_60:0,dilatancyApplied:false,trace:[],overburdenCorrection:1,overburdenCorrectionApplied:false,warnings:[]}
+  if(nField===undefined)return{nField,ce:1,cb:1,cs:1,cr:1,cn:1,n60:0,n1_60:0,dilatancyApplied:false,trace:[],overburdenCorrection:1,overburdenCorrectionApplied:false,warnings:[],hasAssumptions:false}
   const stress=stressAtDepth(borehole,record.depth,laboratories)
   const cfg=record.correction??{}
   const lab=linkedLabForSpt(laboratories,borehole.id,record.id,record.depth)
