@@ -141,4 +141,5 @@ export function jetGroutEngineering(i: JetGroutEngineeringInput): JetGroutEngine
   const priebe = i.columnFrictionAngle != null ? priebeScreening({ areaReplacementRatio: base.areaReplacementRatio, columnFrictionAngle: i.columnFrictionAngle, soilPoissonRatio: i.soilPoissonRatio, columnModulus: i.EsColumn, soilModulus: i.EsSoil }) : undefined
   const axial = i.axial ? jetGroutAxialCapacity(i.axial) : undefined
   const warnings=['Jet Grout kompozit sonuçları ön tasarım/screening niteliğindedir. Nihai kapasite ve oturma için saha deneyleri, kolon sürekliliği, dayanım/kalite kontrolü ve uygun grup/blok kontrolü ayrıca doğrulanmalıdır.']
+  return { ...base, stressConcentrationFactor: beta, virtualRaft, shearSafety, priebeScreening: priebe, axial, screeningOnly: true, warnings }
 }
