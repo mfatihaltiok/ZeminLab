@@ -97,7 +97,7 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const cbResolved=input.cb!==undefined?directCoefficient('CB',input.cb,1,1.15,[1,1.05,1.15])!: {value:boreholeFactor(input.boreholeDiameterMm),source:'sondaj çapından',assumption:false}
   const csResolved=input.cs!==undefined?(()=>{
     if(input.sampler==='without-liner'&&!(input.cs>=1.10&&input.cs<=1.30))throw new Error('İç tüpsüz numune alıcı için CS 1.10–1.30 aralığında olmalıdır.')
-    if(input.sampler!=='without-liner'&&input.cs!==1)return {value:input.cs,source:'kullanıcı seçimi · numune alıcı tipi ayrıca doğrulanmalı',assumption:false}
+    if(input.sampler!==undefined&&input.sampler!=='without-liner'&&input.cs!==1)throw new Error('Standart numune alıcı için CS=1.00 olmalıdır.')
     if(input.cs===1)return {value:1,source:'kullanıcı seçimi · standart numune alıcı',assumption:false}
     if(input.cs>=1.10&&input.cs<=1.30)return {value:input.cs,source:'kullanıcı seçimi · iç tüpsüz numune alıcı',assumption:false}
     throw new Error('CS için yalnız 1.00 veya 1.10–1.30 aralığı kullanılabilir.')
