@@ -111,7 +111,21 @@ export function ProjectInfoScreenV2(){
               <option value="concrete-bedrock">Beton – kaya</option>
             </select>
           </label>
-          <label>Yüksek bina (Bölüm 13)\n            <select value={f.tallBuilding===undefined?'unknown':f.tallBuilding?'yes':'no'} onChange={e=>setFoundation({tallBuilding:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>\n              <option value="unknown">Belirtilmedi</option>\n              <option value="no">Hayır</option>\n              <option value="yes">Evet</option>\n            </select>\n          </label>\n          <label>16.8.3.4(b) doğrusal olmayan zemin analizi\n            <select value={f.nonlinearSoilDeformationAnalysisCompleted===undefined?'unknown':f.nonlinearSoilDeformationAnalysisCompleted?'yes':'no'} onChange={e=>setFoundation({nonlinearSoilDeformationAnalysisCompleted:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>\n              <option value="unknown">Belirtilmedi</option>\n              <option value="no">Yapılmadı</option>\n              <option value="yes">Yapıldı</option>\n            </select>\n          </label>\n          <label>16.8.3.4(a) çevrimsel yerdeğiştirme analizi gerekli mi?
+          <label>Yüksek bina (Bölüm 13)
+            <select value={f.tallBuilding===undefined?'unknown':f.tallBuilding?'yes':'no'} onChange={e=>setFoundation({tallBuilding:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
+              <option value="unknown">Belirtilmedi</option>
+              <option value="no">Hayır</option>
+              <option value="yes">Evet</option>
+            </select>
+          </label>
+          <label>16.8.3.4(b) doğrusal olmayan zemin analizi
+            <select value={f.nonlinearSoilDeformationAnalysisCompleted===undefined?'unknown':f.nonlinearSoilDeformationAnalysisCompleted?'yes':'no'} onChange={e=>setFoundation({nonlinearSoilDeformationAnalysisCompleted:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
+              <option value="unknown">Belirtilmedi</option>
+              <option value="no">Yapılmadı</option>
+              <option value="yes">Yapıldı</option>
+            </select>
+          </label>
+          <label>16.8.3.4(a) çevrimsel yerdeğiştirme analizi gerekli mi?
             <select value={f.cyclicSettlementAnalysisRequired===undefined?'unknown':f.cyclicSettlementAnalysisRequired?'yes':'no'} onChange={e=>setFoundation({cyclicSettlementAnalysisRequired:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
               <option value="unknown">Belirtilmedi</option><option value="no">Hayır</option><option value="yes">Evet</option>
             </select>
@@ -149,17 +163,16 @@ export function ProjectInfoScreenV2(){
         <div className="form-grid">
           <Field label={"γ doğal ("+units.unitWeight+")"} value={soil.unitWeight||''} onChange={v=>setSoil({unitWeight:num(v)})}/>
           <Field label={"γsat ("+units.unitWeight+")"} value={soil.saturatedUnitWeight||''} onChange={v=>setSoil({saturatedUnitWeight:num(v)})}/>
-          <Field label={"c′ ("+units.stress+")"} value={soil.cohesion||''} onChange={v=>setSoil({cohesion:num(v)})}/>
-          <Field label="φ′ (°)" value={soil.frictionAngle||''} onChange={v=>setSoil({frictionAngle:num(v)})}/>
           <Field label="YASS (m)" value={soil.groundwaterDepth??''} onChange={v=>setSoil({groundwaterDepth:v===''?undefined:num(v)})}/>
           <label>TBDY 16.6.1 sürekli tabaka / kalın mercek
             <select value={soil.liquefactionContinuousOrThickLens===undefined?'unknown':soil.liquefactionContinuousOrThickLens?'yes':'no'} onChange={e=>setSoil({liquefactionContinuousOrThickLens:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
               <option value="unknown">Bilinmiyor</option><option value="no">Hayır</option><option value="yes">Evet</option>
             </select>
           </label>
-          <Field label="Arazi eğimi β (°)" value={soil.surfaceSlope||''} onChange={v=>setSoil({surfaceSlope:num(v)})}/>
-          <Field label="Temel tabanı eğimi θ (°)" value={soil.foundationBaseSlope||''} onChange={v=>setSoil({foundationBaseSlope:num(v)})}/>
+          <Field label="Arazi eğimi β (°)" value={soil.surfaceSlope??''} onChange={v=>setSoil({surfaceSlope:num(v)})}/>
+          <Field label="Temel tabanı eğimi θ (°)" value={soil.foundationBaseSlope??''} onChange={v=>setSoil({foundationBaseSlope:num(v)})}/>
         </div>
+        <div className="classification-note">c′ ve φ′ bu başlangıç ekranından girilmez. Bu parametreler ilgili zemin tabakası ve laboratuvar/zemin araştırması verileri üzerinden belirlenecektir.</div>
       </Card>
     </div>
   </Frame>
