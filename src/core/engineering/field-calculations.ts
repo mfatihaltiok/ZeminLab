@@ -107,9 +107,11 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
   const lab=linkedLabForSpt(laboratories,borehole.id,record.id,record.depth)
   const layer=layerAtDepth(borehole,record.depth)
   const soilCode=record.soilCode??layer?.code
-  const claySoil=isClaySoilCode(soilCode)
-  const claySoilSource=claySoil?`Zemin sınıfı ${soilCode}`:undefined
-  const fineContent=cfg.fineContent??lab?.finesContent??lab?.sieve200Passing??layer?.finesContent
+  const labClassification=lab?classifyLaboratoryRecord(lab):null
+  const explicitSoilCode=soilCode!=null&&soilCode.trim().length>0
+  const claySoil=isClaySoilCode(soilCode)||(!explicitSoilCode&&labClassification?.isClay===true)
+  const claySoilSource=claySoil?(isClaySoilCode(soilCode)?`Zemin sınıfı ${soilCode}`:'Laboratuvar Atterberg sınıflandırması'):undefined
+  const fineContent=lab?.finesContent??lab?.sieve200Passing??layer?.finesContent
   const result=calculateSpt({
     nField,
     ce:cfg.ce,cb:cfg.cb,cs:cfg.cs,cr:cfg.cr,
