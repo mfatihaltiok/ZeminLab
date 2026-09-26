@@ -19,7 +19,13 @@ export function migrateProjectData(value:unknown,version:number):ProjectDocument
     cs:Number.isFinite(legacy.samplerCorrection)?legacy.samplerCorrection:undefined,
     cr:Number.isFinite(legacy.rodLengthCorrection)?legacy.rodLengthCorrection:undefined
   }:undefined)
-  const projectInfo=normalizeProjectInfo({...rawProject,...(migratedSpt?{sptCorrections:migratedSpt}:{} )})
+  const sptCorrections:SptCorrectionParameters={
+    ce:migratedSpt?.ce??1,
+    cb:migratedSpt?.cb??1,
+    cs:migratedSpt?.cs??1,
+    cr:migratedSpt?.cr??1
+  }
+  const projectInfo=normalizeProjectInfo({...rawProject,sptCorrections})
   return {projectInfo,boreholes:d.boreholes,labs:d.labs,idealizedSoilProfile:d.idealizedSoilProfile}
 }
 
