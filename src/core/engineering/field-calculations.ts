@@ -35,9 +35,20 @@ function median(values:number[]):number|undefined{
   const a=[...values].sort((x,y)=>x-y),m=Math.floor(a.length/2)
   return a.length%2?a[m]:(a[m-1]+a[m])/2
 }
-function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:LaboratoryRecord[],unitSystem:UnitSystem){
+function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:LaboratoryRecord[],unitSystem:UnitSystem,fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number}){
   const z=Math.max(0,depth)
-  if(!borehole.lithology.length)return{verticalStress:undefined,effectiveStress:undefined,source:'Litoloji profili eksik; σ′v0 hesaplanmadı.'}
+  if(!borehole.lithology.length){
+    const labGammas=laboratories.filter(x=>x.boreholeId===borehole.id&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0).map(x=>x.unitWeight!)
+    const gamma=median(labGammas)??(Number.isFinite(fallback?.unitWeight)&&fallback!.unitWeight!>0?fallback!.unitWeight!:undefined)
+    const gammaSat=median(labGammas)??(Number.isFinite(fallback?.saturatedUnitWeight)&&fallback!.saturatedUnitWeight!>0?fallback!.saturatedUnitWeight!:gamma)
+    if(gamma==null||gammaSat==null)return{verticalStress:undefined,effectiveStress:undefined,source:'γ/γsat bulunamadı; CN hesaplanmadı.'}
+    try{
+      const gwt=borehole.groundwaterDepth??fallback?.groundwaterDepth??1e9
+      const result=effectiveStressAtDepth(z,[{top:0,bottom:Math.max(z,1e-6),gamma:unitWeightToBase(gamma,unitSystem),gammaSat:unitWeightToBase(gammaSat,unitSystem)}],gwt)
+      const source=labGammas.length?'Bağlı laboratuvar γ ile σv/σ′v':'Proje γ/γsat ile ön σv/σ′v'
+      return{verticalStress:result.sigmaV,effectiveStress:result.sigmaVPrime,source}
+    }catch{return{verticalStress:undefined,effectiveStress:undefined,source:'σv/σ′v hesabı yapılamadı; CN uygulanmadı.'}}
+  }
   const layers=borehole.lithology
     .filter(x=>x.to>x.from&&x.to>0)
     .sort((a,b)=>a.from-b.from)
@@ -57,10 +68,10 @@ function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:Laborat
   }
 }
 
-export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[],unitSystem:UnitSystem='kN-m'):SptDerivedValues{
+export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[],unitSystem:UnitSystem='kN-m',fallback?:{unitWeight?:number;saturatedUnitWeight?:number;groundwaterDepth?:number}):SptDerivedValues{
   const nField=fieldN(record)
   if(nField===undefined)return{nField,ce:1,cb:1,cs:1,cr:1,cn:1,n60:0,n1_60:0,dilatancyApplied:false,trace:[],overburdenCorrection:1,overburdenCorrectionApplied:false,warnings:[],hasAssumptions:false}
-  const stress=stressAtDepth(borehole,record.depth,laboratories,unitSystem)
+  const stress=stressAtDepth(borehole,record.depth,laboratories,unitSystem,fallback)
   const cfg=record.correction??{}
   const lab=linkedLabForSpt(laboratories,borehole.id,record.id,record.depth)
   const layer=layerAtDepth(borehole,record.depth)
