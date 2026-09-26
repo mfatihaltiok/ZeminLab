@@ -43,9 +43,9 @@ function directCoefficient(name:string,value:number|undefined,min:number,max:num
   return{value,source:'kullanıcı seçimi',assumption:false}
 }
 function validateEnergyRatioForHammer(energyRatio:number,hammerType?:SptHammerType){
-  if(!Number.isFinite(energyRatio)||energyRatio<27||energyRatio>96)throw new Error('TBDY Tablo 16B.1 kapsamındaki ER %27–%96 aralığında olmalıdır.')
+  if(!Number.isFinite(energyRatio)||energyRatio<45||energyRatio>160)throw new Error('TBDY Tablo 16B.1 kapsamındaki ER %45–%160 aralığında olmalıdır.')
   if(!hammerType||hammerType==='measured')return
-  const range=hammerType==='safety'?[36,70.2]:hammerType==='donut'?[27,60]:[54,96]
+  const range=hammerType==='safety'?[60,117]:hammerType==='donut'?[45,100]:[90,160]
   if(energyRatio<range[0]||energyRatio>range[1])throw new Error('TBDY Tablo 16B.1’e göre '+hammerType+' tokmak için ER %'+range[0]+'–%'+range[1]+' aralığında olmalıdır.')
 }
 
@@ -89,7 +89,7 @@ export function fineContentCorrection(fines:number){
 }
 
 export function calculateSpt(input:SptEngineInput):SptEngineResult{
-  if(!Number.isFinite(input.nField)||input.nField<0)throw new Error('SPT N değeri geçerli olmalıdır.')
+  if(!Number.isInteger(input.nField)||input.nField<0)throw new Error('SPT N değeri sıfır veya pozitif bir tamsayı olmalıdır.')
   const warnings:string[]=[]
   if(input.rodLengthM!==undefined&&input.sptDepthM!==undefined&&input.rodLengthM<input.sptDepthM)throw new Error('Toplam tij boyu SPT deney derinliğinden kısa olamaz.')
   if(input.energyRatio!==undefined)validateEnergyRatioForHammer(input.energyRatio,input.hammerType)
