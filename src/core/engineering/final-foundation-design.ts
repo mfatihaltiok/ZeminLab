@@ -31,6 +31,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   const soilGroup=p.geophysical.soilGroup??p.soilParameters.classification.code
   const zfSiteSpecificRequired=soilGroup==='ZF'
   if(zfSiteSpecificRequired && !p.geophysical.siteSpecificResponseAnalysisCompleted)missing.push('ZF için sahaya özel zemin davranış analizi')
+  if(p.seismic.dts===undefined)missing.push('TBDY tasarım deprem sınıfı (DTS)')
   if(p.geophysical.vs30!=null){
     const inferred=classifyVs30(p.geophysical.vs30)
     if(inferred&&soilGroup&&inferred!==soilGroup&&soilGroup!=='ZF')warnings.push('VS30 ile seçilen zemin grubu farklı; kaynak/tercih raporda açıkça gösterilmelidir.')
@@ -40,6 +41,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   const convertedActions=actionsToEngineeringSI(input.actions??{},p.unitSystem)
   const N=finiteOr(convertedActions.vertical,fp.verticalLoad),Vx=finiteOr(convertedActions.vx,fp.vtX),Vy=finiteOr(convertedActions.vy,fp.vtY),Mx=finiteOr(convertedActions.mx,fp.momentX),My=finiteOr(convertedActions.my,fp.momentY)
   const actions={N,Vx,Vy,Mx,My,source:input.actions?.source??'Temele aktarılan tasarım kuvvetleri'}
+  const seismicDesign=p.seismic.dts!==undefined
 
   if(input.actions && !input.actions.designAction)missing.push('Temele aktarılan kuvvetlerin nihai tasarım etkisi olarak işaretlenmesi')
   if(input.actions && !input.actions.source?.trim())missing.push('Tasarım kuvvetlerinin kaynağı')
@@ -72,7 +74,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
         groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,
         passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,
         usePassiveResistance:fp.usePassiveResistance,
-        seismic:true,interfaceType:resolvedInterface
+        seismic:seismicDesign,interfaceType:resolvedInterface
       }
       if(!resolvedInterface)missing.push('Temel-zemin ara yüzü')
       if(resolvedInterface)sliding=foundationChecks(si)
