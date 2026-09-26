@@ -67,6 +67,7 @@ export function EngineeringSectionRenderer(props:Props){
       const registerTop=top+depthHeight+40
       const registerH=Math.max(60,model.layers.length*rowH+30)
       const height=registerTop+registerH+20
+      app.renderer.resize(width,height)
       const soilX=model.variant==='profile'?150:125
       const soilW=410
       const depthY=(d:number)=>top+d/model.totalDepth*depthHeight
@@ -82,15 +83,15 @@ export function EngineeringSectionRenderer(props:Props){
 
       const root=new Container()
       app.stage.addChild(root)
+
+      const header=new Graphics()
+      header.rect(0,0,width,44).fill(0xe5e9ec).stroke({color:0xaab3ba,width:1})
+      root.addChild(header)
       addText(root,'FALUZMN · '+(model.variant==='profile'?'İDEALİZE ZEMİN PROFİLİ':'SONDAJ LOGU'),18,15,12,true)
       addText(root,'GPU TEKNİK KESİT · PIXIJS',850,16,10,false,0x5f6b73)
       addText(root,'DERİNLİK',33,55,10,true,0x53616a)
       addText(root,'ZEMİN KESİTİ',soilX+8,55,10,true,0x53616a)
       addText(root,'SPT / SAHA / LAB',610,55,10,true,0x53616a)
-
-      const header=new Graphics()
-      header.rect(0,0,width,44).fill(0xe5e9ec).stroke({color:0xaab3ba,width:1})
-      root.addChild(header)
       const frame=new Graphics()
       frame.rect(soilX,top,soilW,depthHeight).fill(0xffffff).stroke({color:0x68757d,width:1.5})
       root.addChild(frame)
