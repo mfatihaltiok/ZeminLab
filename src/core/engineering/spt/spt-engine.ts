@@ -61,13 +61,17 @@ function samplerFactor(input:SptEngineInput){
   return 1.10
 }
 
-function rodFactor(length?:number){
-  if(length===undefined)return 1
-  if(!Number.isFinite(length)||length<3)throw new Error('TBDY Tablo 16B.1 için rod boyu 3 m’den küçükse CR tanımlı değildir.')
+export function rodLengthCorrectionTBDY2018(length:number):number{
+  if(!Number.isFinite(length)||length<3)throw new Error('TBDY Tablo 16B.1 için toplam tij boyu 3 m veya daha büyük olmalıdır; 3 m’den küçük uzunlukta CR tanımlı değildir.')
   if(length<4)return .75
   if(length<6)return .85
-  if(length<10)return .95
+  if(length<=10)return .95
   return 1
+}
+
+function rodFactor(length?:number){
+  if(length===undefined)return 1
+  return rodLengthCorrectionTBDY2018(length)
 }
 
 export function fineContentCorrection(fines:number){
@@ -84,12 +88,16 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const ceResolved=input.ce!==undefined?directCoefficient('CE',input.ce,.45,1.60)!:(()=>{const er=resolveEnergyRatio(input);if(er.value<=0||er.value>100)throw new Error('SPT enerji oranı %0–100 arasında olmalıdır.');return{value:er.value/60,source:er.source,assumption:er.assumption}})()
   const cbResolved=input.cb!==undefined?directCoefficient('CB',input.cb,1,1.15,[1,1.05,1.15])!: {value:boreholeFactor(input.boreholeDiameterMm),source:'sondaj çapından',assumption:false}
   const csResolved=input.cs!==undefined?directCoefficient('CS',input.cs,1,1.30)!: {value:samplerFactor(input),source:'numune alıcıdan',assumption:false}
-  const crResolved=input.cr!==undefined?directCoefficient('CR',input.cr,.75,1,[.75,.85,.95,1])!: {value:rodFactor(input.rodLengthM),source:'tij boyundan',assumption:false}
+  const crResolved=input.rodLengthM!==undefined
+    ? {value:rodFactor(input.rodLengthM),source:'TBDY Tablo 16B.1 toplam tij boyundan',assumption:false}
+    : input.cr!==undefined
+      ? directCoefficient('CR',input.cr,.75,1,[.75,.85,.95,1])!
+      : {value:1,source:'toplam tij boyu girilmedi; geçici CR=1.00',assumption:true}
   if(ceResolved.assumption)warnings.push('CE için otomatik enerji oranı kullanıldı; proje-geneli CE seçimi yapıldığında bu varsayım kaldırılır. '+ceResolved.source)
   const ce=ceResolved.value,cb=cbResolved.value,cs=csResolved.value,cr=crResolved.value
   const assumptions:string[]=[]
   if(input.cb===undefined&&input.boreholeDiameterMm===undefined)assumptions.push('CB: proje-geneli CB seçimi ve sondaj çapı verilmedi; CB=1 varsayıldı.')
-  if(input.cr===undefined&&input.rodLengthM===undefined)assumptions.push('CR: proje-geneli CR seçimi ve tij boyu verilmedi; CR=1 varsayıldı.')
+  if(input.cr===undefined&&input.rodLengthM===undefined)assumptions.push('CR: toplam tij boyu girilmedi; TBDY Tablo 16B.1’e göre CR otomatik hesaplanması için her SPT deneyinde tij boyu girilmelidir.')
   if(input.cs===undefined&&input.sampler==='without-liner'&&input.samplerCorrection===undefined)assumptions.push('CS: iç tüpsüz numune alıcı için CS=1.10 varsayıldı.')
   const n60=input.nField*ce*cb*cs*cr
   const sigma=input.effectiveStress
@@ -119,7 +127,7 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
     {symbol:'CE',title:'Enerji düzeltmesi',formula:'CE=ER/60 veya proje katsayısı',value:ce,note:ceResolved.source},
     {symbol:'CB',title:'Sondaj çapı düzeltmesi',formula:'CB=f(D) veya proje katsayısı',value:cb,note:cbResolved.source},
     {symbol:'CS',title:'Numune alıcı düzeltmesi',formula:'CS=f(sampler) veya proje katsayısı',value:cs,note:csResolved.source},
-    {symbol:'CR',title:'Rod boyu düzeltmesi',formula:'CR=f(L) veya proje katsayısı',value:cr,note:crResolved.source},
+    {symbol:'CR',title:'Tij boyu düzeltmesi',formula:input.rodLengthM!==undefined?'CR=f(L) · TBDY 16B.1':'CR=proje katsayısı / geçici',value:cr,note:crResolved.source},
     {symbol:'N60',title:'Standartlaştırılmış SPT',formula:'N60=N·CE·CB·CS·CR',value:n60},
     {symbol:'CN',title:'Örtü basıncı düzeltmesi',formula:claySoil?'CN=1.00 (killi/kohezyonlu zemin)':'CN=min(1.70,9.78/√σ′v0)',value:cn,note:claySoil?(input.claySoilSource??'Killi zemin'):finitePositive(sigma)?'σ′v0='+sigma!.toFixed(2)+' kPa':'Uygulanmadı'},
     {symbol:'(N1)60',title:'Normalize SPT',formula:'(N1)60=CN·N60',value:n1_60}
