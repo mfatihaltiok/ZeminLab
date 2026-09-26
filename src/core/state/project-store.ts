@@ -21,7 +21,9 @@ export function migrateProjectData(value:unknown,version:number):ProjectDocument
   const sptCorrections:SptCorrectionParameters={
     ce:migratedSpt?.ce??1,
     cb:migratedSpt?.cb??1,
-    cs:migratedSpt?.cs??1
+    cs:migratedSpt?.cs??1,
+    hammerType:migratedSpt?.hammerType,
+    samplerType:migratedSpt?.samplerType
   }
   const boreholes=d.boreholes.map(borehole=>({...borehole,spt:borehole.spt.map(row=>row.rodLengthM!==undefined?row:{...row,rodLengthM:row.correction?.rodLengthM})}))
   const projectInfo=normalizeProjectInfo({...rawProject,sptCorrections})
