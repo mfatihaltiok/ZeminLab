@@ -46,7 +46,9 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
         fineContent:lab?.finesContent??lab?.sieve200Passing??layer?.finesContent,
         plasticityIndex:lab?.plasticityIndex??(lab?.liquidLimit!=null&&lab?.plasticLimit!=null?lab.liquidLimit-lab.plasticLimit:undefined)??layer?.plasticityIndex,
         clayContent:lab?.hydrometer002,
-        waterContent:lab?.waterContent
+        waterContent:lab?.waterContent,
+        rodLengthM:record.rodLengthM,
+        stressSnapshot:record.testStressSnapshot
       }
     })
     return liquefactionProfile({
@@ -58,7 +60,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
   return <Frame screen="liquefaction">
     <Source>{SOURCE_NOTES.liquefaction} 16.6.1 kapsam koşulları, 16.6.2–16.6.6 tetiklenme koşulları ve Ek 16B hesabı aynı sonuç zincirinde gösterilir.</Source>
     {!b?<Card title="SONDAJ GEREKLİ"><div className="inline-empty">Sıvılaşma için sondaj ve SPT verisi gerekir.</div></Card>:
-      <><Card title="HESAP KAPSAMI"><div className="form-grid"><label>Sondaj<select value={b.id} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><Metric label="DTS" value={p.seismic.dts??'—'}/><Metric label="SDS" value={sds?.toFixed(3)??'—'}/><Metric label="Mw" value={p.seismic.magnitude??'—'}/><Metric label="YASS" value={b.groundwaterDepth??'—'}/><Metric label="SPT" value={validSpt.length}/><Metric label="CE" value={p.sptCorrections.ce.toFixed(2)}/><Metric label="CB" value={p.sptCorrections.cb.toFixed(2)}/><Metric label="CS" value={p.sptCorrections.cs.toFixed(2)}/><Metric label="CR" value={p.sptCorrections.cr.toFixed(2)}/></div></Card>
+      <><Card title="HESAP KAPSAMI"><div className="form-grid"><label>Sondaj<select value={b.id} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><Metric label="DTS" value={p.seismic.dts??'—'}/><Metric label="SDS" value={sds?.toFixed(3)??'—'}/><Metric label="Mw" value={p.seismic.magnitude??'—'}/><Metric label="YASS" value={b.groundwaterDepth??'—'}/><Metric label="SPT" value={validSpt.length}/><Metric label="CE" value={p.sptCorrections.ce.toFixed(2)}/><Metric label="CB" value={p.sptCorrections.cb.toFixed(2)}/><Metric label="CS" value={p.sptCorrections.cs.toFixed(2)}/><Metric label="CR" value="SPT başına"/></div></Card>
         {!profileInput?
           <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">YASS, SDS, Mw ve geçerli SPT kayıtları birlikte bulunmalıdır. YASS bilinmiyorsa 16.6.2 kapsamında sıvılaşma değerlendirmesi başlatılmaz.</div></Card>:
           <><div className="metric-strip"><Metric label="TBDY zorunluluğu" value={profileInput.mandatoryByProject?'EVET':'DTS/zemin koşuluna bağlı'}/></div>
