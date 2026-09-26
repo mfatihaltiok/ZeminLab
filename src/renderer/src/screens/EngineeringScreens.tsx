@@ -56,7 +56,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
       Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:l.unitWeight??0,gammaSat:l.saturatedUnitWeight??l.unitWeight??0,soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex})),
       spt:rows,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth
     })
-  },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,validSpt])
+  },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,p.geophysical.soilGroup,p.soilParameters.liquefactionContinuousOrThickLens,validSpt])
 
   return <Frame screen="liquefaction">
     <Source>{SOURCE_NOTES.liquefaction} 16.6.1 kapsam koşulları, 16.6.2–16.6.6 tetiklenme koşulları ve Ek 16B hesabı aynı sonuç zincirinde gösterilir.</Source>
@@ -77,7 +77,7 @@ export function Foundation(){
   const p=useProjectInfo(),f=p.foundationParameters,soil=p.soilParameters
   const N=forceToBase(f.verticalLoad,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
   const ready=f.footingWidth>0&&f.footingLength>0&&N>=0
-  const r=ready?foundationChecks({
+  const r=ready&&f.foundationInterface?foundationChecks({
     B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,
     deltaTan:f.baseFrictionTanDelta,cu:soil.undrainedCohesion,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
     passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance,
@@ -85,7 +85,7 @@ export function Foundation(){
     interfaceType:f.foundationInterface
   }):undefined
   return <Frame screen="foundation"><Source>{SOURCE_NOTES.foundation} TBDY 16.8.4 yatay kayma kontrolü; 16.8.4.6 YASS altında depremde Cu yaklaşımı uygulanır.</Source>
-    {!r?<Card title="TEMEL VERİSİ BEKLENİYOR"><div className="inline-empty">B, L ve yapı yükü girilmelidir.</div></Card>:
+    {!ready?<Card title="TEMEL VERİSİ BEKLENİYOR"><div className="inline-empty">B, L ve yapı yükü girilmelidir.</div></Card>:!f.foundationInterface?<Card title="TEMEL-ZEMİN ARA YÜZÜ EKSİK"><div className="inline-empty">Kayma hesabı için temel-zemin ara yüzü seçilmelidir. Tanδ bu seçim olmadan varsayılmaz.</div></Card>:!r?<Card title="TEMEL HESABI HAZIR DEĞİL"><div className="inline-empty">Temel hesabı için gerekli veriler tamamlanmalıdır.</div></Card>:
       <><div className="metric-strip"><Metric label="B" value={f.footingWidth.toFixed(2)} unit="m"/><Metric label="L" value={f.footingLength.toFixed(2)} unit="m"/><Metric label="Vtx" value={Vx.toFixed(2)} unit="kN"/><Metric label="Vty" value={Vy.toFixed(2)} unit="kN"/><Metric label="Rth+0.3Rpt" value={r.slidingCapacityX.toFixed(2)} unit="kN"/><Metric label="Durum" value={r.evaluable&&r.slidingSafeX&&r.slidingSafeY?'YETERLİ':'KONTROL GEREKLİ'}/></div>
         <Card title="TBDY 2018 16.8.4"><div className="table-wrap"><table><thead><tr><th>Kontrol</th><th>Değer</th><th>Oran</th><th>Durum</th></tr></thead><tbody><tr><td>X</td><td>{Vx.toFixed(2)} / {r.slidingCapacityX.toFixed(2)}</td><td>{r.slidingUtilizationX.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeX?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr><tr><td>Y</td><td>{Vy.toFixed(2)} / {r.slidingCapacityY.toFixed(2)}</td><td>{r.slidingUtilizationY.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeY?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr></tbody></table></div><div className="engineering-note">Rth={r.slidingCapacityX.toFixed(2)} kN · Rpt={r.passiveResistanceDesign.toFixed(2)} kN · mod={r.slidingMode}</div></Card>
         {r.warnings.length>0&&<Card title="UYARILAR"><div className="inline-empty">{r.warnings.join(' ')}</div></Card>}</>}
