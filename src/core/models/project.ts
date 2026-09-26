@@ -6,7 +6,7 @@ export type BuildingUseClass=1|2|3
 export type EarthquakeDesignClass='1'|'1a'|'2'|'2a'|'3'|'3a'|'4'|'4a'
 
 export interface ProjectVisualDocuments{aerialPhoto?:string;layoutPlan?:string;architecturalSection?:string;foundationPlan?:string;foundationStress?:string}
-export interface SptCorrectionParameters{ce:number;cb:number;cs:number;cr:number}
+export interface SptCorrectionParameters{ce:number;cb:number;cs:number}
 export interface JetGroutProjectParameters{
   columnDiameter?:number
   spacing?:number
@@ -72,7 +72,7 @@ export const defaultProjectInfo:ProjectInfo={
   id:'',title:'',projectNo:'',date:'',location:'',province:'',district:'',address:'',parcelInfo:'',pafta:'',ada:'',parsel:'',zoningStatus:'',
   engineer:'',clientName:'',firmName:'',buildingType:'',basementCount:0,normalFloorCount:0,unitSystem:'ton-m',
   geophysical:{soilGroupSource:'VS30',siteSpecificResponseAnalysisCompleted:false},
-  sptCorrections:{ce:1,cb:1,cs:1,cr:1},
+  sptCorrections:{ce:1,cb:1,cs:1},
   seismic:{},
   soilParameters:{unitWeight:0,saturatedUnitWeight:0,cohesion:0,frictionAngle:0,undrainedCohesion:undefined,groundwaterDepth:undefined,surfaceSlope:0,foundationBaseSlope:0,finesContent:0,liquefactionContinuousOrThickLens:undefined,classification:{system:'TS EN ISO 14688-2'}},
   foundationParameters:{
@@ -115,7 +115,7 @@ export function normalizeProjectInfo(value:Partial<ProjectInfo>):ProjectInfo{
   const foundation={...defaultProjectInfo.foundationParameters,...(value.foundationParameters??{})}
   const seismic={...defaultProjectInfo.seismic,...(value.seismic??{})}
   const rawSpt:Partial<SptCorrectionParameters>=value.sptCorrections??{}
-  const sptCorrections={ce:Number.isFinite(rawSpt.ce)?rawSpt.ce:1,cb:Number.isFinite(rawSpt.cb)?rawSpt.cb:1,cs:Number.isFinite(rawSpt.cs)?rawSpt.cs:1,cr:Number.isFinite(rawSpt.cr)?rawSpt.cr:1}
+  const sptCorrections={ce:Number.isFinite(rawSpt.ce)?rawSpt.ce:1,cb:Number.isFinite(rawSpt.cb)?rawSpt.cb:1,cs:Number.isFinite(rawSpt.cs)?rawSpt.cs:1}
   const unitSystem:UnitSystem=value.unitSystem==='kN-m'?'kN-m':'ton-m'
   const foundationType:FoundationType=foundation.foundationType==='surekli'||foundation.foundationType==='radye'||foundation.foundationType==='tekil'?foundation.foundationType:'tekil'
   const structuralWeight=Number.isFinite(foundation.structuralWeight)&&foundation.structuralWeight>=0?foundation.structuralWeight:(Number.isFinite(foundation.verticalLoad)?foundation.verticalLoad:0)
