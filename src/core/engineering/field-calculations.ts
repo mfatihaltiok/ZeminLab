@@ -1,3 +1,5 @@
+import type { UnitSystem } from '../models/project'
+import { unitWeightToBase } from '../units/project-units'
 import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../models/field-data'
 import { calculateSpt, type SptEngineResult } from './spt/spt-engine'
 import { effectiveStressAtDepth } from './stress-profile'
@@ -41,8 +43,8 @@ function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:Laborat
     .sort((a,b)=>a.from-b.from)
     .map(layer=>{
       const labGamma=median(laboratories.filter(x=>x.boreholeId===borehole.id&&x.depth>=layer.from&&x.depth<layer.to&&Number.isFinite(x.unitWeight)&&x.unitWeight!>0).map(x=>x.unitWeight!))
-      const gamma=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?layer.unitWeight!:labGamma
-      return{top:layer.from,bottom:layer.to,gamma:gamma??NaN,gammaSat:Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0?layer.saturatedUnitWeight!:gamma??NaN}
+      const gamma=Number.isFinite(layer.unitWeight)&&layer.unitWeight!>0?unitWeightToBase(layer.unitWeight!,unitSystem):labGamma==null?undefined:unitWeightToBase(labGamma,unitSystem)
+      return{top:layer.from,bottom:layer.to,gamma:gamma??NaN,gammaSat:Number.isFinite(layer.saturatedUnitWeight)&&layer.saturatedUnitWeight!>0?unitWeightToBase(layer.saturatedUnitWeight!,unitSystem):gamma??NaN}
     })
   if(layers.some(x=>!Number.isFinite(x.gamma)||x.gamma<=0||!Number.isFinite(x.gammaSat)||x.gammaSat<=0))return{verticalStress:undefined,effectiveStress:undefined,source:'Deney derinliğine kadar γ/γsat profili eksik; CN uygulanmadı.'}
   try{
@@ -55,7 +57,7 @@ function stressAtDepth(borehole:BoreholeRecord,depth:number,laboratories:Laborat
   }
 }
 
-export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[]):SptDerivedValues{
+export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laboratories:LaboratoryRecord[]=[],unitSystem:UnitSystem='kN-m'):SptDerivedValues{
   const nField=fieldN(record)
   if(nField===undefined)return{nField,ce:1,cb:1,cs:1,cr:1,cn:1,n60:0,n1_60:0,dilatancyApplied:false,trace:[],overburdenCorrection:1,overburdenCorrectionApplied:false,warnings:[]}
   const stress=stressAtDepth(borehole,record.depth,laboratories)
