@@ -63,15 +63,17 @@ function SptCorrectionPanel({value,onChange}:{value:SptCorrectionParameters;onCh
     if(Number.isFinite(n))onChange({...value,[key]:n})
   }
   const options=(items:{value:number;label:string}[])=>items.map(x=><option key={x.value} value={x.value}>{x.label}</option>)
+  const isPreset=CE_OPTIONS.some(x=>Math.abs(x.value-value.ce)<1e-9)
+  const ceMode=isPreset?String(value.ce):'measured'
   return <div className="spt-global-correction">
     <div className="spt-global-correction-title"><b>SPT DÜZELTME KATSAYILARI · PROJE GENELİ</b><span>Tüm sondaj ve SPT deneylerinde aynı katsayı seti kullanılır.</span></div>
     <div className="spt-global-correction-grid">
-      <label>CE<select value={value.ce} onChange={e=>set('ce',e.target.value)}>{options(CE_OPTIONS)}</select></label>
+      <label>CE<select value={ceMode} onChange={e=>{if(e.target.value==='measured')return;set('ce',e.target.value)}}>{options(CE_OPTIONS)}<option value="measured">Ölçülmüş ER</option></select>{ceMode==='measured'&&<input className="ce-er-input" type="number" min="27" max="100" step="1" value={(value.ce*60).toFixed(0)} onChange={e=>{const er=Number(e.target.value);if(Number.isFinite(er)&&er>=27&&er<=100)onChange({...value,ce:er/60})}} placeholder="ER %"/>}</label>
       <label>CB<select value={value.cb} onChange={e=>set('cb',e.target.value)}>{options(CB_OPTIONS)}</select></label>
       <label>CS<select value={value.cs} onChange={e=>set('cs',e.target.value)}>{options(CS_OPTIONS)}</select></label>
       <label>CR<select value={value.cr} onChange={e=>set('cr',e.target.value)}>{options(CR_OPTIONS)}</select></label>
     </div>
-    <div className="spt-global-correction-note">CE ölçülmüş enerji oranı yoksa literatür/TBDY temsil değerleriyle seçilir. CB, CS ve CR TBDY Tablo 16B.1 seçeneklerinden seçilir. CN kumlu/kohezyonsuz zeminde σ′v0 ile, killi zeminde 1.00 olarak hesaplanır.</div>
+    <div className="spt-global-correction-note">CE ölçülmüş ER varsa doğrudan ER/60 kullanılır; yoksa temsil değeri seçilir. CB, CS ve CR TBDY Tablo 16B.1 seçeneklerinden seçilir. CN kohezyonsuz zeminde σ′v0 ile, killi zeminde 1.00 olarak hesaplanır.</div>
   </div>
 }
 
