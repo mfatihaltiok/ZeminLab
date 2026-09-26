@@ -29,7 +29,7 @@ export function JetGroutEngineeringScreen(){
       load:projectLoad>0?projectLoad:undefined,foundationArea:projectArea>0?projectArea:undefined,
       foundationThickness:Number(thickness)>0?Number(thickness):undefined,
       columnFrictionAngle:Number(phi)>0?Number(phi):undefined,cohesion:Number(c)>0?Number(c):undefined,
-      frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH
+      frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH,qualityControlCompleted:f.jetGroutQualityControlCompleted
     })
   },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,phi,c,angle,projectLoad,projectArea,projectH])
   latestJetGroutResult=r
@@ -63,7 +63,7 @@ export function JetGroutEngineeringScreen(){
         <Metric label="Kolon yük payı" value={(r.columnLoadShare*100).toFixed(1)} unit="%"/>
         <Metric label="β" value={r.stressConcentrationFactor.toFixed(2)}/>
       </div>
-      <Card title="KOMPOZİT BİRİM HÜCRE"><CalculationTrace title="Hesap zinciri" source={r.source} rows={[
+      <Card title="TASARIM DURUMU"><div className="inline-empty">{r.designEligible?'Nihai değerlendirmeye aktarılabilir: kalite kontrol + eksenel kapasite kanıtı mevcut.':'Yalnızca ön tasarım/screening. Nihai tasarım uygunluğu olarak kullanılmamalıdır.'}</div>{r.warnings.map((w,i)=><div className="inline-empty" key={i}>{w}</div>)}</Card><Card title="KOMPOZİT BİRİM HÜCRE"><CalculationTrace title="Hesap zinciri" source={r.source} rows={[
         {symbol:'Ac',title:'Kolon alanı',formula:'πd²/4',value:r.areaColumn,unit:'m²'},
         {symbol:'Acell',title:'Hücre alanı',formula:layout==='square'?'s²':'√3·s²/2',value:r.cellArea,unit:'m²'},
         {symbol:'ar',title:'Alan değiştirme oranı',formula:'Ac/Acell',value:r.areaReplacementRatio},
