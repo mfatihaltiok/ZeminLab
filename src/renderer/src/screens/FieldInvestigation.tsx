@@ -55,8 +55,6 @@ function syncLabs(labs: LaboratoryRecord[], borehole: BoreholeRecord): Laborator
 const CE_OPTIONS=[{value:.75,label:'0.75 · ER %45 · halkalı'},{value:1,label:'1.00 · ER %60 · güvenli'},{value:1.5,label:'1.50 · ER %90 · otomatik'}]
 const CB_OPTIONS=[{value:1,label:'1.00 · 65–115 mm'},{value:1.05,label:'1.05 · 150 mm'},{value:1.15,label:'1.15 · 200 mm'}]
 const CS_OPTIONS=[{value:1,label:'1.00 · standart'},{value:1.1,label:'1.10'},{value:1.2,label:'1.20'},{value:1.3,label:'1.30'}]
-const CR_OPTIONS=[{value:.75,label:'0.75 · 3–4 m'},{value:.85,label:'0.85 · 4–6 m'},{value:.95,label:'0.95 · 6–10 m'},{value:1,label:'1.00 · >10 m'}]
-
 function SptCorrectionPanel({value,onChange}:{value:SptCorrectionParameters;onChange:(next:SptCorrectionParameters)=>void}){
   const set=(key:keyof SptCorrectionParameters,raw:string)=>{
     const n=Number(raw)
@@ -66,14 +64,13 @@ function SptCorrectionPanel({value,onChange}:{value:SptCorrectionParameters;onCh
   const isPreset=CE_OPTIONS.some(x=>Math.abs(x.value-value.ce)<1e-9)
   const ceMode=isPreset?String(value.ce):'measured'
   return <div className="spt-global-correction">
-    <div className="spt-global-correction-title"><b>SPT DÜZELTME KATSAYILARI · PROJE GENELİ</b><span>Tüm sondaj ve SPT deneylerinde aynı katsayı seti kullanılır.</span></div>
+    <div className="spt-global-correction-title"><b>SPT DÜZELTME KATSAYILARI · PROJE GENELİ</b><span>CE, CB ve CS tüm sondaj ve SPT deneylerinde sabittir; CR her SPT için tij boyundan otomatik hesaplanır.</span></div>
     <div className="spt-global-correction-grid">
       <label>CE<select value={ceMode} onChange={e=>{if(e.target.value==='measured')return;set('ce',e.target.value)}}>{options(CE_OPTIONS)}<option value="measured">Ölçülmüş ER</option></select>{ceMode==='measured'&&<input className="ce-er-input" type="number" min="27" max="96" step="1" value={(value.ce*60).toFixed(0)} onChange={e=>{const er=Number(e.target.value);if(Number.isFinite(er)&&er>=27&&er<=100)onChange({...value,ce:er/60})}} placeholder="ER %"/>}</label>
       <label>CB<select value={value.cb} onChange={e=>set('cb',e.target.value)}>{options(CB_OPTIONS)}</select></label>
       <label>CS<select value={value.cs} onChange={e=>set('cs',e.target.value)}>{options(CS_OPTIONS)}</select></label>
-      <label>CR<select value={value.cr} onChange={e=>set('cr',e.target.value)}>{options(CR_OPTIONS)}</select></label>
     </div>
-    <div className="spt-global-correction-note">CE ölçülmüş ER varsa doğrudan ER/60 kullanılır; yoksa temsil değeri seçilir. CB, CS ve CR TBDY Tablo 16B.1 seçeneklerinden seçilir. CN kohezyonsuz zeminde σ′v0 ile, killi zeminde 1.00 olarak hesaplanır.</div>
+    <div className="spt-global-correction-note">CE ölçülmüş ER varsa doğrudan ER/60 kullanılır; yoksa temsil değeri seçilir. CB ve CS TBDY Tablo 16B.1’e göre proje genelinde seçilir. CR proje genelinde sabit tutulmaz; her SPT’de girilen toplam tij boyundan TBDY Tablo 16B.1’e göre otomatik hesaplanır.</div>
   </div>
 }
 
@@ -105,13 +102,13 @@ function SptGrid({ borehole, onChange, sptCorrections, onSptCorrectionsChange }:
       <label>Kuyu toplam derinliği (m)<input type="number" value={borehole.totalDepth||''} min="0" step="0.1" placeholder="Boş" onChange={e=>updateMeta('totalDepth',e.target.value)} /></label>
       <label>YASS (m)<input type="number" value={borehole.groundwaterDepth??''} min="0" step="0.01" placeholder="Ölçülmediyse boş" onChange={e=>updateMeta('groundwaterDepth',e.target.value)} /></label>
 
-      <span className="field-rule-note">SPT: 45 cm · CE/CB/CS/CR proje-geneli panelden seçilir.</span>
+      <span className="field-rule-note">SPT: 45 cm · CE/CB/CS proje-geneli · CR tij boyundan otomatik</span>
     </div>
     <SptCorrectionPanel value={sptCorrections} onChange={onSptCorrectionsChange}/>
     <div className="engineering-grid-wrap spt-grid-wrap">
       <div className="grid-toolbar"><b>SPT / ARAZİ DENEYLERİ</b><span>{borehole.spt.length} deney · son başlangıç {fmt(borehole.spt.at(-1)?.depth)} m</span><button onClick={add}>+ Deney</button></div>
-      <table className="engineering-grid spt-grid"><colgroup><col className="col-depth"/><col className="col-type"/><col className="col-n"/><col className="col-n"/><col className="col-n"/><col className="col-n30"/><col className="col-soil"/><col className="col-description"/><col className="col-source"/><col className="col-confirm"/><col className="col-lab"/><col className="col-delete"/></colgroup>
-        <thead><tr><th>Derinlik</th><th>Deney Tipi</th><th>n1</th><th>n2</th><th>n3</th><th>N30</th><th>Zemin Sınıfı</th><th>Zemin Açıklaması</th><th>Kaynak</th><th>Onay</th><th>Lab</th><th/></tr></thead>
+      <table className="engineering-grid spt-grid"><colgroup><col className="col-depth"/><col className="col-type"/><col className="col-n"/><col className="col-n"/><col className="col-n"/><col className="col-n30"/><col className="col-rod"/><col className="col-soil"/><col className="col-description"/><col className="col-source"/><col className="col-confirm"/><col className="col-lab"/><col className="col-delete"/></colgroup>
+        <thead><tr><th>Derinlik</th><th>Deney Tipi</th><th>n1</th><th>n2</th><th>n3</th><th>N30</th><th>Tij boyu (m)</th><th>Zemin Sınıfı</th><th>Zemin Açıklaması</th><th>Kaynak</th><th>Onay</th><th>Lab</th><th/></tr></thead>
         <tbody>{borehole.spt.map(row=>{
           const n30=row.testType==='SPT'&&row.n2!==undefined&&row.n3!==undefined?row.n2+row.n3:undefined
           return <tr key={row.id}>
@@ -121,6 +118,7 @@ function SptGrid({ borehole, onChange, sptCorrections, onSptCorrectionsChange }:
             <td><input className="n-input" type="number" value={row.n2??''} disabled={row.testType==='UD'} onChange={e=>updateRow(row.id,{n2:e.target.value===''?undefined:Number(e.target.value)})}/></td>
             <td><input className="n-input" type="number" value={row.n3??''} disabled={row.testType==='UD'} onChange={e=>updateRow(row.id,{n3:e.target.value===''?undefined:Number(e.target.value)})}/></td>
             <td className="computed-cell">{fmt(n30,0)}</td>
+            <td><input className="rod-input" type="number" value={row.rodLengthM??''} min="3" step="0.01" placeholder="≥ 3" disabled={row.testType==='UD'} onChange={e=>updateRow(row.id,{rodLengthM:e.target.value===''?undefined:Number(e.target.value)})}/></td>
             <td><select value={row.soilCode??''} onChange={e=>{const o=soilMap.get(e.target.value);updateRow(row.id,{soilCode:e.target.value||undefined,soilDescription:o?.description})}}><option value="">Seçiniz</option>{soilOptions.map(o=><option key={o.code} value={o.code}>{o.code}</option>)}</select></td>
             <td className="description-cell">{row.soilDescription||'—'}</td><td><span className="source-badge">{sourceLabel(row.source,row.confirmed)}</span></td>
             <td><button className="confirm-button" onClick={()=>updateRow(row.id,{confirmed:!row.confirmed})}>{row.confirmed?'✓':'○'}</button></td>
@@ -138,11 +136,11 @@ function SptAnalysis({ borehole, labs, unitSystem, fallback, correction }: { bor
     catch(error){return {record,derived:undefined,error:error instanceof Error?error.message:String(error)}}
   })
   return <div className="engineering-grid-wrap">
-    <div className="grid-toolbar"><b>SPT HESAP ZİNCİRİ</b><span>N30 → N60 → CN → (N1)60 → (N1)60f</span><span className="spt-correction-note">CE/CB/CS/CR proje geneli sabit · CN: killi zemin = 1.00, diğer zeminler = derinliğe göre</span></div>
+    <div className="grid-toolbar"><b>SPT HESAP ZİNCİRİ</b><span>N30 → N60 → CN → (N1)60 → (N1)60f</span><span className="spt-correction-note">CE/CB/CS proje geneli sabit · CR her SPT’de tij boyundan · CN: killi zemin = 1.00, diğer zeminler = derinliğe göre</span></div>
     <table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>CE</th><th>CB</th><th>CS</th><th>CR</th><th>N60</th><th>σv0 (kPa)</th><th>u0 (kPa)</th><th>σ′v0 (kPa)</th><th>CN</th><th>(N1)60</th><th>(N1)60f</th><th>Durum</th></tr></thead>
       <tbody>{rows.map(({record,derived,error})=><tr key={record.id}>
         <td>{fmt(record.depth)}–{fmt(experimentDepthTo(record))}</td><td>{fmt(derived?.nField,0)}</td><td>{fmt(derived?.ce)}</td><td>{fmt(derived?.cb)}</td><td>{fmt(derived?.cs)}</td><td>{fmt(derived?.cr)}</td>
-        <td className="computed-cell">{fmt(derived?.n60)}</td><td>{fmt(derived?.verticalStress)}</td><td>{fmt(derived?.porePressure)}</td><td>{fmt(derived?.effectiveStress)}</td><td>{derived?.overburdenCorrectionApplied?fmt(derived.cn):'—'}</td><td className="computed-cell">{derived?.overburdenCorrectionApplied?fmt(derived.n1_60):fmt(derived?.n60)}</td><td>{fmt(derived?.n1_60f)}</td><td>{error??(derived?.warnings.length?'UYARI':'HESAPLANDI')}</td>
+        <td className="computed-cell">{fmt(derived?.n60)}</td><td>{fmt(derived?.verticalStress)}</td><td>{fmt(derived?.porePressure)}</td><td>{fmt(derived?.effectiveStress)}</td><td>{derived?.overburdenCorrectionApplied?fmt(derived.cn):'—'}</td><td className="computed-cell">{derived?.overburdenCorrectionApplied?fmt(derived.n1_60):fmt(derived?.n60)}</td><td>{fmt(derived?.n1_60f)}</td><td>{error??(derived?.hasAssumptions?'VERİ EKSİK':derived?.warnings.length?'UYARI':'HESAPLANDI')}</td>
       </tr>)}</tbody>
     </table>
     {rows.map(({record,derived,error})=>error?<div className="spt-row-error" key={record.id}><b>{fmt(record.depth)} m:</b> {error}</div>:derived?.warnings.length?<div className="spt-row-warning" key={record.id}><b>{fmt(record.depth)} m:</b> {derived.warnings.join(' ')}</div>:null)}
