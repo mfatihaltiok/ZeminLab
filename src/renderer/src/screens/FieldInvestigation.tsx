@@ -136,7 +136,7 @@ function SptAnalysis({ borehole, labs, unitSystem, fallback, correction }: { bor
     catch(error){return {record,derived:undefined,error:error instanceof Error?error.message:String(error)}}
   })
   return <div className="engineering-grid-wrap">
-    <div className="grid-toolbar"><b>SPT HESAP ZİNCİRİ</b><span>N30 → N60 → CN → (N1)60 → (N1)60f</span><span className="spt-correction-note">CE/CB/CS/CR proje geneli sabit · CN derinliğe göre</span></div>
+    <div className="grid-toolbar"><b>SPT HESAP ZİNCİRİ</b><span>N30 → N60 → CN → (N1)60 → (N1)60f</span><span className="spt-correction-note">CE/CB/CS/CR proje geneli sabit · CN: killi zemin = 1.00, diğer zeminler = derinliğe göre</span></div>
     <table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>CE</th><th>CB</th><th>CS</th><th>CR</th><th>N60</th><th>σ′v0</th><th>CN</th><th>(N1)60</th><th>(N1)60f</th><th>Durum</th></tr></thead>
       <tbody>{rows.map(({record,derived,error})=><tr key={record.id}>
         <td>{fmt(record.depth)}–{fmt(experimentDepthTo(record))}</td><td>{fmt(derived?.nField,0)}</td><td>{fmt(derived?.ce)}</td><td>{fmt(derived?.cb)}</td><td>{fmt(derived?.cs)}</td><td>{fmt(derived?.cr)}</td>
