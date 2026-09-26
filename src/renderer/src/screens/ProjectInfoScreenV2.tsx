@@ -111,7 +111,17 @@ export function ProjectInfoScreenV2(){
               <option value="concrete-bedrock">Beton – kaya</option>
             </select>
           </label>
-          <label>Yüksek bina (Bölüm 13)\n            <select value={f.tallBuilding===undefined?'unknown':f.tallBuilding?'yes':'no'} onChange={e=>setFoundation({tallBuilding:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>\n              <option value="unknown">Belirtilmedi</option>\n              <option value="no">Hayır</option>\n              <option value="yes">Evet</option>\n            </select>\n          </label>\n          <label>16.8.3.4(b) doğrusal olmayan zemin analizi\n            <select value={f.nonlinearSoilDeformationAnalysisCompleted===undefined?'unknown':f.nonlinearSoilDeformationAnalysisCompleted?'yes':'no'} onChange={e=>setFoundation({nonlinearSoilDeformationAnalysisCompleted:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>\n              <option value="unknown">Belirtilmedi</option>\n              <option value="no">Yapılmadı</option>\n              <option value="yes">Yapıldı</option>\n            </select>\n          </label>\n          <label>Deprem kayma kontrolü · YASS altında
+          <label>Yüksek bina (Bölüm 13)\n            <select value={f.tallBuilding===undefined?'unknown':f.tallBuilding?'yes':'no'} onChange={e=>setFoundation({tallBuilding:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>\n              <option value="unknown">Belirtilmedi</option>\n              <option value="no">Hayır</option>\n              <option value="yes">Evet</option>\n            </select>\n          </label>\n          <label>16.8.3.4(b) doğrusal olmayan zemin analizi\n            <select value={f.nonlinearSoilDeformationAnalysisCompleted===undefined?'unknown':f.nonlinearSoilDeformationAnalysisCompleted?'yes':'no'} onChange={e=>setFoundation({nonlinearSoilDeformationAnalysisCompleted:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>\n              <option value="unknown">Belirtilmedi</option>\n              <option value="no">Yapılmadı</option>\n              <option value="yes">Yapıldı</option>\n            </select>\n          </label>\n          <label>16.6.7–16.6.10 sıvılaşma sonrası değerlendirme
+            <select value={f.postLiquefactionAssessmentCompleted===undefined?'unknown':f.postLiquefactionAssessmentCompleted?'yes':'no'} onChange={e=>setFoundation({postLiquefactionAssessmentCompleted:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
+              <option value="unknown">Belirtilmedi</option><option value="no">Yapılmadı</option><option value="yes">Yapıldı</option>
+            </select>
+          </label>
+          <label>Jet Grout kalite kontrol / saha doğrulaması
+            <select value={f.jetGroutQualityControlCompleted===undefined?'unknown':f.jetGroutQualityControlCompleted?'yes':'no'} onChange={e=>setFoundation({jetGroutQualityControlCompleted:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
+              <option value="unknown">Belirtilmedi</option><option value="no">Yapılmadı</option><option value="yes">Yapıldı</option>
+            </select>
+          </label>
+          <label>Deprem kayma kontrolü · YASS altında
             <select value={f.seismicBelowGroundwater===undefined?'unknown':f.seismicBelowGroundwater?'yes':'no'} onChange={e=>setFoundation({seismicBelowGroundwater:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
               <option value="unknown">Belirtilmedi</option>
               <option value="no">Hayır</option>
