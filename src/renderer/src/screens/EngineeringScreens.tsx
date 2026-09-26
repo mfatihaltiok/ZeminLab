@@ -77,12 +77,12 @@ export function Foundation(){
   const p=useProjectInfo(),f=p.foundationParameters,soil=p.soilParameters
   const cu=soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem)
   const N=forceToBase(f.verticalLoad,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
-  const ready=f.footingWidth>0&&f.footingLength>0&&N>=0&&f.foundationInterface!==undefined&&f.seismicBelowGroundwater!==undefined
+  const ready=f.footingWidth>0&&f.footingLength>0&&N>=0&&f.foundationInterface!==undefined
   const r=ready&&f.foundationInterface?foundationChecks({
     B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,
-    deltaTan:f.baseFrictionTanDelta,cu,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
+    cu,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
     passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance,
-    seismic:f.seismicBelowGroundwater??false,
+    seismic:true,
     interfaceType:f.foundationInterface
   }):undefined
   return <Frame screen="foundation"><Source>{SOURCE_NOTES.foundation} TBDY 16.8.4 yatay kayma kontrolü; 16.8.4.6 YASS altında depremde Cu yaklaşımı uygulanır.</Source>
