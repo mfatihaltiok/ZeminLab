@@ -115,6 +115,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
     'burland-burbidge': 'Burland & Burbidge',
     elasticity: 'Elastisite teorisi',
     '2to1-layer': '2:1 + tabaka',
+    boussinesq: 'Boussinesq alan integrasyonu',
     janbu: 'Janbu M-integrasyonu',
     schmertmann: 'Schmertmann'
   }
@@ -130,8 +131,9 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
               <option value="burland-burbidge">Yöntem 1 · Burland &amp; Burbidge + kilde konsolidasyon</option>
               <option value="elasticity">Yöntem 2 · Elastisite teorisi + kilde konsolidasyon</option>
               <option value="2to1-layer">Yöntem 3 · 2:1 gerilme yayılımı + tabaka</option>
-              <option value="janbu">Yöntem 4 · Janbu M-integrasyonu</option>
-              <option value="schmertmann">Yöntem 5 · Schmertmann gerinim integrasyonu</option>
+              <option value="boussinesq">Yöntem 4 · Boussinesq dikdörtgen alan integrasyonu</option>
+              <option value="janbu">Yöntem 5 · Janbu M-integrasyonu</option>
+              <option value="schmertmann">Yöntem 6 · Schmertmann gerinim integrasyonu</option>
             </select>
           </label>
           <label>Sondaj / YASS
@@ -236,8 +238,8 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
           <CalculationTrace title="Oturma hesap zinciri" source={result.source} rows={[
             { symbol: 'σ′v0', title: 'Temel tabanındaki efektif gerilme', formula: 'ΣγH − u', value: result.foundationEffectiveStress, unit: 'kPa' },
             { symbol: 'qnet', title: 'Net temel gerilmesi', formula: 'max(0.1q, q − σ′v0)', value: result.netFoundationPressure, unit: 'kPa' },
-            { symbol: 'zI', title: 'Etki derinliği', formula: method === 'burland-burbidge' ? 'B^0.76 (B ≤ 30 m)' : 'Profil/gerilme yayılımı sınırı', value: result.influenceDepth, unit: 'm' },
-            { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: method === 'burland-burbidge' ? 'Σ[fS·fL·Ic·qnet·B^0.7]' : method === 'elasticity' ? 'Σ[(Δσ′/E)·H·(1−ν²)]' : method === '2to1-layer' ? 'Σ[Δσ₂:₁·H/E]' : method === 'janbu' ? 'Σ[Δσ′·H/M]' : 'Σ[C1·C2·q·Iz/Es·Δz]', value: result.totalImmediate, unit: 'mm' },
+            { symbol: 'zI', title: 'Etki derinliği', formula: method === 'burland-burbidge' ? 'Burland-Burbidge bağıntısı' : method === 'boussinesq' ? 'Δσv/q = 0.10 kriteri; Boussinesq alan integrasyonu' : 'Profil/gerilme yayılımı sınırı', value: result.influenceDepth, unit: 'm' },
+            { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: method === 'burland-burbidge' ? 'Σ[fS·fL·Ic·qnet·B^0.7]' : method === 'elasticity' ? 'Σ[(Δσ′/E)·H·(1−ν²)]' : method === '2to1-layer' ? 'Σ[Δσ₂:₁·H/E]' : method === 'boussinesq' ? 'Σ[ΔσBoussinesq·H/E]' : method === 'janbu' ? 'Σ[Δσ′·H/M]' : 'Σ[C1·C2·q·Iz/Es·Δz]', value: result.totalImmediate, unit: 'mm' },
             { symbol: 's꜀', title: 'Toplam konsolidasyon', formula: 'Σ[Cc/(1+e₀)·H·log10(σ′vf/σ′v0)]', value: result.totalConsolidation, unit: 'mm' },
             { symbol: 'sₜ', title: 'Toplam oturma', formula: 'sₜ = sᵢ + s꜀', value: result.totalSettlement, unit: 'mm' },
             ...(ks ? [{ symbol: 'ks', title: 'Winkler yatak katsayısı', formula: ks.formula, value: ks.ks, unit: 'kN/m³' }] : [])
