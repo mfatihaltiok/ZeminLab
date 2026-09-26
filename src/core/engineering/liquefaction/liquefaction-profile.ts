@@ -2,6 +2,7 @@ import { calculateSpt, type SptEngineInput, type SptTraceStep } from '../spt/spt
 import { tbdy2018Liquefaction } from './tbdy2018-liquefaction'
 import { effectiveStressAtDepth as centralEffectiveStressAtDepth } from '../stress-profile'
 import type { EarthquakeDesignClass, SptCorrectionParameters } from '../../models/project'
+import { isClaySoilCode } from '../field-calculations'
 
 export type LiquefactionSoilGroup='ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF'
 export interface LiquefactionSoilLayer{
@@ -71,6 +72,8 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const stress=stressAtDepth(record.depth,input.layers,input.gwt,gammaW)
     const fineContent=record.fineContent??layer?.finesContent,pi=record.plasticityIndex??layer?.plasticityIndex
     const clayContent=record.clayContent??layer?.clayContent,soil=record.soil??layer?.soil
+    const claySoil=isClaySoilCode(soil)
+    const claySoilSource=claySoil?`Zemin sınıfı ${soil}`:undefined
     const waterContent=record.waterContent
     const npt=calculateSpt({
       nField:record.nField,
@@ -78,7 +81,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
         energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,
         sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM
       }),
-      effectiveStress:stress.sigmaVPrime,fineContent,applyOverburden:true,applyDilatancy:false
+      effectiveStress:stress.sigmaVPrime,fineContent,claySoil,claySoilSource,applyOverburden:true,applyDilatancy:false
     })
     const fines=fineContent; const alpha=npt.alpha??NaN,beta=npt.beta??NaN; const n1_60f=npt.n1_60f??NaN
     const saturated=record.depth>=input.gwt-1e-9,within20=record.depth<=20+1e-9
