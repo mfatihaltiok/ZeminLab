@@ -91,7 +91,7 @@ export function EngineeringSectionRenderer(props:Props){
         <line x1={classX} y1={top} x2={classX} y2={bottom} stroke="#adb5ba" />
         <line x1={dataX} y1={top} x2={dataX} y2={bottom} stroke="#adb5ba" />
 
-        {model.layers.map((layer)=>{
+        {model.layers.map((layer,index)=>{
           const y0=depthY(layer.topDepth)
           const y1=depthY(layer.bottomDepth)
           const h=Math.max(4,y1-y0)
@@ -115,7 +115,7 @@ export function EngineeringSectionRenderer(props:Props){
           <text x={dataX+20} y={top+22} fontFamily="Arial" fontSize="8" fontWeight="700" fill="#596971">SPT N</text>
           <text x={dataX+88} y={top+22} fontFamily="Arial" fontSize="8" fontWeight="700" fill="#596971">LAB</text>
           <text x={dataX+179} y={top+22} fontFamily="Arial" fontSize="8" fontWeight="700" fill="#596971">SAHA NOTU</text>
-          {model.layers.map((layer,index)=>{
+          {model.layers.map((layer)=>{
             const mid=depthY((layer.topDepth+layer.bottomDepth)/2)
             const n=layer.sptN??layer.sptN60
             const bw=n==null?0:Math.min(58,Math.max(2,n/Math.max(10,...model.layers.map(x=>x.sptN??x.sptN60??0))*58))
