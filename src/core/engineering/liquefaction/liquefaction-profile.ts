@@ -1,4 +1,4 @@
-import { calculateSpt, fineContentCorrection, type SptEngineInput, type SptTraceStep } from '../spt/spt-engine'
+import { calculateSpt, type SptEngineInput, type SptTraceStep } from '../spt/spt-engine'
 import { tbdy2018Liquefaction } from './tbdy2018-liquefaction'
 import { effectiveStressAtDepth as centralEffectiveStressAtDepth } from '../stress-profile'
 import type { EarthquakeDesignClass } from '../../models/project'
@@ -78,7 +78,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM,effectiveStress:stress.sigmaVPrime,fineContent,
       applyOverburden:true,applyDilatancy:false
     })
-    const fines=fineContent; const fc=fines!=null&&fines>=0&&fines<=100?fineContentCorrection(fines):{alpha:NaN,beta:NaN}; const n1_60f=fines==null||!Number.isFinite(fc.alpha)||!Number.isFinite(fc.beta)?NaN:fc.alpha+fc.beta*npt.n1_60
+    const fines=fineContent; const alpha=npt.alpha??NaN,beta=npt.beta??NaN; const n1_60f=npt.n1_60f??NaN
     const saturated=record.depth>=input.gwt-1e-9,within20=record.depth<=20+1e-9
     const classificationDataComplete=soil!=null&&soil.trim().length>0&&fineContent!=null&&pi!=null
     const potentiallyLiquefiable=classificationDataComplete&&saturated&&within20&&soilIsPotential(soil!,pi)
@@ -88,14 +88,14 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     const triggerRequired=mandatoryAnalysis&&researchDataComplete&&npt.n1_60<30
     const postLiquefactionRequired=false
     const trace:SptTraceStep[]=[...npt.trace,
-      {symbol:'α',title:'İnce dane katsayısı',formula:'α=f(IDI)',value:fc.alpha,note:'IDI='+fines.toFixed(2)+' %'},
-      {symbol:'β',title:'İnce dane katsayısı',formula:'β=0.99+IDI^1.5/1000',value:fc.beta},
+      {symbol:'α',title:'İnce dane katsayısı',formula:'α=f(IDI)',value:alpha,note:'IDI='+fines.toFixed(2)+' %'},
+      {symbol:'β',title:'İnce dane katsayısı',formula:'β=f(IDI)',value:beta},
       {symbol:'(N1)60f',title:'İnce dane düzeltilmiş SPT',formula:'(N1)60f=α+β(N1)60',value:n1_60f}
     ]
     const cyclicSettlementMm=saturated&&potentiallyLiquefiable&&record.depthTo!=null&&record.depthTo>record.depth&&record.maxCyclicShearStrainPercent!=null&&record.maxCyclicShearStrainPercent>=0&&finite(n1_60f)&&n1_60f>0
       ?(record.depthTo-record.depth)*1.5*Math.exp(-0.369*Math.sqrt(n1_60f))*Math.min(0.08,record.maxCyclicShearStrainPercent/100)*10
       :undefined
-    const base={depth:record.depth,depthTo:record.depthTo,soil,fineContent,plasticityIndex:pi,clayContent:clayContent,waterContent,maxCyclicShearStrainPercent:record.maxCyclicShearStrainPercent,cyclicSettlementMm,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha:fc.alpha,beta:fc.beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionRequired}
+    const base={depth:record.depth,depthTo:record.depthTo,soil,fineContent,plasticityIndex:pi,clayContent:clayContent,waterContent,maxCyclicShearStrainPercent:record.maxCyclicShearStrainPercent,cyclicSettlementMm,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha,beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionRequired}
     if(npt.hasAssumptions){ warnings.push(...npt.warnings); return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace} }
     if(stress.covered<Math.max(0,record.depth)-1e-9){
       trace.push({symbol:'Kapsama',title:'Katman kapsamı',formula:'ΣΔz=z',value:stress.covered,unit:'m',note:'SPT derinliğine kadar sürekli γ profili yok.'})
