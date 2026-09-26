@@ -54,7 +54,7 @@ function syncLabs(labs: LaboratoryRecord[], borehole: BoreholeRecord): Laborator
 
 const CE_OPTIONS=[{value:.75,label:'0.75 · ER %45 · halkalı'},{value:1,label:'1.00 · ER %60 · güvenli'},{value:1.5,label:'1.50 · ER %90 · otomatik'}]
 const CB_OPTIONS=[{value:1,label:'1.00 · 65–115 mm'},{value:1.05,label:'1.05 · 150 mm'},{value:1.15,label:'1.15 · 200 mm'}]
-const CS_OPTIONS=[{value:1,label:'1.00 · standart'},{value:1.1,label:'1.10'},{value:1.2,label:'1.20'},{value:1.3,label:'1.30'}]
+const CS_OPTIONS=[{value:1,label:'1.00 · standart (iç tüplü)'},{value:1.1,label:'1.10 · iç tüpsüz'},{value:1.2,label:'1.20 · iç tüpsüz'},{value:1.3,label:'1.30 · iç tüpsüz'}]
 function SptCorrectionPanel({value,onChange}:{value:SptCorrectionParameters;onChange:(next:SptCorrectionParameters)=>void}){
   const set=(key:keyof SptCorrectionParameters,raw:string)=>{
     const n=Number(raw)
@@ -99,6 +99,7 @@ function SptGrid({ borehole, onChange, sptCorrections, onSptCorrectionsChange, l
       try{
         next.testStressSnapshot=captureSptStressSnapshot(borehole,next.depth,labs,unitSystem,fallback)
       }catch{
+        next.confirmed=false
         next.testStressSnapshot=undefined
       }
     }
