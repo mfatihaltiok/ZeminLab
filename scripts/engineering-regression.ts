@@ -51,6 +51,22 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
+  const corrected=calculateSpt({
+    nField:20,
+    energyRatio:60,
+    boreholeDiameterMm:150,
+    sampler:'without-liner',
+    samplerCorrection:1.20,
+    rodLengthM:5,
+    effectiveStress:100
+  })
+  approx(corrected.n60,21.42,1e-12)
+  approx(corrected.cn,0.978,1e-12)
+  approx(corrected.n1_60,20.94876,1e-11)
+  assert.equal(corrected.hasAssumptions,false)
+}
+
+{
   assert.throws(() => calculateSpt({nField:10,energyRatio:60,rodLengthM:2.9,effectiveStress:100}), /rod boyu 3 m’den küçük/)
   const automatic=calculateSpt({nField:10,hammerType:'automatic',effectiveStress:100})
   approx(automatic.ce,.9)
