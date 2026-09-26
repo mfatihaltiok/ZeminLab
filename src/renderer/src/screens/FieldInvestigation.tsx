@@ -4,6 +4,7 @@ import type { BoreholeRecord, LaboratoryRecord, SptRecord } from '../../../core/
 import { deriveSptValues } from '../../../core/engineering/field-calculations'
 import { applyLaboratoryDerivedValues } from '../../../core/engineering/laboratory-calculations'
 import { appendSpt, createEmptyBorehole } from '../../../core/models/field-data-factory'
+import { useProjectInfo } from '../../../core/state/project-store'
 
 type Props = {
   boreholes: BoreholeRecord[]
@@ -105,7 +106,7 @@ function SptGrid({ borehole, onChange }: { borehole: BoreholeRecord; onChange: (
 }
 
 function SptAnalysis({ borehole, labs }: { borehole: BoreholeRecord; labs: LaboratoryRecord[] }) {
-  const rows = borehole.spt.filter(r=>r.testType==='SPT').map(record=>({record,derived:deriveSptValues(borehole,record,labs)}))
+  const rows = borehole.spt.filter(r=>r.testType==='SPT').map(record=>({record,derived:deriveSptValues(borehole,record,labs,p.unitSystem)}))
   return <div className="engineering-grid-wrap"><div className="grid-toolbar"><b>SPT HESAP İZİ</b><span>N30 · N60 · σv · σ′v · CN · (N1)60</span><span className="spt-correction-note">CN = min(1.70, 9.78 / √σ′v) · σ′v profili eksiksiz değilse düzeltme uygulanmaz</span></div><table className="engineering-grid engineering-grid-analysis"><thead><tr><th>Derinlik</th><th>N30</th><th>N60</th><th>σv</th><th>σ′v</th><th>CN</th><th>(N1)60</th><th>CN kaynağı</th><th>Dilatasyon</th></tr></thead><tbody>{rows.map(({record,derived})=><tr key={record.id}><td>{fmt(record.depth)}–{fmt(experimentDepthTo(record))}</td><td>{fmt(derived.nField,0)}</td><td>{fmt(derived.n60)}</td><td>{fmt(derived.verticalStress)}</td><td>{fmt(derived.effectiveStress)}</td><td>{derived.overburdenCorrectionApplied?fmt(derived.overburdenCorrection):'—'}</td><td>{derived.overburdenCorrectionApplied?fmt(derived.n1_60):'—'}</td><td>{derived.overburdenCorrectionApplied?(derived.stressSource??'σ′v profili'):'Uygulanmadı'}</td><td>{derived.dilatancyApplied?`Uygulandı → ${fmt(derived.n60DilatancyCorrected)}`:'—'}</td></tr>)}</tbody></table></div>
 }
 
@@ -131,6 +132,7 @@ function SondajLog({ borehole, labs }: { borehole: BoreholeRecord; labs: Laborat
 }
 
 export default function FieldInvestigation({ boreholes, labs, selectedBoreholeId, onSelectedBoreholeChange, onBoreholesChange, onLabsChange }: Props) {
+  const p=useProjectInfo()
   const [tab,setTab]=useState<'spt'|'lab'|'log'>('spt')
   const active=useMemo(()=>boreholes.find(b=>b.id===selectedBoreholeId)??boreholes[0], [boreholes,selectedBoreholeId])
   useEffect(()=>{if(!selectedBoreholeId&&boreholes[0])onSelectedBoreholeChange(boreholes[0].id)},[boreholes,selectedBoreholeId,onSelectedBoreholeChange])
