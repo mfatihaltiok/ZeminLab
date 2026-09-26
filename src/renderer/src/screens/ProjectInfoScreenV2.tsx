@@ -1,5 +1,5 @@
 import { updateProjectInfo, useProjectInfo } from '../../../core/state/project-store'
-import { classifyVs30, determineDts, calculateSdsSeismic, type SoilClassificationCode, type FoundationType, type UnitSystem, type BuildingUseClass, type FoundationInterface } from '../../../core/models/project'
+import { classifyVs30, determineDts, calculateSdsSeismic, type SoilClassificationCode, type FoundationType, type UnitSystem, type BuildingUseClass , type FoundationInterface } from '../../../core/models/project'
 import { projectUnits } from '../../../core/units/project-units'
 import { Card, Field, Frame, Metric } from '../workspace/WorkspaceShell'
 
@@ -95,68 +95,29 @@ export function ProjectInfoScreenV2(){
         </div>
       </Card>
 
-      <Card title="TEMEL TABANI · KAYMA PARAMETRELERİ">
+      <Card title="TEMEL TABANI · KAYMA KONTROLÜ">
         <div className="form-grid">
-          <Field label="tanδ ≤ 0.60" value={f.baseFrictionTanDelta??0.6} onChange={v=>setFoundation({baseFrictionTanDelta:num(v)})}/>
-          <Field label={"Karakteristik pasif direnç Rpk ("+units.force+")"} value={f.passiveResistanceCharacteristic??0} onChange={v=>setFoundation({passiveResistanceCharacteristic:num(v)})}/>
-          <label>Pasif direnç kredisi<select value={f.usePassiveResistance?'yes':'no'} onChange={e=>setFoundation({usePassiveResistance:e.target.value==='yes'})}><option value="no">Kullanma</option><option value="yes">Kullan</option></select></label>
-          <Field label={"Drenajsız Cu ("+units.stress+")"} value={soil.undrainedCohesion??''} onChange={v=>setSoil({undrainedCohesion:v===''?undefined:num(v)})}/>
-          <Field label="Klasik taşıma FS" value={f.safetyFactor||''} onChange={v=>setFoundation({safetyFactor:num(v)})}/>
           <label>Temel-zemin ara yüzü
             <select value={f.foundationInterface??''} onChange={e=>setFoundation({foundationInterface:(e.target.value||undefined) as FoundationInterface|undefined})}>
               <option value="">Seçiniz</option>
-              <option value="cast-in-place-soil">Yerinde dökme beton – zemin</option>
-              <option value="precast-soil">Prefabrik beton – zemin</option>
-              <option value="concrete-concrete">Beton – beton</option>
-              <option value="concrete-bedrock">Beton – kaya</option>
+              <option value="cast-in-place-soil">Yerinde dökme beton – sıkıştırılmış temel taban zemini</option>
+              <option value="precast-soil">Önüretimli beton – sıkıştırılmış temel taban zemini</option>
+              <option value="concrete-concrete">Yerinde dökme beton – beton</option>
+              <option value="concrete-bedrock">Beton – taban kayası</option>
             </select>
           </label>
-          <label>Yüksek bina (Bölüm 13)
-            <select value={f.tallBuilding===undefined?'unknown':f.tallBuilding?'yes':'no'} onChange={e=>setFoundation({tallBuilding:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
-              <option value="unknown">Belirtilmedi</option>
-              <option value="no">Hayır</option>
-              <option value="yes">Evet</option>
+          <Field label={"Karakteristik pasif direnç Rpk ("+units.force+")"} value={f.passiveResistanceCharacteristic??0} onChange={v=>setFoundation({passiveResistanceCharacteristic:num(v)})}/>
+          <label>Pasif direnç kredisi
+            <select value={f.usePassiveResistance?'yes':'no'} onChange={e=>setFoundation({usePassiveResistance:e.target.value==='yes'})}>
+              <option value="no">Kullanma</option><option value="yes">Kullan</option>
             </select>
           </label>
-          <label>16.8.3.4(b) doğrusal olmayan zemin analizi
-            <select value={f.nonlinearSoilDeformationAnalysisCompleted===undefined?'unknown':f.nonlinearSoilDeformationAnalysisCompleted?'yes':'no'} onChange={e=>setFoundation({nonlinearSoilDeformationAnalysisCompleted:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
-              <option value="unknown">Belirtilmedi</option>
-              <option value="no">Yapılmadı</option>
-              <option value="yes">Yapıldı</option>
-            </select>
-          </label>
-          <label>16.8.3.4(a) çevrimsel yerdeğiştirme analizi gerekli mi?
-            <select value={f.cyclicSettlementAnalysisRequired===undefined?'unknown':f.cyclicSettlementAnalysisRequired?'yes':'no'} onChange={e=>setFoundation({cyclicSettlementAnalysisRequired:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
-              <option value="unknown">Belirtilmedi</option><option value="no">Hayır</option><option value="yes">Evet</option>
-            </select>
-          </label>
-          <label>16.8.3.4(a) çevrimsel yerdeğiştirme analizi
-            <select value={f.cyclicSettlementAnalysisCompleted===undefined?'unknown':f.cyclicSettlementAnalysisCompleted?'yes':'no'} onChange={e=>setFoundation({cyclicSettlementAnalysisCompleted:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
-              <option value="unknown">Belirtilmedi</option><option value="no">Yapılmadı</option><option value="yes">Yapıldı</option>
-            </select>
-          </label>
-          <label>16.6.7–16.6.10 sıvılaşma sonrası değerlendirme
-            <select value={f.postLiquefactionAssessmentCompleted===undefined?'unknown':f.postLiquefactionAssessmentCompleted?'yes':'no'} onChange={e=>setFoundation({postLiquefactionAssessmentCompleted:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
-              <option value="unknown">Belirtilmedi</option><option value="no">Yapılmadı</option><option value="yes">Yapıldı</option>
-            </select>
-          </label>
-          <label>Jet Grout kalite kontrol / saha doğrulaması
-            <select value={f.jetGroutQualityControlCompleted===undefined?'unknown':f.jetGroutQualityControlCompleted?'yes':'no'} onChange={e=>setFoundation({jetGroutQualityControlCompleted:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
-              <option value="unknown">Belirtilmedi</option><option value="no">Yapılmadı</option><option value="yes">Yapıldı</option>
-            </select>
-          </label>
-          <label>Deprem kayma kontrolü · YASS altında
-            <select value={f.seismicBelowGroundwater===undefined?'unknown':f.seismicBelowGroundwater?'yes':'no'} onChange={e=>setFoundation({seismicBelowGroundwater:e.target.value==='unknown'?undefined:e.target.value==='yes'})}>
-              <option value="unknown">Belirtilmedi</option>
-              <option value="no">Hayır</option>
-              <option value="yes">Evet</option>
-            </select>
-          </label>
-          <Metric label="γRv" value="1.40"/>
+          <Field label="Klasik taşıma FS" value={f.safetyFactor||''} onChange={v=>setFoundation({safetyFactor:num(v)})}/>
+          <Metric label="tanδ (TBDY Tablo 16.3)" value={f.foundationInterface==='cast-in-place-soil'?'0.60':f.foundationInterface==='precast-soil'?'0.40':f.foundationInterface?'0.50':'—'}/>
           <Metric label="γRh" value="1.10"/>
           <Metric label="γRp" value="1.40"/>
         </div>
-        <div className="classification-note">Temel YASS altında/aynı kotta ise TBDY 16.8.4.6 gereği deprem sürtünme direnci Cu ile hesaplanır.</div>
+        <div className="classification-note">Kayma kontrolü otomatik yapılır. Tanδ, saha deneyiyle farklı bir değer belirlenmedikçe TBDY 2018 16.8.4.3 Tablo 16.3'ten alınır. Temel tabanı YASS altında/aynı kotta ve deprem durumunda ise 16.8.4.6 gereği drenajsız kayma dayanımı kullanılır.</div>
       </Card>
 
       <Card title="ZEMİN PARAMETRELERİ">
