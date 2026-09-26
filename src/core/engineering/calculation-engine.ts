@@ -161,9 +161,18 @@ export function foundationChecks(i:FoundationCheckInput){
   }
 }
 
-export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number}){
-  const Ac=Math.PI*i.columnDiameter**2/4,ratio=Math.min(1,Ac/Math.max(i.spacing**2,1e-9)),composite=(1-ratio)*i.qultSoil+ratio*i.qultColumn*i.improvementFactor
-  return{value:{Ac,ratio,composite,allowable:composite/Math.max(i.FS,1e-9),columnLoad:Ac*i.columnStrength/Math.max(i.FS,1e-9)},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio}],method:'Jet Grout ön model',source:'Proje kaynak paketi'}
+export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number;qualityControlCompleted?:boolean}){
+  if(!Number.isFinite(i.columnDiameter)||i.columnDiameter<=0)throw new Error('Jet Grout kolon çapı pozitif olmalıdır.')
+  if(!Number.isFinite(i.spacing)||i.spacing<=0)throw new Error('Jet Grout aks aralığı pozitif olmalıdır.')
+  if(!Number.isFinite(i.FS)||i.FS<=0)throw new Error('Jet Grout güvenlik katsayısı pozitif olmalıdır.')
+  if(!Number.isFinite(i.qultSoil)||i.qultSoil<0||!Number.isFinite(i.qultColumn)||i.qultColumn<0||!Number.isFinite(i.columnStrength)||i.columnStrength<0)throw new Error('Jet Grout dayanım girdileri geçerli olmalıdır.')
+  if(!Number.isFinite(i.improvementFactor)||i.improvementFactor<0)throw new Error('Jet Grout iyileştirme katsayısı negatif olamaz.')
+  const Ac=Math.PI*i.columnDiameter**2/4,cell=i.spacing**2,ratio=Ac/Math.max(cell,1e-9)
+  if(ratio>1)throw new Error('Kolon kesit alanı hücre alanını aşamaz; çap/aks aralığını kontrol edin.')
+  const composite=(1-ratio)*i.qultSoil+ratio*i.qultColumn*i.improvementFactor
+  const warnings=['Bu hesap kompozit ön modeldir; jet grout nihai tasarımı kolon geometrisi, kalite kontrol, dayanım deneyleri, süreklilik ve saha doğrulaması ile ayrıca doğrulanmalıdır.']
+  if(!i.qualityControlCompleted)warnings.push('Saha kalite kontrolü/doğrulaması işaretlenmedi; sonuç nihai tasarım uygunluğu olarak kullanılamaz.')
+  return{value:{Ac,ratio,composite,allowable:composite/i.FS,columnLoad:Ac*i.columnStrength/i.FS,screeningOnly:true,designEligible:Boolean(i.qualityControlCompleted)},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio},{symbol:'qcomp',title:'Kompozit taşıma modeli',formula:'(1−ρ)qsoil+ρ·qcolumn·I',value:composite}],method:'Jet Grout ön model',source:'Proje kaynak paketi',warnings}
 }
 
 export function stressAtDepth(depth:number,layers:{top:number;bottom:number;gamma:number;gammaSat:number}[],gwt:number){const r=effectiveStressAtDepth(depth,layers,gwt);return{sigmaV:r.sigmaV,sigmaVPrime:r.sigmaVPrime,u:r.porePressure}}
