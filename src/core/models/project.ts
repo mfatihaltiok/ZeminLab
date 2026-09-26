@@ -6,7 +6,7 @@ export type BuildingUseClass=1|2|3
 export type EarthquakeDesignClass='1'|'1a'|'2'|'2a'|'3'|'3a'|'4'|'4a'
 
 export interface ProjectVisualDocuments{aerialPhoto?:string;layoutPlan?:string;architecturalSection?:string;foundationPlan?:string;foundationStress?:string}
-export interface SptCorrectionParameters{ce:number;cb:number;cs:number}
+export interface SptCorrectionParameters{ce:number;cb:number;cs:number;hammerType?:'donut'|'safety'|'automatic'|'measured';samplerType?:'standard'|'without-liner'}
 export interface JetGroutProjectParameters{
   columnDiameter?:number
   spacing?:number
@@ -115,7 +115,12 @@ export function normalizeProjectInfo(value:Partial<ProjectInfo>):ProjectInfo{
   const foundation={...defaultProjectInfo.foundationParameters,...(value.foundationParameters??{})}
   const seismic={...defaultProjectInfo.seismic,...(value.seismic??{})}
   const rawSpt:Partial<SptCorrectionParameters>=value.sptCorrections??{}
-  const sptCorrections={ce:Number.isFinite(rawSpt.ce)?rawSpt.ce:1,cb:Number.isFinite(rawSpt.cb)?rawSpt.cb:1,cs:Number.isFinite(rawSpt.cs)?rawSpt.cs:1}
+  const ce=Number.isFinite(rawSpt.ce)?rawSpt.ce:1
+  const cb=Number.isFinite(rawSpt.cb)?rawSpt.cb:1
+  const cs=Number.isFinite(rawSpt.cs)?rawSpt.cs:1
+  const hammerType=rawSpt.hammerType??(Math.abs(ce-.75)<1e-9?'donut':Math.abs(ce-1)<1e-9?'safety':Math.abs(ce-1.5)<1e-9?'automatic':undefined)
+  const samplerType=rawSpt.samplerType??(Math.abs(cs-1)<1e-9?'standard':cs>=1.10&&cs<=1.30?'without-liner':undefined)
+  const sptCorrections={ce,cb,cs,hammerType,samplerType}
   const unitSystem:UnitSystem=value.unitSystem==='kN-m'?'kN-m':'ton-m'
   const foundationType:FoundationType=foundation.foundationType==='surekli'||foundation.foundationType==='radye'||foundation.foundationType==='tekil'?foundation.foundationType:'tekil'
   const structuralWeight=Number.isFinite(foundation.structuralWeight)&&foundation.structuralWeight>=0?foundation.structuralWeight:(Number.isFinite(foundation.verticalLoad)?foundation.verticalLoad:0)
