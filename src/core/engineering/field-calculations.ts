@@ -76,10 +76,11 @@ function stressAtDepth(
       if(needsSaturatedGamma&&gammaSatValue==null){
         return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'YASS altında kalan SPT seviyesinde γsat bulunamadı; σ′v0 hesaplanmadı.'}
       }
-      if(gammaValue==null||gammaSatValue==null||!Number.isFinite(gammaValue)||gammaValue<=0||!Number.isFinite(gammaSatValue)||gammaSatValue<=0){
-        return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'SPT derinliğine kadar γ/γsat bulunamadı; CN uygulanmadı.'}
+      if(gammaValue==null||!Number.isFinite(gammaValue)||gammaValue<=0){
+        return{verticalStress:undefined,porePressure:undefined,effectiveStress:undefined,source:'SPT derinliğine kadar γ bulunamadı; CN uygulanmadı.'}
       }
-      layers.push({top,bottom,gamma:unitWeightToBase(gammaValue,unitSystem),gammaSat:unitWeightToBase(gammaSatValue,unitSystem)})
+      const gammaSatForIntegration=gammaSatValue??gammaValue
+      layers.push({top,bottom,gamma:unitWeightToBase(gammaValue,unitSystem),gammaSat:unitWeightToBase(gammaSatForIntegration,unitSystem)})
       cursor=bottom
       if(cursor>=z-eps)break
     }
