@@ -77,7 +77,10 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
     }catch(e){missing.push(e instanceof Error?e.message:'Oturma hesabı doğrulanamadı')}
   }
   let liquefaction:LiquefactionProfileResult|undefined
-  const liquefactionScopeKnown = p.seismic.dts!==undefined && soilGroup!==undefined && p.soilParameters.liquefactionContinuousOrThickLens!==undefined
+  const liquefactionDtsKnown = p.seismic.dts!==undefined
+  const liquefactionSoilKnown = soilGroup!==undefined
+  const liquefactionPotentialScope = liquefactionDtsKnown && liquefactionSoilKnown && (p.seismic.dts==='1'||p.seismic.dts==='1a'||p.seismic.dts==='2'||p.seismic.dts==='2a') && (soilGroup==='ZD'||soilGroup==='ZE'||soilGroup==='ZF')
+  const liquefactionScopeKnown = liquefactionDtsKnown && liquefactionSoilKnown && (!liquefactionPotentialScope || p.soilParameters.liquefactionContinuousOrThickLens!==undefined)
   const liquefactionMandatory = liquefactionScopeKnown && (p.seismic.dts==='1'||p.seismic.dts==='1a'||p.seismic.dts==='2'||p.seismic.dts==='2a') && (soilGroup==='ZD'||soilGroup==='ZE'||soilGroup==='ZF') && p.soilParameters.liquefactionContinuousOrThickLens===true
   if(liquefactionMandatory && !input.liquefaction) missing.push('16.6 kapsamında zorunlu sıvılaşma değerlendirmesi')
   if(!liquefactionScopeKnown) missing.push('16.6.1 sıvılaşma kapsamı için DTS, zemin grubu ve sürekli tabaka/kalın mercek bilgisi')
