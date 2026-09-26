@@ -99,7 +99,7 @@ function methodFactors(method:SurfaceFoundationMethod,B:number,L:number,Df:numbe
   return{sc,sq,sg,dc,dq,dg:1,ic,iq,ig,...slope,...base}
 }
 
-function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number,baseQ:number,mf:ReturnType<typeof methodFactors>,method:SurfaceFoundationMethod){
+function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influence:number,baseQ:number,BearingB:number,mf:ReturnType<typeof methodFactors>,method:SurfaceFoundationMethod){
   if(!layers?.length)return[]
   const active=layers
     .filter(l=>l.bottomDepth>Df&&l.topDepth<Df+influence&&l.bottomDepth>l.topDepth&&finite(l.cohesion)&&finite(l.phi)&&finite(l.gamma))
@@ -108,7 +108,7 @@ function layerChecks(layers:SurfaceFoundationLayer[]|undefined,Df:number,influen
     const top=Math.max(l.topDepth,Df),bottom=Math.min(l.bottomDepth,Df+influence),thickness=Math.max(0,bottom-top)
     const phi=clamp(l.phi,0,50),ff=factors(phi,method)
     const gamma=finite(l.gammaSat)?Math.max(l.gammaSat-gammaW,.001):Math.max(l.gamma,.001)
-    const qk=Math.max(0,l.cohesion)*ff.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+baseQ*ff.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+0.5*gamma*Math.max(.01,Math.min(1e3,influence))*ff.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
+    const qk=Math.max(0,l.cohesion)*ff.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+baseQ*ff.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+0.5*gamma*Math.max(.01,Math.min(1e3,BearingB))*ff.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
     return{top:l.topDepth,bottom:l.bottomDepth,c:l.cohesion,phi,gamma,qk,controlling:false}
   })
 }
@@ -259,7 +259,8 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(contactState==='NO_CONTACT')warnings.push('Temel tabanında basınçlı temas bulunmadığından q0/qt karşılaştırması nihai uygunluk için kullanılamaz.')
   if(contactState==='PARTIAL')warnings.push('Kısmi temas alanı compression-only lineer basınç dağılımından nümerik olarak çözüldü; qmin=0 ve qmax gerçek temas alanı üzerinden raporlanır.')
   let adequate=qo<=qt&&contactState!=='NO_CONTACT'&&(!i.layers||layeredComplete)
-  const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,mf,method)
+  const finalDesignEligible=!i.layers?.length||layeredComplete&&false
+  const checks=layerChecks(i.layers,i.Df,2*Bp,water.surcharge,Bp,mf,method)
   checks.forEach(x=>x.controlling=false)
   if(i.layers?.length&&layerData?.complete)warnings.push('Tabaka kontrolleri artık bağımsız min(qk) olarak tasarım direncine indirilmez; eşdeğer parametreli hesap ana sonucu, tabaka listesi ise izlenebilirlik kontrolüdür.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: sürşarj ve γ′/ağırlıklı γ dikkate alındı.')
@@ -291,7 +292,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
     qAvg,qMax,qMin,contactState,coreContact,
     representativeC,representativePhi,representativeGamma,ultimateClassical:qk,allowableClassical:qk/Math.max(i.safetyFactor??3,1e-9),
     undrainedQk:i.undrainedCu!=null?i.undrainedCu*5.14*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge:undefined,
-    layeredScreeningOnly:Boolean(i.layers?.length),finalDesignEligible:!i.layers?.length||layeredComplete,
+    layeredScreeningOnly:Boolean(i.layers?.length),finalDesignEligible,
     layerChecks:checks,warnings,method,foundationType,
     source:'TBDY 2018 16.8.3.1–16.8.3.4; tabakalı zemin için 2B′ etki derinliğinde eşdeğer parametre mühendislik yaklaşımı; eğim katsayıları genel kabul görmüş Vesic tipi bağıntılar.',
     steps,value
