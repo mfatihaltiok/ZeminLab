@@ -46,7 +46,7 @@ export interface Stage2SettlementInput{
 }
 
 export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
-  const B=Math.max(i.B,0),L=Math.max(i.L??i.B,0),q=Math.max(i.q,0),method=i.method??'elastic'
+  const B=Math.max(i.B,0),L=Math.max(i.L??i.B,0),q=Math.max(i.q,0),qNet=Math.max(i.qNet??q,0),method=i.method??'elastic'
   const warnings:string[]=[]
   if(B<=0||L<=0)warnings.push('B ve L pozitif olmalıdır.')
   if(!i.layers.length)warnings.push('Katman tanımlanmadı.')
@@ -54,19 +54,19 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
   const C1=i.schmertmannC1,C2=i.schmertmannC2
   const results:any[]=[],missing=false
   for(const [index,layer] of i.layers.entries()){
-    const H=Math.max(0,layer.thickness),zmid=Math.max(0,H/2),ds=method==='2:1'?q*B*L/Math.max((B+zmid)*(L+zmid),1e-9):Math.max(0,layer.deltaSigma)
+    const H=Math.max(0,layer.thickness),zmid=Math.max(0,H/2),ds=method==='2:1'?qNet*B*L/Math.max((B+zmid)*(L+zmid),1e-9):Math.max(0,layer.deltaSigma)
     let s=0,type='none'
     if(H>0&&ds>0){
       if(method==='elastic'||method==='2:1'){
         const E=layer.Es
         if(E!=null&&Number.isFinite(E)&&E>0){const nu=Math.max(0,Math.min(.49,layer.nu??0));s=ds*H*(1-nu*nu)/E;type=method==='elastic'?'elastic':'2:1 + elastic'}else warnings.push('Katman '+(index+1)+': Es eksik.')
       }else if(method==='janbu'){
-        const M=layer.M??layer.Es
-        if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push('Katman '+(index+1)+': M eksik.')
+        const M=layer.M
+        if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push('Katman '+(index+1)+': Janbu için açık M parametresi eksik; Es otomatik olarak M yerine kullanılmaz.')
       }else if(method==='schmertmann'){
         const E=layer.Es
         const Iz=layer.Iz
-        if(C1!=null&&C2!=null&&E!=null&&E>0&&Iz!=null)s=C1*C2*q*Iz*H/E,type='Schmertmann'
+        if(C1!=null&&C2!=null&&E!=null&&E>0&&Iz!=null)s=C1*C2*qNet*Iz*H/E,type='Schmertmann'
         else warnings.push('Katman '+(index+1)+': Schmertmann için C1,C2,Es,Iz birlikte verilmelidir.')
       }else{
         const sigma0=Math.max(layer.sigmaV0,1e-6),sigma1=sigma0+ds
