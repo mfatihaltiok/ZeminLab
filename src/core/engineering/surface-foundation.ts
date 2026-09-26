@@ -198,9 +198,9 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad
   const Vh=Math.abs(i.horizontalLoad??0)
   const groundSlope=Math.abs(i.groundSlope??0),baseSlope=Math.abs(i.baseSlope??0)
-  if(methodIsUnsupportedForFoundationType(i.method??'TBDY-2018',i.foundationType??'tekil'))warnings.push('Seçilen yöntem/temel tipi kombinasyonu için literatür bağıntısı ayrıca doğrulanmalıdır.')
   if(groundSlope>=90||baseSlope>=90||groundSlope+baseSlope>=90)throw new Error('Arazi ve temel tabanı eğimleri geçersiz.')
   const warnings:string[]=[]
+  if(methodIsUnsupportedForFoundationType(method,foundationType))warnings.push('Seçilen yöntem/temel tipi kombinasyonu için literatür bağıntısı ayrıca doğrulanmalıdır.')
   const ex=N>0?(i.momentY??0)/N:0,ey=N>0?(i.momentX??0)/N:0
   if(N===0&&(i.momentX!==0||i.momentY!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
   const coreContact=Math.abs(ex)<=i.B/6+1e-12&&Math.abs(ey)<=i.L/6+1e-12
