@@ -45,10 +45,8 @@ function directCoefficient(name:string,value:number|undefined,min:number,max:num
 
 function boreholeFactor(diameter?:number){
   if(diameter===undefined)return 1
-  if(!Number.isFinite(diameter)||!([65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115] as number[]).includes(diameter) && diameter!==150 && diameter!==200) {
-    throw new Error('CB için yalnız TBDY Tablo 16B.1’deki çap sınıfları kullanılabilir: 65–115 mm, 150 mm veya 200 mm.')
-  }
-  if(diameter<=115)return 1
+  if(!Number.isFinite(diameter)||!((diameter>=65&&diameter<=115)||diameter===150||diameter===200))throw new Error('CB için yalnız TBDY Tablo 16B.1’deki çap sınıfları kullanılabilir: 65–115 mm, 150 mm veya 200 mm.')
+  if(diameter>=65&&diameter<=115)return 1
   if(diameter===150)return 1.05
   return 1.15
 }
