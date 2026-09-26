@@ -17,14 +17,14 @@ export interface SptEngineInput{
 export interface SptTraceStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string}
 export interface SptEngineResult{
   nField:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number
-  n1_60_dilatancy?:number;dilatancyApplied:boolean;hasAssumptions:boolean;trace:SptTraceStep[];warnings:string[]
+  n1_60_dilatancy?:number;alpha?:number;beta?:number;n1_60f?:number;dilatancyApplied:boolean;hasAssumptions:boolean;trace:SptTraceStep[];warnings:string[]
 }
 
 function finitePositive(value:number|undefined){return value!==undefined&&Number.isFinite(value)&&value>0}
 
 function resolveEnergyRatio(input:SptEngineInput){
   if(finitePositive(input.energyRatio))return {value:input.energyRatio!,source:'ölçülmüş/girilen enerji oranı',assumption:false}
-  if(input.hammerType==='automatic')return {value:80,source:'otomatik şahmerdan için proje varsayımı %80',assumption:true}
+  if(input.hammerType==='automatic')return {value:90,source:'otomatik darbeli tokmak için TBDY Tablo 16B.1 alt sınırı %90 varsayımı',assumption:true}
   if(input.hammerType==='donut')return {value:45,source:'donut şahmerdan için proje varsayımı %45',assumption:true}
   if(input.hammerType==='safety')return {value:60,source:'safety şahmerdan için proje varsayımı %60',assumption:true}
   return {value:60,source:'enerji oranı girilmedi; %60 proje varsayımı',assumption:true}
@@ -89,6 +89,10 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   }
   const n1_60=n60*cn
   const fines=input.fineContent
+  const fc=fines!==undefined&&Number.isFinite(fines)&&fines>=0&&fines<=100?fineContentCorrection(fines):undefined
+  const alpha=fc?.alpha
+  const beta=fc?.beta
+  const n1_60f=fc?alpha!+beta!*n1_60:undefined
   if(fines!==undefined&&(!Number.isFinite(fines)||fines<0||fines>100))throw new Error('İnce dane oranı 0–100% arasında olmalıdır.')
   const dilatancyApplied=Boolean(input.applyDilatancy&&fines<35&&finitePositive(sigma)&&n1_60>15)
   const n1_60_dilatancy=dilatancyApplied?15+.5*(n1_60-15):undefined
@@ -102,9 +106,14 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
     {symbol:'CN',title:'Örtü basıncı düzeltmesi',formula:'CN=min(1.70,9.78/√σ′v0)',value:cn,note:finitePositive(sigma)?'σ′v0='+sigma!.toFixed(2)+' kPa':'Uygulanmadı'},
     {symbol:'(N1)60',title:'Normalize SPT',formula:'(N1)60=CN·N60',value:n1_60}
   ]
+  if(fc){
+    trace.push({symbol:'α',title:'İnce dane katsayısı',formula:'α=f(IDI)',value:alpha!,note:'FC='+fines!.toFixed(2)+' %'})
+    trace.push({symbol:'β',title:'İnce dane katsayısı',formula:'β=f(IDI)',value:beta!})
+    trace.push({symbol:'(N1)60f',title:'İnce dane düzeltilmiş SPT',formula:'(N1)60f=α+β(N1)60',value:n1_60f!})
+  }
   if(dilatancyApplied){
     trace.push({symbol:'(N1)60,d',title:'Dilatansi düzeltmesi',formula:'15+0.5[(N1)60−15]',value:n1_60_dilatancy,note:'Yalnız yöntem açıkça gerektiriyorsa kullanılmalıdır.'})
   }
   warnings.push(...assumptions)
-  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,dilatancyApplied,hasAssumptions:er.assumption||assumptions.length>0,trace,warnings}
+  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,alpha,beta,n1_60f,dilatancyApplied,hasAssumptions:er.assumption||assumptions.length>0,trace,warnings}
 }
