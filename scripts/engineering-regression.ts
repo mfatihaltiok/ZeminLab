@@ -239,4 +239,4 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(missing.missingData.length>0)
 }
 
-console.log('Engineering regression tests: PASS')
+console.log('Engineering regression tests: PASS') // CI verification
