@@ -21,6 +21,7 @@ export interface IdealizedSoilLayer {
   laboratoryRecordIds: string[]
   representativeSptN?: number
   representativeN60?: number
+  representativeN1_60?: number
   gamma?: number
   gammaSat?: number
   waterContent?: number
@@ -58,6 +59,7 @@ export interface IdealizedSoilProfile {
   sourceLaboratoryIds: string[]
   layers: IdealizedSoilLayer[]
   methodology: string
+  unitSystem?: UnitSystem
   notes?: string
 }
 
@@ -71,6 +73,7 @@ export function createEmptyIdealizedProfile(): IdealizedSoilProfile {
     sourceBoreholeIds: [],
     sourceLaboratoryIds: [],
     layers: [],
+    unitSystem: 'kN-m',
     methodology: 'TBDY 2018 + Türk mevzuatı ve ilgili TS/TS EN/TS EN ISO standartları esas alınır. Katman sınırları; litoloji, SPT, laboratuvar verileri ve mühendislik değerlendirmesi birlikte dikkate alınarak oluşturulur.'
   }
 }
