@@ -52,7 +52,7 @@ function syncLabs(labs: LaboratoryRecord[], borehole: BoreholeRecord): Laborator
   return [...labs.filter(l => l.boreholeId !== borehole.id), ...next]
 }
 
-const CE_OPTIONS=[{value:.75,label:'0.75 · ER %45 · halkalı'},{value:1,label:'1.00 · ER %60 · güvenli'},{value:1.5,label:'1.50 · ER %90 · otomatik'}]
+const CE_OPTIONS=[{value:.75,label:'0.75 · ER %45 · halkalı',hammerType:'donut' as const},{value:1,label:'1.00 · ER %60 · güvenli',hammerType:'safety' as const},{value:1.5,label:'1.50 · ER %90 · otomatik',hammerType:'automatic' as const}]
 const CB_OPTIONS=[{value:1,label:'1.00 · 65–115 mm'},{value:1.05,label:'1.05 · 150 mm'},{value:1.15,label:'1.15 · 200 mm'}]
 const CS_OPTIONS=[{value:1,label:'1.00 · standart (iç tüplü)'},{value:1.1,label:'1.10 · iç tüpsüz'},{value:1.2,label:'1.20 · iç tüpsüz'},{value:1.3,label:'1.30 · iç tüpsüz'}]
 function SptCorrectionPanel({value,onChange}:{value:SptCorrectionParameters;onChange:(next:SptCorrectionParameters)=>void}){
@@ -62,13 +62,13 @@ function SptCorrectionPanel({value,onChange}:{value:SptCorrectionParameters;onCh
   }
   const options=(items:{value:number;label:string}[])=>items.map(x=><option key={x.value} value={x.value}>{x.label}</option>)
   const isPreset=CE_OPTIONS.some(x=>Math.abs(x.value-value.ce)<1e-9)
-  const ceMode=isPreset?String(value.ce):'measured'
+  const ceMode=value.hammerType==='measured'?'measured':isPreset?String(value.ce):'measured'
   return <div className="spt-global-correction">
     <div className="spt-global-correction-title"><b>SPT DÜZELTME KATSAYILARI · PROJE GENELİ</b><span>CE, CB ve CS tüm sondaj ve SPT deneylerinde sabittir; CR her SPT için tij boyundan otomatik hesaplanır.</span></div>
     <div className="spt-global-correction-grid">
-      <label>CE<select value={ceMode} onChange={e=>{if(e.target.value==='measured')return;set('ce',e.target.value)}}>{options(CE_OPTIONS)}<option value="measured">Ölçülmüş ER</option></select>{ceMode==='measured'&&<input className="ce-er-input" type="number" min="27" max="96" step="1" value={(value.ce*60).toFixed(0)} onChange={e=>{const er=Number(e.target.value);if(Number.isFinite(er)&&er>=27&&er<=100)onChange({...value,ce:er/60})}} placeholder="ER %"/>}</label>
+      <label>CE<select value={ceMode} onChange={e=>{if(e.target.value==='measured'){onChange({...value,hammerType:'measured'});return}const option=CE_OPTIONS.find(x=>String(x.value)===e.target.value);if(option)onChange({...value,ce:option.value,hammerType:option.hammerType})}}>{options(CE_OPTIONS)}<option value="measured">Ölçülmüş ER</option></select>{ceMode==='measured'&&<input className="ce-er-input" type="number" min="27" max="96" step="1" value={(value.ce*60).toFixed(0)} onChange={e=>{const er=Number(e.target.value);if(Number.isFinite(er)&&er>=27&&er<=96)onChange({...value,ce:er/60,hammerType:'measured'})}} placeholder="ER %"/>}</label>
       <label>CB<select value={value.cb} onChange={e=>set('cb',e.target.value)}>{options(CB_OPTIONS)}</select></label>
-      <label>CS<select value={value.cs} onChange={e=>set('cs',e.target.value)}>{options(CS_OPTIONS)}</select></label>
+      <label>CS<select value={value.cs} onChange={e=>{const cs=Number(e.target.value);if(Number.isFinite(cs))onChange({...value,cs,samplerType:cs===1?'standard':'without-liner'})}}>{options(CS_OPTIONS)}</select></label>
     </div>
     <div className="spt-global-correction-note">CE ölçülmüş ER varsa doğrudan ER/60 kullanılır; yoksa temsil değeri seçilir. CB ve CS TBDY Tablo 16B.1’e göre proje genelinde seçilir. CR proje genelinde sabit tutulmaz; her SPT’de girilen toplam tij boyundan otomatik hesaplanır. Tij boyu, SPT derinliğinden kısa olamaz. Onaylanan SPT’de σv0, u0 ve σ′v0 test koşullarının fotoğrafı gibi sabitlenir; sonradan değişen proje YASS/γ değerleri eski SPT’yi değiştirmez.</div>
   </div>
