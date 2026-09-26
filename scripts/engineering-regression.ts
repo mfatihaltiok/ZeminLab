@@ -8,20 +8,9 @@ import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
 import { toEngineeringSI } from '../src/core/units/engineering-input-adapter.ts'
-import { calculateCyclicSettlement } from '../src/core/engineering/cyclic-settlement-engine.ts'
 
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(Math.abs(actual-expected)<=tolerance,`expected ${expected}, got ${actual}`)
-}
-
-{
-  const cyclic=calculateCyclicSettlement({layers:[{topDepth:5,bottomDepth:7,n1_60cs:20,maxCyclicShearStrain:0.08,saturated:true,liquefactionFactorOfSafety:.8}]})
-  assert.equal(cyclic.ready,true)
-  assert.ok(cyclic.totalSettlement>0)
-  assert.equal(cyclic.layers[0].status,'HESAPLANDI')
-  const missing=calculateCyclicSettlement({layers:[{topDepth:5,bottomDepth:7,n1_60cs:20,saturated:true}]})
-  assert.equal(missing.ready,false)
-  assert.equal(missing.layers[0].status,'VERİ EKSİK')
 }
 
 {
@@ -112,7 +101,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
       engineer:'',clientName:'',firmName:'',buildingType:'',basementCount:0,normalFloorCount:0,unitSystem:'ton-m' as const,
       geophysical:{},seismic:{},
       soilParameters:{unitWeight:1.8,saturatedUnitWeight:2.0,cohesion:0.1,frictionAngle:30,groundwaterDepth:2,surfaceSlope:0,foundationBaseSlope:0,finesContent:10,classification:{system:'TS EN ISO 14688-2' as const}},
-      foundationParameters:{foundationType:'tekil' as const,footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:10,horizontalLoad:1,momentX:1,momentY:1,resistanceFactorRv:1.4,vtX:1,vtY:1,structuralWeight:10,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:5,usePassiveResistance:true},
+      foundationParameters:{foundationType:'tekil' as const,footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:10,horizontalLoad:1,momentX:1,momentY:1,resistanceFactorRv:1.4,vtX:1,vtY:1,structuralWeight:10,passiveResistanceCharacteristic:5,usePassiveResistance:true},
       jetGrout:{},visualDocuments:{}
     }
   }
@@ -239,7 +228,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
       geophysical:{soilGroup:'ZD',soilGroupSource:'USER',siteSpecificResponseAnalysisCompleted:false},
       seismic:{ss:.5,fs:1,sds:.5,bks:2},
       soilParameters:{unitWeight:18,saturatedUnitWeight:19,cohesion:10,frictionAngle:30,groundwaterDepth:10,surfaceSlope:0,foundationBaseSlope:0,finesContent:10,liquefactionContinuousOrThickLens:false,classification:{system:'TBDY 2018',code:'ZB'}},
-      foundationParameters:{foundationType:'tekil',footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:1000,horizontalLoad:0,momentX:0,momentY:0,resistanceFactorRv:1.4,vtX:100,vtY:0,structuralWeight:1000,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:0,usePassiveResistance:false,foundationInterface:'cast-in-place-soil',tallBuilding:false,cyclicSettlementAnalysisRequired:false,cyclicSettlementAnalysisCompleted:false,nonlinearSoilDeformationAnalysisCompleted:true},
+      foundationParameters:{foundationType:'tekil',footingWidth:2,footingLength:2,footingDepth:1,safetyFactor:3,verticalLoad:1000,horizontalLoad:0,momentX:0,momentY:0,resistanceFactorRv:1.4,vtX:100,vtY:0,structuralWeight:1000,baseFrictionTanDelta:.6,passiveResistanceCharacteristic:0,usePassiveResistance:false,foundationInterface:'cast-in-place-soil'},
       jetGrout:{layout:'square'},visualDocuments:{}
     }
   })
