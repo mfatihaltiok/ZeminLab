@@ -17,7 +17,7 @@ export interface LiquefactionProfileInput{
   dts?:EarthquakeDesignClass;soilGroup?:LiquefactionSoilGroup;continuousOrThickLens?:boolean;foundationDepth?:number
 }
 export interface LiquefactionProfileRow{
-  depth:number;depthTo?:number;soil?:string;fineContent?:number;plasticityIndex?:number;clayContent?:number;waterContent?:number;maxCyclicShearStrainPercent?:number
+  depth:number;depthTo?:number;soil?:string;fineContent?:number;plasticityIndex?:number;clayContent?:number;waterContent?:number;maxCyclicShearStrainPercent?:number;cyclicSettlementMm?:number
   sigmaV:number;porePressure:number;sigmaVPrime:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number;alpha:number;beta:number;n1_60f:number
   crrM75?:number;CM?:number;tauResistance?:number;rd:number;tauEarthquake?:number;FS?:number
   saturated:boolean;potentiallyLiquefiable:boolean;mandatoryAnalysis:boolean;triggerRequired:boolean;postLiquefactionRequired:boolean;postLiquefactionTrigger:'FS<1.10'|'none'
@@ -92,7 +92,10 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       {symbol:'β',title:'İnce dane katsayısı',formula:'β=0.99+IDI^1.5/1000',value:fc.beta},
       {symbol:'(N1)60f',title:'İnce dane düzeltilmiş SPT',formula:'(N1)60f=α+β(N1)60',value:n1_60f}
     ]
-    const base={depth:record.depth,depthTo:record.depthTo,soil,fineContent,plasticityIndex:pi,clayContent,waterContent,maxCyclicShearStrainPercent:record.maxCyclicShearStrainPercent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha:fc.alpha,beta:fc.beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionRequired}
+    const cyclicSettlementMm=record.depthTo!=null&&record.depthTo>record.depth&&record.maxCyclicShearStrainPercent!=null&&record.maxCyclicShearStrainPercent>=0&&finite(n1_60f)&&n1_60f>0
+      ?(record.depthTo-record.depth)*1.5*Math.exp(-0.369*Math.sqrt(n1_60f))*Math.min(0.08,record.maxCyclicShearStrainPercent/100)*10
+      :undefined
+    const base={depth:record.depth,depthTo:record.depthTo,soil,fineContent,plasticityIndex:pi,clayContent:clayContent,waterContent,maxCyclicShearStrainPercent:record.maxCyclicShearStrainPercent,cyclicSettlementMm,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha:fc.alpha,beta:fc.beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionRequired}
     if(npt.hasAssumptions){ warnings.push(...npt.warnings); return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace} }
     if(stress.covered<Math.max(0,record.depth)-1e-9){
       trace.push({symbol:'Kapsama',title:'Katman kapsamı',formula:'ΣΔz=z',value:stress.covered,unit:'m',note:'SPT derinliğine kadar sürekli γ profili yok.'})
