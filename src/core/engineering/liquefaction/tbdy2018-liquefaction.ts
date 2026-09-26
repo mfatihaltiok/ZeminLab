@@ -12,8 +12,11 @@ export function tbdy2018Liquefaction(i:TBDYLiquefactionInput):TBDYLiquefactionRe
   for(const [name,value] of [['CE',i.CE],['CB',i.CB],['CR',i.CR],['CS',i.CS],['SDS',i.SDS],['Mw',i.Mw],['finesContent',i.finesContent]] as const){
     if(!Number.isFinite(value))throw new Error(name+' geçerli bir sayı olmalıdır.')
   }
-  if(i.CE<=0||i.CB<=0||i.CR<=0||i.CS<=0)throw new Error('SPT düzeltme katsayıları pozitif olmalıdır.')
-  if(i.Mw<=0||i.SDS<0||i.finesContent<0||i.finesContent>100)throw new Error('Mw, SDS ve ince dane oranı geçerli aralıkta olmalıdır.')
+  if(i.CE<.45||i.CE>1.60)throw new Error('CE TBDY Tablo 16B.1 aralığında olmalıdır: 0.45–1.60.')
+  if(![1,1.05,1.15].includes(i.CB))throw new Error('CB TBDY Tablo 16B.1’de 1.00, 1.05 veya 1.15 olmalıdır.')
+  if(!(i.CS===1||(i.CS>=1.10&&i.CS<=1.30)))throw new Error('CS TBDY Tablo 16B.1’e göre 1.00 veya 1.10–1.30 aralığında olmalıdır.')
+  if(![.75,.85,.95,1].includes(i.CR))throw new Error('CR TBDY 2018 Tablo 16B.1’e göre 0.75, 0.85, 0.95 veya 1.00 olmalıdır; değer tij boyundan türetilmelidir.')
+  if(i.Mw<=0||i.SDS<0||i.finesContent<0||i.finesContent>100)throw new Error('Mw, SDS ve ince dane oranı geçerli aralıkta olmalıdır.') 
   const sv=i.effectiveStress,z=i.depth
   const CN=i.normalizedSpt?.CN??Math.min(1.70,9.78/Math.sqrt(sv))
   const N160=i.normalizedSpt?.N160??i.rawSPT*CN*i.CE*i.CB*i.CR*i.CS
