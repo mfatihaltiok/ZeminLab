@@ -22,6 +22,10 @@ const rad=(deg:number)=>deg*Math.PI/180
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 const clamp=(x:number,min:number,max:number)=>Math.max(min,Math.min(max,x))
 
+function methodIsUnsupportedForFoundationType(method:SurfaceFoundationMethod,foundationType:FoundationType){
+  return foundationType==='radye'&&method==='Terzaghi'
+}
+
 function factors(phiDeg:number,method:SurfaceFoundationMethod){
   const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi))
   const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
@@ -73,7 +77,7 @@ function methodFactors(method:SurfaceFoundationMethod,B:number,L:number,Df:numbe
   const Nphi=Math.tan(Math.PI/4+rad(phi)/2)**2
   const slope=method==='TBDY-2018'||method==='Hansen'||method==='Vesic'?vesicGroundFactors(groundSlope,phi,Nq):{gc:1,gq:1,gg:1}
   const base=method==='TBDY-2018'||method==='Hansen'||method==='Vesic'?vesicBaseFactors(baseSlope,phi,Nq):{bc:1,bq:1,bg:1}
-  if(method==='Terzaghi')return{sc:Math.abs(B-L)<1e-9?1.3:1,sq:1,sg:Math.abs(B-L)<1e-9?.8:1,dc:1,dq:1,dg:1,ic:1,iq:1,ig:1,...slope,...base}
+  if(method==='Terzaghi')return{sc:1+.3*r,sq:1,sg:1-.2*r,dc:1,dq:1,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
   const sc=method==='Meyerhof'?1+.2*Nphi*r:1+(Nq/Math.max(Nc,1e-9))*r
   const sq=method==='Meyerhof'?(phi>10?1+.1*Nphi*r:1):1+r*t
   const sg=method==='Meyerhof'?(phi>10?sq:1):Math.max(.6,1-.4*r)
@@ -194,6 +198,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad
   const Vh=Math.abs(i.horizontalLoad??0)
   const groundSlope=Math.abs(i.groundSlope??0),baseSlope=Math.abs(i.baseSlope??0)
+  if(methodIsUnsupportedForFoundationType(i.method??'TBDY-2018',i.foundationType??'tekil'))warnings.push('Seçilen yöntem/temel tipi kombinasyonu için literatür bağıntısı ayrıca doğrulanmalıdır.')
   if(groundSlope>=90||baseSlope>=90||groundSlope+baseSlope>=90)throw new Error('Arazi ve temel tabanı eğimleri geçersiz.')
   const warnings:string[]=[]
   const ex=N>0?(i.momentY??0)/N:0,ey=N>0?(i.momentX??0)/N:0
