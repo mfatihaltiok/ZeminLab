@@ -4,6 +4,7 @@ import { liquefactionProfile, type LiquefactionProfileInput, type LiquefactionPr
 import { calculateIdealizedSettlement, type IdealizedSettlementInput, type IdealizedSettlementResult } from './idealized-settlement-engine'
 import { type ProjectInfo, normalizeProjectInfo, classifyVs30 } from '../models/project'
 import { toEngineeringSI, actionsToEngineeringSI } from '../units/engineering-input-adapter'
+import { calculateCyclicSettlement, type CyclicSettlementResult } from './cyclic-settlement-engine'
 
 export type FinalStatus='UYGUN'|'UYGUN DEĞİL'|'VERİ EKSİK'
 
@@ -21,7 +22,7 @@ export interface FinalFoundationResult{
   status:FinalStatus;evaluable:boolean
   project:{dts?:string;bks?:number;sds?:number;soilGroup?:string;vs30?:number;zfSiteSpecificRequired:boolean}
   actions:{N:number;Vx:number;Vy:number;Mx:number;My:number;source:string}
-  bearing?:ReturnType<typeof calculateSurfaceFoundation>;sliding?:ReturnType<typeof foundationChecks>;settlement?:IdealizedSettlementResult;liquefaction?:LiquefactionProfileResult
+  bearing?:ReturnType<typeof calculateSurfaceFoundation>;sliding?:ReturnType<typeof foundationChecks>;settlement?:IdealizedSettlementResult;liquefaction?:LiquefactionProfileResult;cyclicSettlement?:CyclicSettlementResult
   failedChecks:string[];missingData:string[];warnings:string[]
   trace:Array<{check:string;status:FinalStatus;source:string;details:string}>
 }
@@ -70,7 +71,6 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       if(sliding){ if(!sliding.evaluable)missing.push('Deprem + YASS altında kayma için cu');else if(!sliding.slidingSafeResultant)failed.push('Kayma'); warnings.push(...sliding.warnings) }
     }catch(e){missing.push(e instanceof Error?e.message:'Temel hesabı doğrulanamadı')}
   }
-  if(p.foundationParameters.cyclicSettlementAnalysisRequired===true && !p.foundationParameters.cyclicSettlementAnalysisCompleted) missing.push('16.8.3.4(a) çevrimsel yükleme altında temel altı yerdeğiştirme analizi')
   if(p.foundationParameters.cyclicSettlementAnalysisRequired===undefined) missing.push('16.8.3.4(a) çevrimsel yerdeğiştirme analizinin uygulanabilirlik kararı')
   if(!input.settlement) missing.push('Temel altında yerdeğiştirme/oturma kontrolü')
   if(input.settlement&&bearing){
@@ -82,6 +82,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
     }catch(e){missing.push(e instanceof Error?e.message:'Oturma hesabı doğrulanamadı')}
   }
   let liquefaction:LiquefactionProfileResult|undefined
+  let cyclicSettlement:CyclicSettlementResult|undefined
   const liquefactionDtsKnown = p.seismic.dts!==undefined
   const liquefactionSoilKnown = soilGroup!==undefined
   const liquefactionPotentialScope = liquefactionDtsKnown && liquefactionSoilKnown && (p.seismic.dts==='1'||p.seismic.dts==='1a'||p.seismic.dts==='2'||p.seismic.dts==='2a') && (soilGroup==='ZD'||soilGroup==='ZE'||soilGroup==='ZF')
@@ -94,10 +95,26 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       liquefaction=liquefactionProfile(input.liquefaction)
       const bad=liquefaction.rows.some(r=>r.conclusion==='SIVILAŞMA RİSKİ VAR'),incomplete=liquefaction.rows.some(r=>r.status==='VERİ EKSİK'||r.liquefactionCheck==='not-evaluable')
       trace.push({check:'Sıvılaşma',status:bad?'UYGUN DEĞİL':incomplete?'VERİ EKSİK':'UYGUN',source:'TBDY 2018 16.6 + Ek 16B',details:String(liquefaction.rows.length)+' SPT noktası'})
-      if(bad)failed.push('Sıvılaşma');if(incomplete)missing.push('Sıvılaşma için eksik saha/laboratuvar verisi');if(liquefaction.postLiquefactionRequired&&!p.foundationParameters.postLiquefactionAssessmentCompleted)missing.push('16.6.7–16.6.10 sıvılaşma sonrası değerlendirme');warnings.push(...liquefaction.warnings)
+      if(bad)failed.push('Sıvılaşma')
+      if(incomplete)missing.push('Sıvılaşma için eksik saha/laboratuvar verisi')
+      if(liquefaction.postLiquefactionRequired&&!p.foundationParameters.postLiquefactionAssessmentCompleted)missing.push('16.6.7–16.6.10 sıvılaşma sonrası değerlendirme')
+      warnings.push(...liquefaction.warnings)
+      const cyclicRows=liquefaction.rows.filter(r=>r.potentiallyLiquefiable&&r.saturated&&r.depthTo!=null&&r.depthTo>r.depth).map(r=>({
+        topDepth:r.depth,bottomDepth:r.depthTo!,n1_60cs:r.n1_60f,
+        maxCyclicShearStrain:finite(r.maxCyclicShearStrainPercent)?r.maxCyclicShearStrainPercent!/100:undefined,
+        saturated:true,liquefactionFactorOfSafety:r.FS,soilType:r.soil
+      }))
+      if(cyclicRows.length>0)cyclicSettlement=calculateCyclicSettlement({layers:cyclicRows})
+      if(p.foundationParameters.cyclicSettlementAnalysisRequired===true){
+        if(cyclicSettlement?.ready)trace.push({check:'16.8.3.4(a) çevrimsel yerdeğiştirme',status:'UYGUN',source:'Ishihara–Yoshimine 1992 hacimsel şekil değiştirme korelasyonu',details:'Toplam çevrimsel hacimsel oturma='+cyclicSettlement.totalSettlement.toFixed(2)+' mm'})
+        else if(!p.foundationParameters.cyclicSettlementAnalysisCompleted)missing.push('16.8.3.4(a) çevrimsel yükleme altında temel altı yerdeğiştirme analizi')
+        if(cyclicSettlement)warnings.push(...cyclicSettlement.warnings)
+      }
     }catch(e){missing.push(e instanceof Error?e.message:'Sıvılaşma hesabı doğrulanamadı')}
+  } else if(p.foundationParameters.cyclicSettlementAnalysisRequired===true && !p.foundationParameters.cyclicSettlementAnalysisCompleted){
+    missing.push('16.8.3.4(a) çevrimsel yükleme altında temel altı yerdeğiştirme analizi')
   }
   if(!soilGroup)warnings.push('Zemin grubu girilmemiş; taşıma gücü ve oturma hesabı için kullanılan zemin parametreleri ayrıca doğrulanmalıdır.')
   const m=[...new Set(missing)],f=[...new Set(failed)],status:FinalStatus=f.length?'UYGUN DEĞİL':m.length?'VERİ EKSİK':'UYGUN'
-  return{status,evaluable:status!=='VERİ EKSİK',project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired},actions,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,settlement,liquefaction}
+  return{status,evaluable:status!=='VERİ EKSİK',project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired},actions,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,settlement,liquefaction,cyclicSettlement}
 }
