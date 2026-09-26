@@ -22,10 +22,6 @@ const rad=(deg:number)=>deg*Math.PI/180
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x)
 const clamp=(x:number,min:number,max:number)=>Math.max(min,Math.min(max,x))
 
-function methodIsUnsupportedForFoundationType(method:SurfaceFoundationMethod,foundationType:FoundationType){
-  return foundationType==='radye'&&method==='Terzaghi'
-}
-
 function factors(phiDeg:number,method:SurfaceFoundationMethod){
   const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi))
   const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
@@ -200,7 +196,6 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const groundSlope=Math.abs(i.groundSlope??0),baseSlope=Math.abs(i.baseSlope??0)
   if(groundSlope>=90||baseSlope>=90||groundSlope+baseSlope>=90)throw new Error('Arazi ve temel tabanı eğimleri geçersiz.')
   const warnings:string[]=[]
-  if(methodIsUnsupportedForFoundationType(method,foundationType))warnings.push('Seçilen yöntem/temel tipi kombinasyonu için literatür bağıntısı ayrıca doğrulanmalıdır.')
   const ex=N>0?(i.momentY??0)/N:0,ey=N>0?(i.momentX??0)/N:0
   if(N===0&&(i.momentX!==0||i.momentY!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
   const coreContact=Math.abs(ex)<=i.B/6+1e-12&&Math.abs(ey)<=i.L/6+1e-12
