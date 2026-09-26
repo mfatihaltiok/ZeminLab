@@ -511,4 +511,12 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(missing.missingData.length>0)
 }
 
+
+{
+  assert.throws(() => calculateSpt({nField:10,energyRatio:40,hammerType:'measured',effectiveStress:100,rodLengthM:5}), /ER %45–%160/)
+  assert.throws(() => calculateSpt({nField:10,energyRatio:80,hammerType:'safety',effectiveStress:100,rodLengthM:5}), /safety tokmak için ER %60–%117/)
+  approx(calculateSpt({nField:10,energyRatio:80,hammerType:'safety',effectiveStress:100,rodLengthM:5}).ce,80/60)
+  assert.throws(() => calculateSpt({nField:10.5,energyRatio:60,hammerType:'safety',effectiveStress:100,rodLengthM:5}), /tamsayı/)
+}
+
 console.log('Engineering regression tests: PASS')
