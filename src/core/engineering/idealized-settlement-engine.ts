@@ -107,15 +107,15 @@ function schmertmannIz(z:number,B:number,L:number,qNet:number,sigmaPeak:number){
   return izPeak*(1-z/zBottom)
 }
 function consolidationSettlement(layer:IdealizedSoilLayer,thickness:number,sigma0:number,sigma1:number){
-  if(!finite(layer.compressionIndexCc)||!finite(layer.initialVoidRatio)||sigma0<=0||sigma1<=sigma0)return{value:0,ok:false}
-  const Cc=layer.compressionIndexCc!,Cr=finite(layer.recompressionIndexCr)&&layer.recompressionIndexCr!>=0?layer.recompressionIndexCr!:Cc,e0=layer.initialVoidRatio!,pc=finite(layer.preconsolidationPressure)&&layer.preconsolidationPressure!>sigma0?layer.preconsolidationPressure!:sigma0
+  if(!finite(layer.compressionIndexCc)||!finite(layer.initialVoidRatio)||sigma0<=0||sigma1<=sigma0)return{value:0,ok:false,crAssumed:false}
+  const Cc=layer.compressionIndexCc!,crProvided=finite(layer.recompressionIndexCr)&&layer.recompressionIndexCr!>=0,Cr=crProvided?layer.recompressionIndexCr!:Cc,e0=layer.initialVoidRatio!,pc=finite(layer.preconsolidationPressure)&&layer.preconsolidationPressure!>sigma0?layer.preconsolidationPressure!:sigma0
   let strain=0
   if(sigma1<=pc)strain=Cr*Math.log10(sigma1/sigma0)
   else{
     strain=Cr*Math.log10(Math.max(pc/sigma0,1))
     strain+=Cc*Math.log10(Math.max(sigma1/pc,1))
   }
-  return{value:Math.max(0,thickness*strain/(1+e0)*1000),ok:true}
+  return{value:Math.max(0,thickness*strain/(1+e0)*1000),ok:true,crAssumed:!crProvided}
 }
 
 export function calculateIdealizedSettlement(input:IdealizedSettlementInput):IdealizedSettlementResult{
@@ -166,7 +166,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       if(cohesive){
         methodName='Kil/kohezyonlu tabaka: konsolidasyon'
         const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective)
-        if(r.ok)consolidation=r.value;else{status='VERİ EKSİK';note='Cc, e0 ve başlangıç efektif gerilmesi gerekir.'}
+        if(r.ok){consolidation=r.value;if(r.crAssumed)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): Geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.')}else{status='VERİ EKSİK';note='Cc, e0 ve başlangıç efektif gerilmesi gerekir.'}
       }else{
         methodName='Burland & Burbidge (1985)'
         const r=burlandSettlement(layer,qNet,B,L,zTop,zBottom,influenceDepth,zMid,gwt);immediate=r.value;note=r.note
@@ -177,7 +177,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
       if(finite(M)&&M>0)immediate=deltaSigma*thickness*(1-(finite(layer.poissonRatio)?layer.poissonRatio!:0.3)**2)/M*1000
       else{status='VERİ EKSİK';note='Constrained/oedometric modül gerekir.'}
-      if(cohesive){const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective);if(r.ok)consolidation=r.value;else status='VERİ EKSİK'}
+      if(cohesive){const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective);if(r.ok){consolidation=r.value;if(r.crAssumed)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): Geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.')}else status='VERİ EKSİK'}
     }else if(method==='boussinesq'){
       methodName='Boussinesq alan integrasyonu + elastik tabaka'
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus

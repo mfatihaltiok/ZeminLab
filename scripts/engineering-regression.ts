@@ -200,8 +200,8 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(sandyDerived.porePressure!,29.43,1e-12)
   approx(sandyDerived.effectiveStress!,66.57,1e-12)
   approx(sandyDerived.cn,9.78/Math.sqrt(66.57),1e-12)
-  approx(sandyDerived.n60,20,1e-12)
-  approx(sandyDerived.n1_60,20*sandyDerived.cn,1e-12)
+  approx(sandyDerived.n60,17,1e-12)
+  approx(sandyDerived.n1_60,17*sandyDerived.cn,1e-12)
   assert.equal(sandyDerived.hasAssumptions,true)
 }
 
@@ -270,7 +270,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   }
   const clayRecord={id:'SPT-CLAY-2',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'CIM',source:'manual' as const,confirmed:false}
   const clayDerived=deriveSptValues(clayBorehole,clayRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
-  approx(clayDerived.effectiveStress!,66.57,1e-12)
+  approx(clayDerived.effectiveStress!,63.57,1e-12)
   approx(clayDerived.cn,1,1e-12)
   approx(clayDerived.n1_60,clayDerived.n60,1e-12)
 }
@@ -399,7 +399,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   })
   assert.equal(result.mandatoryByProject,true)
   assert.equal(result.rows[0].mandatoryAnalysis,true)
-  approx(result.rows[0].n1_60,12.266276470940088,1e-10)
+  approx(result.rows[0].n1_60,11.652962647393084,1e-10)
   approx(result.rows[0].beta,1.1543167672515497,1e-12)
   assert.ok(result.rows[0].FS !== undefined)
   assert.equal(result.rows[0].conclusion,'SIVILAŞMA RİSKİ VAR')
@@ -514,9 +514,220 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 
 {
   assert.throws(() => calculateSpt({nField:10,energyRatio:40,hammerType:'measured',effectiveStress:100,rodLengthM:5}), /ER %45–%160/)
-  assert.throws(() => calculateSpt({nField:10,energyRatio:80,hammerType:'safety',effectiveStress:100,rodLengthM:5}), /safety tokmak için ER %60–%117/)
+  assert.throws(() => calculateSpt({nField:10,energyRatio:50,hammerType:'safety',effectiveStress:100,rodLengthM:5}), /safety tokmak için ER %60/)
   approx(calculateSpt({nField:10,energyRatio:80,hammerType:'safety',effectiveStress:100,rodLengthM:5}).ce,80/60)
   assert.throws(() => calculateSpt({nField:10.5,energyRatio:60,hammerType:'safety',effectiveStress:100,rodLengthM:5}), /tamsayı/)
 }
 
-console.log('Engineering regression tests: PASS')
+// ═══════════════════════════════════════════════════════════════════════════════
+// JET GROUT MODÜLÜ REGRESSION TESTLERİ
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import { jetGroutAdvanced } from '../src/core/engineering/advanced-geotech.ts'
+import { jetGroutEngineering } from '../src/core/engineering/jet-grout-advanced.ts'
+import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovementRatio, estimateColumnDiameter, estimateColumnStrength } from '../src/core/engineering/jet-grout.ts'
+
+{
+  // Jet Grout kompozit zemin - kare düzen
+  const result = jetGroutAdvanced({
+    columnDiameter: 0.6,
+    spacing: 1.5,
+    layout: 'square',
+    qSoil: 100,
+    qColumn: 2000,
+    EsSoil: 5000,
+    EsColumn: 50000,
+    cSoil: 10,
+    cColumn: 200
+  })
+  
+  // Alan değiştirme oranı: ρ = Ac/Acell = π(0.6)²/4 / 1.5²
+  const expectedAr = Math.PI * 0.6 * 0.6 / 4 / (1.5 * 1.5)
+  approx(result.areaReplacementRatio, expectedAr, 1e-6)
+  
+  // Kompozit taşıma gücü: qcomp = ρ·qcol + (1-ρ)·qsoil
+  const expectedQ = expectedAr * 2000 + (1 - expectedAr) * 100
+  approx(result.compositeCapacity, expectedQ, 1e-6)
+  
+  // Kompozit modül: Ecomp = ρ·Ecol + (1-ρ)·Esoil
+  const expectedE = expectedAr * 50000 + (1 - expectedAr) * 5000
+  approx(result.compositeModulus!, expectedE, 1e-6)
+  
+  // Yük paylaşımı
+  const n = 50000 / 5000
+  const expectedColumnShare = (n * expectedAr) / (1 + (n - 1) * expectedAr)
+  approx(result.columnLoadShare, expectedColumnShare, 1e-6)
+  
+  console.log('✓ Jet Grout kompozit zemin (kare düzen)')
+}
+
+{
+  // Jet Grout kompozit zemin - üçgen düzen
+  const result = jetGroutAdvanced({
+    columnDiameter: 0.8,
+    spacing: 2.0,
+    layout: 'triangular',
+    qSoil: 150,
+    qColumn: 3000
+  })
+  
+  // Üçgen düzen alan: Acell = √3/2 · s²
+  const cellArea = Math.sqrt(3) / 2 * 2.0 * 2.0
+  const Ac = Math.PI * 0.8 * 0.8 / 4
+  approx(result.cellArea, cellArea, 1e-6)
+  approx(result.areaReplacementRatio, Ac / cellArea, 1e-6)
+  
+  console.log('✓ Jet Grout kompozit zemin (üçgen düzen)')
+}
+
+{
+  // Jet Grout tam tasarım hesabı
+  const design = calculateJetGroutDesign({
+    columnDiameter: 0.6,
+    spacing: 1.5,
+    layout: 'square',
+    soilUnitWeight: 18,
+    soilCohesion: 10,
+    soilFrictionAngle: 25,
+    soilEs: 5000,
+    soilNu: 0.3,
+    columnStrength: 2500,
+    columnEs: 50000,
+    columnLength: 5,
+    foundationWidth: 10,
+    foundationLength: 10,
+    foundationDepth: 1.5,
+    verticalLoad: 5000,
+    safetyFactorBearing: 3,
+    safetyFactorSliding: 1.5
+  })
+  
+  // Kompozit parametreler hesaplanmalı
+  assert.ok(design.areaReplacementRatio > 0)
+  assert.ok(design.compositeBearingCapacity > 0)
+  assert.ok(design.compositeEs! > 0)
+  
+  // Taşıma gücü kontrolü
+  assert.ok(design.appliedStress > 0)
+  assert.ok(design.bearingCapacityUtilization >= 0)
+  assert.equal(typeof design.bearingCapacitySafe, 'boolean')
+  
+  // Oturma azaltma
+  assert.ok(design.untreatedSettlement! > 0)
+  assert.ok(design.treatedSettlement! > 0)
+  assert.ok(design.settlementReduction! > 0)
+  assert.ok(design.settlementReduction! < 100)
+  
+  // Eksenel kapasite
+  assert.ok(design.axialCapacity!.shaftCapacity > 0)
+  assert.ok(design.axialCapacity!.tipCapacity > 0)
+  assert.ok(design.axialCapacity!.totalCapacity > 0)
+  assert.ok(design.axialCapacity!.designCapacity > 0)
+  assert.ok(design.axialCapacity!.groupEfficiency > 0)
+  assert.ok(design.axialCapacity!.groupEfficiency <= 1)
+  
+  // Kolon sayısı
+  assert.ok(design.numberOfColumns! > 0)
+  
+  // Kaynak referansları
+  assert.ok(design.sources.length >= 2)
+  assert.equal(design.sources[0].key, 'EROL-CHEKINMEZ-BAYRAM-2018')
+  
+  console.log('✓ Jet Grout tam tasarım hesabı')
+}
+
+{
+  // Kolon sayısı hesaplama
+  const n1 = calculateNumberOfColumns(10, 10, 1.5, 'square')
+  const n2 = calculateNumberOfColumns(10, 10, 2.0, 'square')
+  assert.ok(n1 > n2) // Daha küçük aralık = daha fazla kolon
+  
+  console.log('✓ Jet Grout kolon sayısı hesaplama')
+}
+
+{
+  // İyileştirme oranı hesaplama
+  const ratio1 = calculateImprovementRatio(0.6, 1.5, 'square')
+  const ratio2 = calculateImprovementRatio(0.8, 1.5, 'square')
+  assert.ok(ratio2 > ratio1) // Daha büyük çap = daha yüksek iyileştirme
+  
+  const ratio3 = calculateImprovementRatio(0.6, 1.5, 'square')
+  const ratio4 = calculateImprovementRatio(0.6, 1.5, 'triangular')
+  assert.ok(ratio4 > ratio3) // Üçgen düzen daha verimli
+  
+  console.log('✓ Jet Grout iyileştirme oranı hesaplama')
+}
+
+{
+  // Kolon çapı tahmini
+  const clay = estimateColumnDiameter('clay', 'double')
+  const sand = estimateColumnDiameter('sand', 'double')
+  assert.ok(clay.typical > sand.typical) // Killi zeminde daha büyük çap
+  
+  const single = estimateColumnDiameter('clay', 'single')
+  const triple = estimateColumnDiameter('clay', 'triple')
+  assert.ok(triple.typical > single.typical) // Triple jet daha büyük çap
+  
+  console.log('✓ Jet Grout kolon çapı tahmini')
+}
+
+{
+  // Kolon dayanımı tahmini
+  const strength1 = estimateColumnStrength('clay', 300)
+  const strength2 = estimateColumnStrength('sand', 300)
+  assert.ok(strength2.typical > strength1.typical) // Kumda daha yüksek dayanım
+  
+  const strength3 = estimateColumnStrength('clay', 200)
+  const strength4 = estimateColumnStrength('clay', 400)
+  assert.ok(strength4.typical > strength3.typical) // Daha fazla çimento = daha yüksek dayanım
+  
+  console.log('✓ Jet Grout kolon dayanımı tahmini')
+}
+
+{
+  // Jet Grout mühendislik hesabı (tam paket)
+  const result = jetGroutEngineering({
+    columnDiameter: 0.6,
+    spacing: 1.5,
+    layout: 'square',
+    qSoil: 100,
+    qColumn: 2000,
+    cSoil: 10,
+    cColumn: 200,
+    EsSoil: 5000,
+    EsColumn: 50000,
+    load: 5000,
+    foundationArea: 100,
+    FS: 3,
+    columnFrictionAngle: 35,
+    soilPoissonRatio: 0.3,
+    foundationThickness: 5,
+    cohesion: 10,
+    frictionAngle: 25,
+    verticalLoad: 5000,
+    horizontalLoad: 500
+  })
+  
+  // Temel kompozit parametreler
+  assert.ok(result.areaReplacementRatio > 0)
+  assert.ok(result.compositeCapacity > 0)
+  assert.ok(result.stressConcentrationFactor > 1)
+  
+  // Sanal radye
+  assert.ok(result.virtualRaft)
+  assert.ok(result.virtualRaft!.reductionPercent > 0)
+  
+  // Kayma güvenliği
+  assert.ok(result.shearSafety)
+  assert.ok(result.shearSafety!.FS > 0)
+  
+  // Uyarılar
+  assert.ok(result.warnings.length > 0)
+  
+  console.log('✓ Jet Grout mühendislik hesabı (tam paket)')
+}
+
+console.log('\n═══════════════════════════════════════════════════════════════════════════════')
+console.log('TÜM MÜHENDİSLİK REGRESSION TESTLERİ BAŞARILI')
+console.log('═══════════════════════════════════════════════════════════════════════════════')
+

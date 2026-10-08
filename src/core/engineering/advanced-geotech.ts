@@ -69,12 +69,14 @@ export interface LayerSettlementResult {
   consolidation: number
   total: number
   layers: Array<{ settlement: number; type: 'elastic' | 'oedometer' }>
+  warnings: string[]
 }
 
 export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlementResult {
   let immediate = 0
   let consolidation = 0
   const details: LayerSettlementResult['layers'] = []
+  const warnings: string[] = []
   for (const l of layers) {
     const H = Math.max(0, l.thickness)
     const ds = Math.max(0, l.deltaSigma)
@@ -92,6 +94,7 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
       const sigma1 = l.sigma0 + ds
       const spc = l.sigmaPc ?? l.sigma0
       const Cr = Math.max(0, l.Cr ?? l.Cc)
+      if (l.Cr == null && l.Cc != null) warnings.push('Katmanda geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.')
       if (spc > l.sigma0 && sigma1 > l.sigma0) {
         const sigmaA = Math.min(sigma1, spc)
         const sigmaB = Math.max(sigma1, spc)
@@ -110,7 +113,7 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
     }
     details.push({ settlement: Math.max(0, s), type })
   }
-  return { immediate, consolidation, total: immediate + consolidation, layers: details }
+  return { immediate, consolidation, total: immediate + consolidation, layers: details, warnings }
 }
 
 export interface SchmertmannLayer { thickness: number; Es: number; Iz: number }
