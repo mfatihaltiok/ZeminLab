@@ -1,0 +1,708 @@
+/* ═══════════════════════════════════════════════════════════════
+   FALUZMN Profesyonel Mühendislik Rapor Stilleri
+   A4 formatında yazdırılabilir profesyonel rapor görünümü
+   ═══════════════════════════════════════════════════════════════ */
+
+.erp-container {
+  max-width: 210mm;
+  margin: 0 auto;
+  background: #fff;
+  color: #1a1a1a;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+}
+
+/* Kapak Sayfası */
+.erp-cover {
+  min-height: 297mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+  border: 1px solid #d0d7de;
+  page-break-after: always;
+}
+
+.erp-cover-content {
+  text-align: center;
+  padding: 60px;
+}
+
+.erp-cover-logo {
+  font-size: 48px;
+  font-weight: 800;
+  color: #1a4971;
+  letter-spacing: 8px;
+  margin-bottom: 20px;
+}
+
+.erp-cover-divider {
+  width: 200px;
+  height: 3px;
+  background: #1a4971;
+  margin: 30px auto;
+}
+
+.erp-cover h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a2332;
+  line-height: 1.3;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.erp-cover-info {
+  margin-top: 40px;
+}
+
+.erp-cover-info table {
+  margin: 0 auto;
+  text-align: left;
+  border-collapse: collapse;
+}
+
+.erp-cover-info td {
+  padding: 8px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid #e0e5ea;
+}
+
+.erp-cover-info td:first-child {
+  color: #5a6872;
+  font-weight: 500;
+}
+
+.erp-cover-info td:last-child {
+  color: #1a2332;
+  min-width: 200px;
+}
+
+.erp-cover-footer {
+  margin-top: 60px;
+  padding-top: 20px;
+  border-top: 1px solid #c0c8d0;
+}
+
+.erp-cover-footer p {
+  font-size: 10px;
+  color: #6a7580;
+  margin: 4px 0;
+}
+
+/* İçindekiler */
+.erp-toc {
+  min-height: 297mm;
+  padding: 60px 50px;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  page-break-after: always;
+}
+
+.erp-toc h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a4971;
+  margin-bottom: 40px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #1a4971;
+}
+
+.erp-toc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.erp-toc-item {
+  display: grid;
+  grid-template-columns: 40px 1fr 200px;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e8ecf0;
+  transition: background 0.2s;
+}
+
+.erp-toc-item:hover {
+  background: #f5f8fb;
+}
+
+.erp-toc-num {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a4971;
+}
+
+.erp-toc-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a2332;
+}
+
+.erp-toc-method {
+  font-size: 11px;
+  color: #5a6872;
+  text-align: right;
+  font-style: italic;
+}
+
+/* Proje Bilgileri */
+.erp-project-info-page {
+  min-height: 297mm;
+  padding: 50px;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  page-break-after: always;
+}
+
+.erp-project-info-page h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a4971;
+  margin-bottom: 30px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #1a4971;
+}
+
+.erp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: linear-gradient(90deg, #1a4971 0%, #2a6091 100%);
+  color: #fff;
+  margin-bottom: 30px;
+  border-radius: 4px;
+}
+
+.erp-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.erp-logo {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #1a4971;
+  font-size: 22px;
+  font-weight: 800;
+  border-radius: 4px;
+}
+
+.erp-header-text h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.erp-header-text p {
+  font-size: 11px;
+  opacity: 0.85;
+  margin: 2px 0 0;
+}
+
+.erp-header-info {
+  border-collapse: collapse;
+}
+
+.erp-header-info td {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.85);
+}
+
+.erp-header-info td:last-child {
+  text-align: right;
+}
+
+.erp-info-block {
+  margin-bottom: 24px;
+}
+
+.erp-info-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.erp-info-item {
+  padding: 16px;
+  background: #f5f8fb;
+  border: 1px solid #d8dee4;
+  border-radius: 4px;
+}
+
+.erp-info-item span {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6a7580;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.erp-info-item b {
+  font-size: 14px;
+  color: #1a2332;
+}
+
+/* Hesaplama Bölümleri */
+.erp-section {
+  min-height: 297mm;
+  padding: 40px 50px;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  page-break-after: always;
+  position: relative;
+}
+
+.erp-section-header {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: 20px;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(90deg, #1a4971 0%, #2a6091 100%);
+  color: #fff;
+  margin-bottom: 24px;
+  border-radius: 4px;
+}
+
+.erp-section-number {
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.erp-section-titles h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.erp-section-titles p {
+  font-size: 12px;
+  opacity: 0.85;
+  margin: 4px 0 0;
+}
+
+.erp-section-method {
+  text-align: right;
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 4px;
+}
+
+.erp-section-method span {
+  display: block;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.7;
+}
+
+.erp-section-method b {
+  font-size: 13px;
+}
+
+.erp-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.erp-block {
+  border: 1px solid #d8dee4;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.erp-block h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a4971;
+  margin: 0;
+  padding: 10px 16px;
+  background: #f0f4f8;
+  border-bottom: 1px solid #d8dee4;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Girdi Tablosu */
+.erp-input-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.erp-input-table th {
+  padding: 8px 12px;
+  text-align: left;
+  background: #f8fafc;
+  border-bottom: 1px solid #d8dee4;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #5a6872;
+  font-weight: 600;
+}
+
+.erp-input-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #eef1f4;
+}
+
+.erp-input-table td:first-child {
+  color: #3a4550;
+}
+
+.erp-input-table td b {
+  color: #1a2332;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+}
+
+/* Hesaplama Tablosu */
+.erp-calc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+}
+
+.erp-calc-table th {
+  padding: 8px 10px;
+  text-align: left;
+  background: #f0f4f8;
+  border-bottom: 2px solid #c0c8d0;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #4a5560;
+  font-weight: 700;
+}
+
+.erp-step-row td {
+  padding: 10px;
+  border-bottom: 1px solid #eef1f4;
+  vertical-align: top;
+}
+
+.erp-step-row:hover {
+  background: #fafbfc;
+}
+
+.erp-step-index {
+  width: 36px;
+  text-align: center;
+  font-weight: 700;
+  color: #1a4971;
+  font-family: 'Consolas', monospace;
+  font-size: 11px;
+}
+
+.erp-step-symbol {
+  width: 60px;
+  font-family: 'Georgia', serif;
+  font-weight: 600;
+  color: #1a4971;
+  font-size: 13px;
+}
+
+.erp-step-title {
+  width: 120px;
+  color: #3a4550;
+  font-weight: 500;
+}
+
+.erp-step-formula {
+  width: 200px;
+}
+
+.erp-step-formula code {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 11px;
+  color: #1a2332;
+  background: #f8fafc;
+  padding: 4px 8px;
+  border-left: 2px solid #1a4971;
+  display: inline-block;
+}
+
+.erp-step-sub {
+  font-family: 'Consolas', monospace;
+  font-size: 10px;
+  color: #5a6872;
+  margin-top: 4px;
+  padding-left: 10px;
+}
+
+.erp-step-value {
+  width: 100px;
+  text-align: right;
+  font-family: 'Consolas', monospace;
+}
+
+.erp-step-value b {
+  font-size: 13px;
+  color: #1a2332;
+}
+
+.erp-step-value span {
+  font-size: 9px;
+  color: #6a7580;
+  margin-left: 2px;
+}
+
+.erp-step-note {
+  width: 120px;
+  font-size: 9px;
+  color: #6a7580;
+  font-style: italic;
+}
+
+/* Sonuç Tablosu */
+.erp-result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.erp-result-table th {
+  padding: 8px 12px;
+  text-align: left;
+  background: #f0f4f8;
+  border-bottom: 2px solid #c0c8d0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #4a5560;
+  font-weight: 700;
+}
+
+.erp-result-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef1f4;
+}
+
+.erp-result-table td b {
+  font-family: 'Consolas', monospace;
+  font-size: 13px;
+  color: #1a2332;
+}
+
+.erp-status-ok {
+  background: #f0f9f4;
+}
+
+.erp-status-warning {
+  background: #fef9f0;
+}
+
+.erp-status-fail {
+  background: #fef0f0;
+}
+
+.erp-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.erp-badge.ok {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.erp-badge.warning {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+
+.erp-badge.fail {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Notlar */
+.erp-notes {
+  background: #fef9f0;
+  border-color: #f0d8a8;
+}
+
+.erp-notes h3 {
+  background: #f5e6c8;
+  border-color: #f0d8a8;
+  color: #8a6d3b;
+}
+
+.erp-notes ul {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+}
+
+.erp-notes li {
+  padding: 6px 0 6px 20px;
+  position: relative;
+  font-size: 11px;
+  color: #5a4520;
+  line-height: 1.5;
+}
+
+.erp-notes li::before {
+  content: '⚠';
+  position: absolute;
+  left: 0;
+  color: #b8860b;
+}
+
+/* Kaynak Referansı */
+.erp-source-ref {
+  padding: 12px 16px;
+  background: #f0f4f8;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #4a5560;
+  line-height: 1.5;
+}
+
+.erp-source-ref span {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 6px;
+}
+
+/* İmza Sayfası */
+.erp-signature-page {
+  min-height: 297mm;
+  padding: 60px 50px;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  page-break-after: always;
+  display: flex;
+  flex-direction: column;
+}
+
+.erp-signature-page h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a4971;
+  margin-bottom: 60px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #1a4971;
+}
+
+.erp-signature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  margin-top: auto;
+}
+
+.erp-signature-box {
+  text-align: center;
+  padding: 30px 20px;
+  border: 1px solid #d8dee4;
+  border-radius: 4px;
+}
+
+.erp-sig-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #6a7580;
+  font-weight: 600;
+  margin-bottom: 40px;
+}
+
+.erp-sig-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a2332;
+  margin-bottom: 60px;
+}
+
+.erp-sig-line {
+  width: 80%;
+  height: 1px;
+  background: #1a2332;
+  margin: 0 auto 16px;
+}
+
+.erp-sig-date {
+  font-size: 11px;
+  color: #5a6872;
+}
+
+/* Yazdır Butonu */
+.erp-print-button {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  padding: 14px 24px;
+  background: #1a4971;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(26, 73, 113, 0.3);
+  transition: all 0.2s;
+  z-index: 1000;
+}
+
+.erp-print-button:hover {
+  background: #2a6091;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(26, 73, 113, 0.4);
+}
+
+/* Yazdırma Stilleri */
+@media print {
+  .erp-container {
+    max-width: none;
+    margin: 0;
+    border: none;
+  }
+  
+  .erp-cover, .erp-toc, .erp-section, .erp-signature-page, .erp-project-info-page {
+    border: none;
+    min-height: auto;
+    page-break-after: always;
+  }
+  
+  .erp-print-button {
+    display: none;
+  }
+  
+  .erp-section-header {
+    background: #1a4971 !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .erp-header {
+    background: #1a4971 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

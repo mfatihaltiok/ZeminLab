@@ -14,7 +14,7 @@ function factors(phiDeg:number,method:BearingMethod){
   const Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
   let Ngamma=0
   if(phi>0){
-    if(method==='Terzaghi'){const Kpy=3*(1+Math.sin(rad(phi)))/Math.max(1-Math.sin(rad(phi)),1e-9);Ngamma=.5*t*(Kpy/Math.cos(rad(phi))**2-1)}
+    if(method==='Terzaghi')Ngamma=2*(Nq-1)*t
     else if(method==='Meyerhof')Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
     else if(method==='Hansen')Ngamma=1.5*(Nq-1)*t
     else Ngamma=2*(Nq+1)*t

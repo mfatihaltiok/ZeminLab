@@ -11,6 +11,7 @@ import { IdealizedSettlementScreen } from './screens/IdealizedSettlementScreen'
 import FieldInvestigation from './screens/FieldInvestigation'
 import BoreholeLogScreen from './screens/BoreholeLogScreen'
 import EngineeringReportScreen from './screens/EngineeringReportScreen'
+import ProfessionalEngineeringReport from './screens/ProfessionalEngineeringReportScreen'
 import { ProjectInfoScreenV2 } from './screens/ProjectInfoScreenV2'
 import { IdealizedSoilProfileScreen } from './screens/IdealizedSoilProfileScreen'
 import { BearingCapacityScreen } from './screens/BearingCapacityScreen'
@@ -37,7 +38,7 @@ function App(){
  const newProject=()=>{updateProjectInfo({...defaultProjectInfo,id:crypto.randomUUID(),date:new Date().toISOString().slice(0,10)});setProjectPath(undefined);setBoreholes([]);setLabs([]);setSelectedBoreholeId('');setIdealizedSoilProfile(undefined);setStatusText('Yeni proje oluşturuldu');setScreen('dashboard')}
  const field=<><FieldCommandBar boreholes={boreholes} labs={labs} selectedBoreholeId={selectedBoreholeId} onSelectedBoreholeChange={setSelectedBoreholeId} onBoreholesChange={setBoreholes} onLabsChange={setLabs} onSaveBoreholeCache={()=>void saveBoreholesCache()} onSaveLabCache={()=>void saveLabsCache()} statusText={statusText}/><FieldInvestigation boreholes={boreholes} labs={labs} selectedBoreholeId={selectedBoreholeId} onSelectedBoreholeChange={setSelectedBoreholeId} onBoreholesChange={setBoreholes} onLabsChange={setLabs}/></>
  const foundation=<Foundation/>
- const content:Record<ScreenId,ReactNode>={dashboard:<Dashboard onNavigate={setScreen}/>,'project-info':<ProjectInfoScreenV2/>,field:field,'borehole-log':<BoreholeLogScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes}/>,profile:<IdealizedSoilProfileScreen boreholes={boreholes} labs={labs} profile={idealizedSoilProfile} onChange={setIdealizedSoilProfile}/>, 'bearing-capacity':<BearingCapacityScreen profile={idealizedSoilProfile}/>,settlement:<IdealizedSettlementScreen profile={idealizedSoilProfile} boreholes={boreholes}/>,liquefaction:<Liquefaction boreholes={boreholes} labs={labs}/>,foundation:foundation,'jet-grout':<JetGroutEngineeringScreen/>,report:<EngineeringReportScreen boreholes={boreholes} labs={labs} profile={idealizedSoilProfile}/>}
+ const content:Record<ScreenId,ReactNode>={dashboard:<Dashboard onNavigate={setScreen}/>,'project-info':<ProjectInfoScreenV2/>,field:field,'borehole-log':<BoreholeLogScreen boreholes={boreholes} labs={labs} onBoreholesChange={setBoreholes}/>,profile:<IdealizedSoilProfileScreen boreholes={boreholes} labs={labs} profile={idealizedSoilProfile} onChange={setIdealizedSoilProfile}/>, 'bearing-capacity':<BearingCapacityScreen profile={idealizedSoilProfile}/>,settlement:<IdealizedSettlementScreen profile={idealizedSoilProfile} boreholes={boreholes}/>,liquefaction:<Liquefaction boreholes={boreholes} labs={labs}/>,foundation:foundation,'jet-grout':<JetGroutEngineeringScreen/>,report:<ProfessionalEngineeringReport boreholes={boreholes} labs={labs} profile={idealizedSoilProfile}/>}
  return <WorkspaceShell screen={screen} onScreenChange={setScreen} onNewProject={newProject} onOpenProject={openProject} onSaveProject={saveProject} onSaveAsProject={saveProjectAs} statusText={statusText}>{content[screen]}</WorkspaceShell>
 }
 export default App

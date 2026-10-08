@@ -3,10 +3,12 @@ import { bearingCapacity as bearingEngine, foundationChecks as foundationEngine,
 import { stage2BearingCapacity, stage2Settlement, type Stage2BearingInput, type Stage2SettlementInput, type Stage2BearingMethod } from '../engineering/stage2-engine'
 import { liquefactionProfile as liquefactionProfileEngine, type LiquefactionProfileInput, type LiquefactionProfileResult } from '../engineering/liquefaction/liquefaction-profile'
 import { layerSettlement as layerSettlementEngine, schmertmannSettlement, stressSpread21, jetGroutAdvanced as jetGroutAdvancedEngine, type LayerSettlementInput, type SchmertmannLayer } from '../engineering/advanced-geotech'
+import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovementRatio, estimateColumnDiameter, estimateColumnStrength, type JetGroutDesignParameters, type JetGroutDesignResult } from '../engineering/jet-grout'
+import { jetGroutEngineering, type JetGroutEngineeringInput, type JetGroutEngineeringResult, jetGroutAxialCapacity, type JetGroutAxialInput } from '../engineering/jet-grout-advanced'
 import { calculateSurfaceFoundation, type SurfaceFoundationInput, type SurfaceFoundationMethod } from '../engineering/surface-foundation'
 import { calculateSubgradeReaction, type SubgradeReactionInput } from '../engineering/subgrade-reaction'
 
-export type { BearingMethod, LayerSettlementInput, SchmertmannLayer, LiquefactionProfileInput, LiquefactionProfileResult, Stage2BearingInput, Stage2SettlementInput, Stage2BearingMethod, SurfaceFoundationInput, SurfaceFoundationMethod, SubgradeReactionInput }
+export type { BearingMethod, LayerSettlementInput, SchmertmannLayer, LiquefactionProfileInput, LiquefactionProfileResult, Stage2BearingInput, Stage2SettlementInput, Stage2BearingMethod, SurfaceFoundationInput, SurfaceFoundationMethod, SubgradeReactionInput, JetGroutDesignParameters, JetGroutDesignResult, JetGroutEngineeringInput, JetGroutEngineeringResult, JetGroutAxialInput }
 export type SoilLayerInput={top:number;bottom:number;soil?:string;gamma:number;gammaSat:number;cohesion?:number;phi?:number;fines?:number;cu?:number;PI?:number}
 export type SptInput={depth:number;nField:number;energyRatio?:number;boreholeDiameter?:number;sampler?:'standard'|'without-liner';samplerCorrection?:number;rodLengthM?:number;hammerType?:'donut'|'safety'|'automatic'|'measured';fines?:number}
 
@@ -42,6 +44,11 @@ export function subgradeReaction(i:SubgradeReactionInput){return calculateSubgra
 export function layerSettlement(layers:LayerSettlementInput[]){return layerSettlementEngine(layers)}
 export function schmertmann(q:number,layers:SchmertmannLayer[],C1=1,C2=1){return schmertmannSettlement(q,layers,C1,C2)}
 export function jetGroutAdvanced(i:Parameters<typeof jetGroutAdvancedEngine>[0]){return jetGroutAdvancedEngine(i)}
+export function jetGroutFullDesign(i:JetGroutDesignParameters):JetGroutDesignResult{return calculateJetGroutDesign(i)}
+export function jetGroutNumberOfColumns(foundationWidth:number,foundationLength:number,spacing:number,layout:'square'|'triangular'='square'):number{return calculateNumberOfColumns(foundationWidth,foundationLength,spacing,layout)}
+export function jetGroutImprovementRatio(columnDiameter:number,spacing:number,layout:'square'|'triangular'='square'):number{return calculateImprovementRatio(columnDiameter,spacing,layout)}
+export function jetGroutEstimateDiameter(soilType:'clay'|'silt'|'sand'|'gravel',method:'single'|'double'|'triple'='double'){return estimateColumnDiameter(soilType,method)}
+export function jetGroutEstimateStrength(soilType:'clay'|'silt'|'sand'|'gravel',cementContent?:number){return estimateColumnStrength(soilType,cementContent)}
 
 export const SOURCE_NOTES={
  investigation:'TBDY 2018 Bölüm 16 ve Ek 16A: zemin araştırmaları, SPT/laboratuvar verileri ve raporlama.',

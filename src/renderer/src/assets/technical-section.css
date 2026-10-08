@@ -1,0 +1,89 @@
+/* ═══════════════════════════════════════════════════════════════
+   FALUZMN Profesyonel Teknik Kesit Stilleri
+   ═══════════════════════════════════════════════════════════════ */
+
+.ts-container {
+  display: inline-block;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.ts-svg {
+  display: block;
+  background: #fafbfc;
+}
+
+/* Lejant */
+.ts-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: #f0f4f8;
+  border-top: 1px solid #d0d7de;
+  font-size: 10px;
+  color: #4a5560;
+  flex-wrap: wrap;
+}
+
+.ts-legend-title {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #1a4971;
+  margin-right: 8px;
+}
+
+.ts-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ts-legend-item i {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #888;
+  border-radius: 2px;
+}
+
+.ts-legend-line i {
+  width: 20px;
+  height: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.ts-legend-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 8px;
+  font-weight: 700;
+  color: #fff;
+  border: none !important;
+}
+
+.ts-legend-marker.spt {
+  background: #1a4971;
+}
+
+.ts-legend-marker.lab {
+  background: #2e7d32;
+}
+
+/* Yazdırma için */
+@media print {
+  .ts-container {
+    box-shadow: none;
+    border: 1px solid #ccc;
+    page-break-inside: avoid;
+  }
+}
