@@ -57,7 +57,8 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
   }
   if(i.waterTableDepth==null)warnings.push('YASS girilmedi; klasik sonuç kuru zemin kabulüyle ön değerlendirmedir.')
   if(i.layers?.length)warnings.push('Klasik yöntem katmanlı zemin parametrelerini hesapta kullanmaz; katmanlı nihai değerlendirme için TBDY yüzeysel temel motoru ve zemin profili analizi gerekir.')
-  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,gammaBearing,surcharge,c:i.c,phi:i.phi,FS:i.FS??3,method:i.method})
+  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,gammaBearing,surcharge,c:i.c,phi:i.phi,FS:i.FS,method:i.method})
+  warnings.push(...(r.warnings??[]))
   if(H>0)warnings.push('Klasik taşıma gücü API yatay yük ve kayma güvenliğini değerlendirmez; temel kayma kontrolü ayrı yapılmalıdır.')
   if((i.momentX??0)!==0||(i.momentY??0)!==0)warnings.push('Klasik taşıma gücü API merkezi düşey yük varsayar; momentli temas için TBDY motoru kullanılmalıdır.')
   return{
