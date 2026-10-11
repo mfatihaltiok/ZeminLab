@@ -5,7 +5,7 @@ import type { IdealizedSoilProfile } from '../../core/models/idealized-soil-prof
 import type { BoreholeRecord } from '../../core/models/field-data'
 import { forceToBase, forceFromBase, stressFromBase, stressToBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
 import type { SubgradeReactionMethod, SubgradeSoilType } from '../../core/engineering/subgrade-reaction'
-import { updateProjectInfo, useProjectInfo } from '../../core/state/project-store'
+import { useProjectInfo } from '../../core/state/project-store'
 import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
 
@@ -55,10 +55,10 @@ function ProfileDiagram({ result }: { result: ReturnType<typeof calculateIdealiz
 
 export let latestIdealizedSettlementResult: ReturnType<typeof calculateIdealizedSettlement> | undefined
 
-export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile?: IdealizedSoilProfile; boreholes?: BoreholeRecord[] }) {
+export function IdealizedSettlementScreen({ profile, boreholes = [], onChange }: { profile?: IdealizedSoilProfile; boreholes?: BoreholeRecord[]; onChange:(profile:IdealizedSoilProfile)=>void }) {
   const p = useProjectInfo()
   const selectedMethod:IdealizedSettlementMethod=profile?.settlementMethod??'burland-burbidge'
-  const changeMethod=(value:IdealizedSettlementMethod)=>{if(profile)updateProjectInfo({idealizedSoilProfile:{...profile,settlementMethod:value}})}
+  const changeMethod=(value:IdealizedSettlementMethod)=>{if(profile)onChange({...profile,settlementMethod:value})}
   const [ksMethod, setKsMethod] = useState<SubgradeReactionMethod>('erol-plate')
   const [kv1Input, setKv1Input] = useState('')
   const [ksSoilType, setKsSoilType] = useState<SubgradeSoilType>('cohesive')
@@ -69,7 +69,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
   const qGross = finite(f.structuralWeight) && finite(f.footingWidth) && finite(f.footingLength)
     ? forceToBase(f.structuralWeight, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
     : 0
-  const setTime=(key:'settlementTimeYears'|'secondaryStartTimeYears',raw:string)=>{if(!profile)return;const value=raw.trim()===''?undefined:Number(raw);if(value!==undefined&&(!Number.isFinite(value)||value<0||(key==='secondaryStartTimeYears'&&value===0)))return;updateProjectInfo({idealizedSoilProfile:{...profile,[key]:value}})}
+  const setTime=(key:'settlementTimeYears'|'secondaryStartTimeYears',raw:string)=>{if(!profile)return;const value=raw.trim()===''?undefined:Number(raw);if(value!==undefined&&(!Number.isFinite(value)||value<0||(key==='secondaryStartTimeYears'&&value===0)))return;onChange({...profile,[key]:value})}
 
   const result = useMemo(() => {
     if (!profile || profile.status !== 'SABİTLENDİ') return undefined
