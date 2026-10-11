@@ -10,9 +10,29 @@ import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.t
 import { captureSptStressSnapshot, deriveSptValues } from '../src/core/engineering/field-calculations.ts'
 import { toEngineeringSI } from '../src/core/units/engineering-input-adapter.ts'
 import { normalizeEngineeringRenderModel } from '../src/renderer/src/components/engineering-render-model.ts'
+import { stage2BearingCapacity, stage2Settlement } from '../src/core/engineering/stage2-engine.ts'
 
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(Math.abs(actual-expected)<=tolerance,`expected ${expected}, got ${actual}`)
+}
+
+{
+  assert.throws(() => stage2Settlement({ B: 0, q: 100, layers: [{ thickness: 1, sigmaV0: 100, deltaSigma: 50, Es: 10000 }] }), /B ve L boyutları pozitif/)
+  assert.throws(() => stage2Settlement({ B: 2, q: 100, layers: [{ thickness: 1, sigmaV0: 100, deltaSigma: 50, Es: 10000, nu: 0.6 }] }), /Poisson oranı/)
+  assert.throws(() => stage2Settlement({ B: 2, q: 100, layers: [{ thickness: -1, sigmaV0: 100, deltaSigma: 50, Es: 10000 }] }), /kalınlık pozitif/)
+  const settlement = stage2Settlement({
+    B: 2, q: 100, layers: [{ thickness: 2, sigmaV0: 100, deltaSigma: 50, Es: 10000, nu: 0.3 }], method: 'elastic'
+  })
+  approx(settlement.value.total, 0.0091)
+}
+
+{
+  assert.throws(() => stage2BearingCapacity({
+    B: 0, L: 2, Df: 1, gamma: 18, c: 0, phi: 30, method: 'Meyerhof'
+  }), /fiziksel sınırlar/)
+  assert.throws(() => stage2BearingCapacity({
+    B: 2, L: 2, Df: 1, gamma: 18, c: 0, phi: 30, FS: 0, method: 'Meyerhof'
+  }), /FS pozitif/)
 }
 
 {
