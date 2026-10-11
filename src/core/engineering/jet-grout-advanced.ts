@@ -146,6 +146,8 @@ export interface JetGroutQCInput {
   requiredCoreSamples?: number
   measuredCoreSamples?: number
   continuityVerified?: boolean
+  constructionLogsVerified?: boolean
+  testReportReviewed?: boolean
 }
 export interface JetGroutQCCheck { name: string; required: string; measured: string; passed: boolean }
 export interface JetGroutQCResult { status: 'pass' | 'fail' | 'not-evaluable'; checks: JetGroutQCCheck[]; warnings: string[] }
@@ -161,11 +163,14 @@ export function verifyJetGroutQC(i: JetGroutQCInput): JetGroutQCResult {
   if(i.requiredDiameter!=null&&i.measuredDiameter!=null)checks.push({name:'Kolon çapı',required:String(i.requiredDiameter)+' m',measured:String(i.measuredDiameter)+' m',passed:i.measuredDiameter>=i.requiredDiameter})
   if(i.requiredCoreSamples!=null&&i.measuredCoreSamples!=null)checks.push({name:'Karot numune adedi',required:String(i.requiredCoreSamples)+' adet',measured:String(i.measuredCoreSamples)+' adet',passed:i.measuredCoreSamples>=i.requiredCoreSamples})
   if(i.continuityVerified!=null)checks.push({name:'Kolon sürekliliği',required:'Doğrulanmış',measured:i.continuityVerified?'Doğrulandı':'Doğrulanmadı',passed:i.continuityVerified})
+  if(i.constructionLogsVerified!=null)checks.push({name:'İmalat kayıtları',required:'İncelenmiş',measured:i.constructionLogsVerified?'İncelendi':'İncelenmedi',passed:i.constructionLogsVerified})
+  if(i.testReportReviewed!=null)checks.push({name:'Deney raporları',required:'İncelenmiş',measured:i.testReportReviewed?'İncelendi':'İncelenmedi',passed:i.testReportReviewed})
   const missing=[
     i.requiredUcs==null?'proje UCS kabul kriteri':undefined,i.measuredUcs==null?'ölçülen UCS':undefined,
     i.requiredDiameter==null?'proje kolon çapı kriteri':undefined,i.measuredDiameter==null?'ölçülen kolon çapı':undefined,
     i.requiredCoreSamples==null?'gerekli karot adedi':undefined,i.measuredCoreSamples==null?'alınan karot adedi':undefined,
-    i.continuityVerified==null?'süreklilik doğrulaması':undefined
+    i.continuityVerified==null?'süreklilik doğrulaması':undefined,
+    i.constructionLogsVerified==null?'imalat kayıtlarının incelenmesi':undefined,i.testReportReviewed==null?'deney raporlarının incelenmesi':undefined
   ].filter((x):x is string=>Boolean(x))
   const warnings=['Kabul kriterleri proje şartnamesi/zemin iyileştirme tasarımına göre tanımlanmalıdır; bu kontrol evrensel bir TBDY kabul eşiği oluşturmaz.']
   if(missing.length)warnings.push('Kalite kontrolü tamamlanamadı; eksik: '+missing.join(', ')+'.')
