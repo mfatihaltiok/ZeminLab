@@ -206,7 +206,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(i.undrainedCu!=null&&i.undrainedCu<0)throw new Error('Cu negatif olamaz.')
   if(i.additionalSurcharge!=null&&i.additionalSurcharge<0)throw new Error('Ek sürşarj negatif olamaz.')
   if(i.groundwaterDepth!=null&&i.groundwaterDepth<0)throw new Error('YASS derinliği negatif olamaz.')
-  if(i.layers?.some(l=>![l.topDepth,l.bottomDepth,l.gamma,l.cohesion,l.phi].every(finite)||l.topDepth<0||l.bottomDepth<=l.topDepth||l.gamma<=0||l.cohesion<0||l.phi<0||l.phi>50||(l.gammaSat!=null&&(!finite(l.gammaSat)||l.gammaSat<=gammaW))||(i.groundwaterDepth!=null&&l.bottomDepth>i.groundwaterDepth&&l.gammaSat==null)))throw new Error('Tabakalı zemin verilerinde derinlik, γ, γsat, kohezyon veya sürtünme açısı geçersiz; YASS altındaki katmanlarda γsat açıkça girilmelidir.')
+  if(i.layers?.some(l=>![l.topDepth,l.bottomDepth,l.gamma,l.cohesion,l.phi].every(finite)||l.topDepth<0||l.bottomDepth<=l.topDepth||l.gamma<=0||l.cohesion<0||l.phi<0||l.phi>50||(l.gammaSat!=null&&(!finite(l.gammaSat)||l.gammaSat<=gammaW))||(i.groundwaterDepth!=null&&l.topDepth<i.Df+i.B&&l.bottomDepth>i.groundwaterDepth&&l.gammaSat==null)))throw new Error('Tabakalı zemin verilerinde derinlik, γ, γsat, kohezyon veya sürtünme açısı geçersiz; YASS altındaki katmanlarda γsat açıkça girilmelidir.')
   if(i.layers?.length){const ordered=[...i.layers].sort((a,b)=>a.topDepth-b.topDepth);for(let k=1;k<ordered.length;k++)if(ordered[k].topDepth<ordered[k-1].bottomDepth-1e-9)throw new Error('Tabakalı zemin profili çakışan derinlik aralıkları içeremez.')}
   const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad
   const Vh=Math.abs(i.horizontalLoad??0)
