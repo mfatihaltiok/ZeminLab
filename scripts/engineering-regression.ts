@@ -60,7 +60,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
-  const s=calculateSpt({nField:20,energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10,effectiveStress:100,fineContent:30})
+  const s=calculateSpt({nField:20,energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10,effectiveStress:100,fineContent:30,soilCode:'SP'})
   assert.throws(()=>calculateSpt({nField:10,hammerType:'measured',sampler:'standard',rodLengthM:5}),/Ölçülmüş enerji oranı/)
   assert.throws(()=>calculateSpt({nField:10,energyRatio:60,effectiveStress:-1,rodLengthM:5}),/efektif düşey gerilme/)
   assert.throws(()=>calculateSpt({nField:10,energyRatio:90,ce:1,hammerType:'automatic',rodLengthM:5}),/ER ile CE/)
@@ -88,7 +88,8 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     sampler:'without-liner',
     samplerCorrection:1.20,
     rodLengthM:5,
-    effectiveStress:100
+    effectiveStress:100,
+    soilCode:'SP'
   })
   approx(corrected.n60,21.42,1e-12)
   approx(corrected.cn,0.978,1e-12)
@@ -97,7 +98,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
-  const global=calculateSpt({nField:20,ce:.90,cb:1.05,cs:1.20,rodLengthM:8,effectiveStress:100})
+  const global=calculateSpt({nField:20,ce:.90,cb:1.05,cs:1.20,rodLengthM:8,effectiveStress:100,soilCode:'SP'})
   approx(global.cr,.95,1e-12)
   approx(global.n60,20*.90*1.05*1.20*.95,1e-12)
   approx(global.n1_60,global.n60*.978,1e-12)
