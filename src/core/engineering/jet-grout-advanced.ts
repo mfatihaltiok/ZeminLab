@@ -5,9 +5,13 @@ export interface PriebeScreeningResult { n0: number; n1: number; activeEarthPres
 
 /** Priebe 1995 is retained only as a clearly labelled stone-column/vibro-replacement screening check. */
 export function priebeScreening(i: PriebeScreeningInput): PriebeScreeningResult {
-  const ar = Math.min(0.95, Math.max(1e-6, i.areaReplacementRatio))
-  const phi = Math.max(0, Math.min(60, i.columnFrictionAngle)) * Math.PI / 180
-  const mu = i.soilPoissonRatio == null ? 1 / 3 : Math.max(0, Math.min(0.49, i.soilPoissonRatio))
+  if(!Number.isFinite(i.areaReplacementRatio)||i.areaReplacementRatio<=0||i.areaReplacementRatio>=1)throw new Error('Priebe tarama hesabında alan değiştirme oranı 0<ar<1 olmalıdır.')
+  if(!Number.isFinite(i.columnFrictionAngle)||i.columnFrictionAngle<0||i.columnFrictionAngle>=90)throw new Error('Taş kolon sürtünme açısı 0°≤φ<90° olmalıdır.')
+  if(i.soilPoissonRatio!=null&&(!Number.isFinite(i.soilPoissonRatio)||i.soilPoissonRatio<0||i.soilPoissonRatio>=0.5))throw new Error('Poisson oranı 0≤ν<0.5 olmalıdır.')
+  if(i.columnModulus!=null&&(!Number.isFinite(i.columnModulus)||i.columnModulus<=0)||i.soilModulus!=null&&(!Number.isFinite(i.soilModulus)||i.soilModulus<=0))throw new Error('Modül oranı için Es değerleri pozitif olmalıdır.')
+  const ar = i.areaReplacementRatio
+  const phi = i.columnFrictionAngle * Math.PI / 180
+  const mu = i.soilPoissonRatio ?? 1 / 3
   const ka = Math.pow(Math.tan(Math.PI / 4 - phi / 2), 2)
   const f = ((1 - mu) * (1 - ar)) / Math.max(1 - 2 * mu + ar, 1e-9)
   const n0 = 1 + ar * ((1 + f / Math.max(ka, 1e-9)) / Math.max(f, 1e-9) - 1)
@@ -19,8 +23,10 @@ export function priebeScreening(i: PriebeScreeningInput): PriebeScreeningResult 
 export interface VirtualRaftInput { load: number; area: number; treatedThickness: number; untreatedModulus: number; treatedModulus: number; poissonRatio?: number }
 export interface VirtualRaftResult { q: number; untreatedSettlement: number; treatedSettlement: number; reductionRatio: number; reductionPercent: number; formula: string }
 export function virtualRaftSettlement(i: VirtualRaftInput): VirtualRaftResult {
-  const A = Math.max(i.area, 1e-9), H = Math.max(i.treatedThickness, 0), Es = Math.max(i.untreatedModulus, 1e-9), Ec = Math.max(i.treatedModulus, 1e-9)
-  const nu = Math.max(0, Math.min(0.49, i.poissonRatio ?? 0.30)), q = Math.max(0, i.load) / A, factor = 1 - nu * nu
+  if(![i.load,i.area,i.treatedThickness,i.untreatedModulus,i.treatedModulus].every(Number.isFinite)||i.load<0||i.area<=0||i.treatedThickness<=0||i.untreatedModulus<=0||i.treatedModulus<=0)throw new Error('Sanal radye hesabında yük negatif olmayan, alan/kalınlık/modüller pozitif sonlu olmalıdır.')
+  if(i.poissonRatio!=null&&(!Number.isFinite(i.poissonRatio)||i.poissonRatio<=-1||i.poissonRatio>=0.5))throw new Error('Poisson oranı -1<ν<0.5 aralığında olmalıdır.')
+  const A = i.area, H = i.treatedThickness, Es = i.untreatedModulus, Ec = i.treatedModulus
+  const nu = i.poissonRatio ?? 0.30, q = i.load / A, factor = 1 - nu * nu
   const untreatedSettlement = q * H * factor / Es, treatedSettlement = q * H * factor / Ec
   const reductionRatio = untreatedSettlement > 0 ? treatedSettlement / untreatedSettlement : 0
   return { q, untreatedSettlement, treatedSettlement, reductionRatio, reductionPercent: Math.max(0, 1 - reductionRatio) * 100, formula: 's = q·H·(1−ν²)/E; treated/untreated equivalent-layer comparison' }
@@ -29,9 +35,11 @@ export function virtualRaftSettlement(i: VirtualRaftInput): VirtualRaftResult {
 export interface ShearSafetyInput { verticalLoad: number; horizontalLoad: number; area: number; cohesion: number; frictionAngle: number; effectiveNormalStress?: number }
 export interface ShearSafetyResult { shearStress: number; shearResistance: number; FS: number; formula: string }
 export function jetGroutShearSafety(i: ShearSafetyInput): ShearSafetyResult {
-  const A = Math.max(i.area, 1e-9), tau = Math.max(0, i.horizontalLoad) / A, sigma = i.effectiveNormalStress != null ? Math.max(0, i.effectiveNormalStress) : Math.max(0, i.verticalLoad) / A
-  const phi = Math.max(0, i.frictionAngle) * Math.PI / 180, resistance = Math.max(0, i.cohesion) + sigma * Math.tan(phi)
-  return { shearStress: tau, shearResistance: resistance, FS: tau > 0 ? resistance / tau : 99, formula: 'FS = [c′ + σ′n·tanφ′] / τ, τ = H/A' }
+  if(![i.verticalLoad,i.horizontalLoad,i.area,i.cohesion,i.frictionAngle].every(Number.isFinite)||i.verticalLoad<0||i.horizontalLoad<0||i.area<=0||i.cohesion<0||i.frictionAngle<0||i.frictionAngle>50)throw new Error('Jet Grout kayma girdileri geçersiz.')
+  if(i.effectiveNormalStress!=null&&(!Number.isFinite(i.effectiveNormalStress)||i.effectiveNormalStress<0))throw new Error('Efektif normal gerilme negatif olmayan sonlu değer olmalıdır.')
+  const A = i.area, tau = i.horizontalLoad / A, sigma = i.effectiveNormalStress != null ? i.effectiveNormalStress : i.verticalLoad / A
+  const phi = i.frictionAngle * Math.PI / 180, resistance = i.cohesion + sigma * Math.tan(phi)
+  return { shearStress: tau, shearResistance: resistance, FS: tau > 0 ? resistance / tau : Number.POSITIVE_INFINITY, formula: 'FS = [c′ + σ′n·tanφ′] / τ, τ = H/A' }
 }
 
 export interface JetGroutLayer {
@@ -76,7 +84,15 @@ export interface JetGroutAxialResult {
  * remain explicit inputs instead of being guessed from the book.
  */
 export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResult {
-  const d = Math.max(i.diameter, 1e-6), Ab = Math.PI * d * d / 4, perimeter = Math.PI * d
+  if(!Number.isFinite(i.diameter)||i.diameter<=0)throw new Error('Jet Grout kolon çapı pozitif olmalıdır.')
+  if(!Array.isArray(i.layers)||i.layers.length===0)throw new Error('Jet Grout eksenel kapasitesi için zemin tabakaları gereklidir.')
+  if(i.columnStrength!=null&&(!Number.isFinite(i.columnStrength)||i.columnStrength<=0))throw new Error('Jet Grout kolon dayanımı pozitif olmalıdır.')
+  if(i.numberOfColumns!=null&&(!Number.isInteger(i.numberOfColumns)||i.numberOfColumns<1))throw new Error('Kolon sayısı pozitif tamsayı olmalıdır.')
+  if(i.groupRows!=null&&(!Number.isInteger(i.groupRows)||i.groupRows<1)||i.groupColumns!=null&&(!Number.isInteger(i.groupColumns)||i.groupColumns<1))throw new Error('Grup satır/sütun sayıları pozitif tamsayı olmalıdır.')
+  if(i.groupSpacing!=null&&(!Number.isFinite(i.groupSpacing)||i.groupSpacing<=0))throw new Error('Grup aks aralığı pozitif olmalıdır.')
+  if(i.resistanceFactor!=null&&(!Number.isFinite(i.resistanceFactor)||i.resistanceFactor<=0))throw new Error('Direnç katsayısı pozitif olmalıdır.')
+  for(const [index,l] of i.layers.entries())if(![l.thickness,l.gamma,l.cohesion,l.frictionAngle].every(Number.isFinite)||l.thickness<=0||l.gamma<=0||l.cohesion<0||l.frictionAngle<0||l.frictionAngle>50||(l.effectiveStressAtTop!=null&&(!Number.isFinite(l.effectiveStressAtTop)||l.effectiveStressAtTop<0))||(l.effectiveStressAtBottom!=null&&(!Number.isFinite(l.effectiveStressAtBottom)||l.effectiveStressAtBottom<0))||(l.interfaceAlpha!=null&&(!Number.isFinite(l.interfaceAlpha)||l.interfaceAlpha<0||l.interfaceAlpha>1))||(l.interfaceDelta!=null&&(!Number.isFinite(l.interfaceDelta)||l.interfaceDelta<0||l.interfaceDelta>50)))throw new Error('Jet Grout tabaka '+(index+1)+' parametreleri geçersiz.')
+  const d = i.diameter, Ab = Math.PI * d * d / 4, perimeter = Math.PI * d
   let shaftCharacteristic = 0
   const layerTrace = i.layers.map((layer, index) => {
     const H = Math.max(0, layer.thickness)
@@ -114,7 +130,7 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
   const groupCharacteristic = Math.min(columnCharacteristic * n, blockCharacteristic)
   const governingMode = columnCharacteristic * n <= blockCharacteristic ? 'individual' : 'block'
   const groupEfficiency = columnCharacteristic * n > 0 ? groupCharacteristic / (columnCharacteristic * n) : 0
-  const resistanceFactor = Math.max(i.resistanceFactor ?? 1, 1)
+  const resistanceFactor = i.resistanceFactor ?? 1
   return { shaftCharacteristic, tipCharacteristic, columnCharacteristic, groupCharacteristic, designCapacity: groupCharacteristic / resistanceFactor, groupEfficiency, governingMode, layerTrace, source: 'Erol & Çekinmez Bayram (2018) Jet Enjeksiyon Yöntemi; kapasite alt kontrolleri genel geoteknik uç/şaft dayanımı bağıntılarıyla ve açık kullanıcı girdileriyle yürütülür.' }
 }
 
