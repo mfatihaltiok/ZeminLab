@@ -867,6 +867,8 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
     }]
   })
   assert.ok(axial.designCapacity>0)
+  const axialClay=jetGroutAxialCapacity({diameter:0.6,columnStrength:100000,numberOfColumns:1,resistanceFactor:1.4,layers:[{thickness:1,gamma:18,cohesion:100,frictionAngle:0,effectiveStressAtTop:10,effectiveStressAtBottom:20,interfaceAlpha:1,interfaceDelta:0}]})
+  approx(axialClay.tipCharacteristic,(100*5.14+20)*Math.PI*0.6**2/4,1e-8)
   assert.throws(()=>jetGroutAxialCapacity({
     diameter:0.6,columnStrength:2500,numberOfColumns:1,resistanceFactor:1.4,layers:[{
       thickness:3,gamma:18,cohesion:10,frictionAngle:30
