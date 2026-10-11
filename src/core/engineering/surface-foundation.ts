@@ -291,7 +291,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const layerQk=checks.length?Math.min(...checks.map(x=>x.qk)):Infinity
   const qk=checks.length?Math.min(equivalentQk,layerQk):equivalentQk
   if(checks.length){for(const x of checks)x.controlling=Math.abs(x.qk-layerQk)<=1e-9}
-  const qt=qk/rf
+  const qt=method==='TBDY-2018'?qk/rf:i.safetyFactor!=null?qk/i.safetyFactor:0
   const qAvg=effectiveArea>0?N/(i.B*i.L):Infinity
   const qo=effectiveArea>0?N/effectiveArea:Infinity
   const contact=compressionContact(i.B,i.L,N,i.momentX??0,i.momentY??0)
