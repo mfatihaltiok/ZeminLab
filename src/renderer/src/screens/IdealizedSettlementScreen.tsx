@@ -58,9 +58,8 @@ export let latestIdealizedSettlementResult: ReturnType<typeof calculateIdealized
 export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile?: IdealizedSoilProfile; boreholes?: BoreholeRecord[] }) {
   const p = useProjectInfo()
   const updateProjectInfo=useProjectInfo().updateProjectInfo
-  const [method, setMethod] = useState<IdealizedSettlementMethod>('burland-burbidge')
-  const selectedMethod:IdealizedSettlementMethod=profile?.settlementMethod??method
-  const changeMethod=(value:IdealizedSettlementMethod)=>{setMethod(value);if(profile)updateProjectInfo({idealizedSoilProfile:{...profile,settlementMethod:value}})}
+  const selectedMethod:IdealizedSettlementMethod=profile?.settlementMethod??'burland-burbidge'
+  const changeMethod=(value:IdealizedSettlementMethod)=>{if(profile)updateProjectInfo({idealizedSoilProfile:{...profile,settlementMethod:value}})}
   const [ksMethod, setKsMethod] = useState<SubgradeReactionMethod>('erol-plate')
   const [kv1Input, setKv1Input] = useState('')
   const [ksSoilType, setKsSoilType] = useState<SubgradeSoilType>('cohesive')
