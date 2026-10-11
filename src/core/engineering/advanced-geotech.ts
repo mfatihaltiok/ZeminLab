@@ -163,6 +163,9 @@ export interface JetGroutAdvancedResult {
   areaReplacementRatio: number
   compositeCapacity: number
   allowableCapacity?: number
+  appliedPressure?: number
+  designUtilization?: number
+  designAdequate?: boolean
   compositeModulus?: number
   compositeCohesion?: number
   columnLoadShare: number
@@ -217,6 +220,9 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
     ? compositeCapacity * i.foundationArea / i.load
     : undefined
   const allowableCapacity = i.FS != null ? compositeCapacity / i.FS : undefined
+  const appliedPressure=i.load!=null&&i.foundationArea!=null&&i.foundationArea>0?i.load/i.foundationArea:undefined
+  const designUtilization=allowableCapacity!=null&&allowableCapacity>0&&appliedPressure!=null?appliedPressure/allowableCapacity:undefined
+  const designAdequate=designUtilization!=null?designUtilization<=1:undefined
 
   return {
     areaColumn: Ac,
@@ -224,6 +230,9 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
     areaReplacementRatio: ar,
     compositeCapacity,
     allowableCapacity,
+    appliedPressure,
+    designUtilization,
+    designAdequate,
     compositeModulus,
     compositeCohesion,
     columnLoadShare,
