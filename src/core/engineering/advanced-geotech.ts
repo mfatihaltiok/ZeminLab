@@ -81,7 +81,11 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
   for (const [index,l] of layers.entries()) {
     const values=[l.thickness,l.sigma0,l.deltaSigma,l.Es,l.mv,l.Cc,l.e0,l.Cr,l.sigmaPc]
     if(values.some(v=>v!==undefined&&!Number.isFinite(v)))throw new Error('Oturma katmanı '+(index+1)+': parametreler sonlu olmalıdır.')
-    if(l.thickness<=0||l.deltaSigma<0||l.Es!=null&&l.Es<=0||l.mv!=null&&l.mv<0||l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<0||l.Cr!=null&&l.Cr<0||l.sigmaPc!=null&&l.sigmaPc<=0)throw new Error('Oturma katmanı '+(index+1)+': fiziksel olmayan parametre.')
+    if(l.thickness<=0||l.deltaSigma<0||l.Es!=null&&l.Es<=0||l.mv!=null&&l.mv<0||l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<0||l.Cr!=null&&l.Cr<0||l.sigmaPc!=null&&l.sigmaPc<=0||l.sigma0!=null&&l.sigma0<=0)throw new Error('Oturma katmanı '+(index+1)+': fiziksel olmayan parametre.')
+    if((l.Cc!=null)!==(l.e0!=null))throw new Error('Oturma katmanı '+(index+1)+': Cc ve e0 birlikte girilmelidir.')
+    if(l.Cr!=null&&l.Cc==null)throw new Error('Oturma katmanı '+(index+1)+': Cr girildiyse Cc de gereklidir.')
+    if(l.Cc!=null&&l.sigma0==null)throw new Error('Oturma katmanı '+(index+1)+': Cc/e0 konsolidasyonu için σ′v0 gereklidir.')
+    if(l.sigmaPc!=null&&l.sigma0!=null&&l.sigmaPc<l.sigma0)throw new Error('Oturma katmanı '+(index+1)+': σpc, başlangıç efektif gerilmesinden küçük olamaz.')
     const H = l.thickness
     const ds = l.deltaSigma
     let s = 0
@@ -114,6 +118,8 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
     } else if (l.Es != null && l.Es > 0) {
       s = H * ds / l.Es
       immediate += s
+    } else {
+      warnings.push('Katman '+(index+1)+': pozitif Es veya mv ya da eksiksiz Cc/e0/σ′v0 parametreleri yok; katman oturması hesaplanmadı.')
     }
     details.push({ settlement: Math.max(0, s), type })
   }
