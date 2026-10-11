@@ -152,7 +152,8 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
   const codeIsClay=isClaySoilCode(soilCode)
   const classificationConflict=explicitSoilCode&&labClassification!==null&&codeIsClay!==labClassification.isClay
   const claySoil=labClassification?.isClay===true||codeIsClay
-  const claySoilSource=claySoil?(labClassification?.isClay===true?'Laboratuvar Atterberg sınıflandırması':`Zemin sınıfı ${soilCode}`):undefined
+  const clayFlag=labClassification!==null?labClassification.isClay:codeIsClay?true:undefined
+  const claySoilSource=clayFlag===true?(labClassification?.isClay===true?'Laboratuvar Atterberg sınıflandırması':`Zemin sınıfı ${soilCode}`):undefined
   const fineContent=lab?.finesContent??lab?.sieve200Passing??layer?.finesContent
   const result=calculateSpt({
     nField,
@@ -163,7 +164,8 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
     sptDepthM:record.depth,
     effectiveStress:stress.effectiveStress,
     fineContent,
-    claySoil,
+    soilCode,
+    claySoil:clayFlag,
     claySoilSource,
     applyOverburden:true,
     applyDilatancy:false
