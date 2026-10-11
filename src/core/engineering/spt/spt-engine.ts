@@ -128,7 +128,7 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const n60=input.nField*ce*cb*cs*cr
   const sigma=input.effectiveStress
   const applyOverburden=input.applyOverburden??true
-  const clayCode=(input.soilCode??'').trim().toUpperCase().replace(/[\\s_]/g,'')
+  const clayCode=(input.soilCode??'').trim().toUpperCase().replace(/[\s_]/g,'')
   const inferredClay=['CL','CH','CLAY','KIL','KİL'].includes(clayCode)||clayCode.startsWith('CI')
   const claySoil=input.claySoil??inferredClay
   let cn=1
