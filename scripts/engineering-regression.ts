@@ -4,6 +4,7 @@ import { calculateSurfaceFoundation } from '../src/core/engineering/surface-foun
 import { liquefactionProfile } from '../src/core/engineering/liquefaction/liquefaction-profile.ts'
 import { foundationChecks } from '../src/core/engineering/calculation-engine.ts'
 import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-settlement-engine.ts'
+import { stage2Settlement } from '../src/core/engineering/stage2-engine.ts'
 import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
@@ -14,6 +15,22 @@ import { normalizeEngineeringRenderModel } from '../src/renderer/src/components/
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(Math.abs(actual-expected)<=tolerance,`expected ${expected}, got ${actual}`)
 }
+
+{
+  const result=stage2Settlement({B:2,L:2,q:100,qNet:100,method:'2:1',layers:[
+    {thickness:1,sigmaV0:100,deltaSigma:0,Es:10000},
+    {thickness:1,sigmaV0:120,deltaSigma:0,Es:10000}
+  ]})
+  approx(result.value.layerResults[0].deltaSigma,64)
+  approx(result.value.layerResults[1].deltaSigma,400/(3.5*3.5))
+  assert.throws(()=>stage2Settlement({B:2,L:2,q:100,method:'elastic',layers:[
+    {thickness:1,sigmaV0:100,deltaSigma:10,Es:10000,nu:0.5}
+  ]}))
+  assert.throws(()=>stage2Settlement({B:2,L:2,q:100,method:'elastic',layers:[
+    {thickness:-1,sigmaV0:100,deltaSigma:10,Es:10000}
+  ]}))
+}
+
 
 {
   const render=normalizeEngineeringRenderModel({variant:'profile',totalDepth:10,layers:[
