@@ -22,8 +22,8 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 
 {
   const result=stage2Settlement({B:2,L:2,q:100,qNet:100,method:'2:1',layers:[
-    {thickness:1,sigmaV0:100,deltaSigma:0,Es:10000},
-    {thickness:1,sigmaV0:120,deltaSigma:0,Es:10000}
+    {thickness:1,sigmaV0:100,deltaSigma:0,Es:10000,nu:0.3},
+    {thickness:1,sigmaV0:120,deltaSigma:0,Es:10000,nu:0.3}
   ]})
   approx(result.value.layerResults[0].deltaSigma,64)
   approx(result.value.layerResults[1].deltaSigma,400/(3.5*3.5))
@@ -58,6 +58,8 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 
 {
   const s=calculateSpt({nField:20,energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10,effectiveStress:100,fineContent:30})
+  assert.throws(()=>calculateSpt({nField:10,hammerType:'measured',sampler:'standard',rodLengthM:5}),/Ölçülmüş enerji oranı/)
+  assert.throws(()=>calculateSpt({nField:10,energyRatio:60,effectiveStress:-1,rodLengthM:5}),/efektif düşey gerilme/)
   approx(s.ce,1)
   approx(s.cb,1)
   approx(s.cs,1)
@@ -408,6 +410,13 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(seismicCu.slidingCapacityResultant,4*100/1.1)
   assert.equal(seismicCu.slidingMode,'undrained-cu')
   assert.equal(seismicCu.evaluable,true)
+  const missingGroundwater=foundationChecks({B:2,L:2,N:1000,Vx:500,Vy:0,Mx:0,My:0,seismic:true,interfaceType:'cast-in-place-soil'})
+  assert.equal(missingGroundwater.evaluable,false)
+  assert.equal(missingGroundwater.slidingCapacityResultant,0)
+  const missingInterface=foundationChecks({B:2,L:2,N:1000,Vx:500,Vy:0,Mx:0,My:0,deltaTan:0.6,groundwaterDepth:10,foundationDepth:1,seismic:true})
+  assert.equal(missingInterface.evaluable,false)
+  assert.equal(missingInterface.slidingTanDelta,0)
+  assert.throws(()=>foundationChecks({B:2,L:2,N:1000,Vx:100,Vy:0,Mx:0,My:0,deltaTan:0.7,interfaceType:'precast-soil'}),/üst sınırını aşamaz/)
 }
 
 
@@ -785,6 +794,10 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.throws(()=>jetGroutAdvanced({columnDiameter:0.6,spacing:1.5,qSoil:-1,qColumn:1000}))
   const ks=calculateSubgradeReaction({B:2,L:4,Es:20000,nu:0.3,method:'elastic',unitSystem:'kN-m'})
   assert.ok(Number.isFinite(ks.ks)&&ks.ks>0)
+  const plateClay=calculateSubgradeReaction({B:0.3048,L:0.3048,Kv1:10000,soilType:'cohesive',method:'erol-plate',unitSystem:'kN-m'})
+  const plateSand=calculateSubgradeReaction({B:0.3048,L:0.3048,Kv1:10000,soilType:'cohesionless',method:'erol-plate',unitSystem:'kN-m'})
+  approx(plateClay.ks,10000,1e-8)
+  approx(plateSand.ks,10000,1e-8)
 }
 
 {
