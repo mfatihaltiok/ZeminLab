@@ -149,7 +149,6 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
 
 function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile?: IdealizedSoilProfile): ReportSection | null {
   const f = p.foundationParameters
-  const soil = p.soilParameters
   const B = f.footingWidth, L = f.footingLength
 
   if (!profile || profile.status !== 'SABİTLENDİ' || !(B > 0 && L > 0)) return null
@@ -157,7 +156,7 @@ function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile?: 
   try {
     const qGross = forceToBase(f.structuralWeight, p.unitSystem) / (B * L)
     const result = settlement({
-      B, L, q: qGross,
+      B, q: qGross,
       Es: profile.layers[0]?.constrainedModulus ?? profile.layers[0]?.oedometricModulus ?? 10000,
       nu: profile.layers[0]?.poissonRatio ?? 0.3
     })
@@ -250,7 +249,7 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
   }
 }
 
-export function ProfessionalEngineeringReport({ boreholes, labs, profile }: Props) {
+export function ProfessionalEngineeringReport({ profile }: Props) {
   const p = useProjectInfo()
 
   const sections = useMemo(() => {

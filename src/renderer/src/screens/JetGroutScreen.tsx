@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { jetGroutEngineering, type JetGroutEngineeringInput } from '../../core/engineering/jet-grout-advanced'
+import { jetGroutEngineering, type JetGroutEngineeringInput } from '../../../core/engineering/jet-grout-advanced'
 
 interface JetGroutScreenProps {
   onBack: () => void
