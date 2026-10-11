@@ -38,6 +38,7 @@ export interface IdealizedSoilLayer {
   initialVoidRatio?: number
   preconsolidationPressure?: number
   secondaryCompressionIndex?: number
+  elasticModulus?: number
   constrainedModulus?: number
   oedometricModulus?: number
   poissonRatio?: number
