@@ -32,8 +32,8 @@ export function JetGroutEngineeringScreen(){
       load:projectLoad>0?projectLoad:undefined,foundationArea:projectArea>0?projectArea:undefined,
       foundationThickness:Number(thickness)>0?Number(thickness):undefined,
       soilPoissonRatio:nu!==''&&Number.isFinite(Number(nu))&&Number(nu)>-1&&Number(nu)<0.5?Number(nu):undefined,
-      columnFrictionAngle:Number(phi)>0?Number(phi):undefined,cohesion:Number(c)>0?Number(c):undefined,
-      frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH,
+      cohesion:Number(c)>0?stressToBase(Number(c),p.unitSystem):undefined,
+      frictionAngle:angle!==''&&Number.isFinite(Number(angle))&&Number(angle)>=0&&Number(angle)<=50?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH,
       qc:{
         requiredUcs:num(qcRequiredUcs)==null?undefined:stressToBase(num(qcRequiredUcs)!,p.unitSystem),
         measuredUcs:num(qcMeasuredUcs)==null?undefined:stressToBase(num(qcMeasuredUcs)!,p.unitSystem),
