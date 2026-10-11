@@ -96,7 +96,7 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   if(input.effectiveStress!==undefined&&(!Number.isFinite(input.effectiveStress)||input.effectiveStress<0))throw new Error('SPT örtü düzeltmesi için efektif düşey gerilme negatif olmayan sonlu değer olmalıdır.')
   if(input.boreholeDiameterMm!==undefined)boreholeFactor(input.boreholeDiameterMm)
   if(input.samplerCorrection!==undefined&&input.sampler!=='without-liner')throw new Error('CS düzeltmesi yalnız iç tüpsüz numune alıcı için girilebilir.')
-  if(input.cs!==undefined&&input.cs>1&&input.sampler!=='without-liner')throw new Error('CS>1 yalnız iç tüpsüz numune alıcı için kullanılabilir.')
+  if(input.cs!==undefined&&input.cs>1&&input.sampler!=='without-liner')throw new Error('Standart numune alıcı için CS=1.00 olmalıdır; CS>1 yalnız iç tüpsüz numune alıcı için kullanılabilir.')
   if(input.hammerType==='measured'&&input.energyRatio===undefined&&input.ce===undefined)throw new Error('Ölçülmüş enerji oranı seçildiğinde ER veya karşılık gelen CE açıkça girilmelidir.')
   if(input.energyRatio!==undefined)validateEnergyRatioForHammer(input.energyRatio,input.hammerType)
   const ceResolved=input.ce!==undefined?(validateEnergyRatioForHammer(input.ce*60,input.hammerType),directCoefficient('CE',input.ce,.45,1.60)!):( ()=>{const er=resolveEnergyRatio(input);validateEnergyRatioForHammer(er.value,input.hammerType);return{value:er.value/60,source:er.source,assumption:er.assumption}})()
