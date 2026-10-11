@@ -8,7 +8,7 @@ export interface CalculationResult<T>{value:T;steps:CalculationStep[];method:str
 const rad=(d:number)=>d*Math.PI/180
 const clamp=(x:number,a:number,b:number)=>Math.max(a,Math.min(b,x))
 
-export interface BearingInput{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS:number;method:BearingMethod;waterReduction?:number;surcharge?:number;gammaBearing?:number}
+export interface BearingInput{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS?:number;method:BearingMethod;waterReduction?:number;surcharge?:number;gammaBearing?:number}
 function factors(phiDeg:number,method:BearingMethod){
   const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi))
   const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
@@ -34,8 +34,8 @@ function classicalFactors(method:BearingMethod,B:number,L:number,Df:number,phi:n
   return{sc,sq,sg,dc,dq,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
 }
 export function bearingCapacity(i:BearingInput):CalculationResult<any>{
-  if(![i.B,i.L,i.Df,i.gamma,i.c,i.phi,i.FS].every(Number.isFinite))throw new Error('Taşıma gücü girdileri sonlu sayılar olmalıdır.')
-  if(i.B<=0||i.L<=0||i.Df<0||i.gamma<=0||i.c<0||i.FS<=0||i.phi<0||i.phi>50)throw new Error('Taşıma gücü girdileri fiziksel sınırlar dışında.')
+  if(![i.B,i.L,i.Df,i.gamma,i.c,i.phi].every(Number.isFinite)||i.FS!=null&&!Number.isFinite(i.FS))throw new Error('Taşıma gücü girdileri sonlu sayılar olmalıdır.')
+  if(i.B<=0||i.L<=0||i.Df<0||i.gamma<=0||i.c<0||i.FS!=null&&i.FS<=0||i.phi<0||i.phi>50)throw new Error('Taşıma gücü girdileri fiziksel sınırlar dışında.')
   if(!['Terzaghi','Meyerhof','Hansen','Vesic'].includes(i.method))throw new Error('Desteklenmeyen klasik taşıma gücü yöntemi.')
   const gammaTerm=i.waterReduction??1
   if(!Number.isFinite(gammaTerm)||gammaTerm<0||gammaTerm>1)throw new Error('Su düzeltme katsayısı 0 ile 1 arasında olmalıdır.')
@@ -44,7 +44,7 @@ export function bearingCapacity(i:BearingInput):CalculationResult<any>{
   const f=factors(i.phi,i.method),m=classicalFactors(i.method,i.B,i.L,i.Df,f.phi,f.Nq,f.Nc),q=i.surcharge??i.gamma*i.Df,gammaBearing=i.gammaBearing??i.gamma
   const ultimate=i.c*f.Nc*m.sc*m.dc*m.ic*m.gc*m.bc+q*f.Nq*m.sq*m.dq*m.iq*m.gq*m.bq+.5*gammaBearing*i.B*f.Ngamma*m.sg*m.dg*m.ig*m.gg*m.bg*gammaTerm
   const netUltimate=ultimate-q
-  const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:m.sc,sq:m.sq,sg:m.sg,dc:m.dc,dq:m.dq,dg:m.dg,ultimate,netUltimate,allowableGross:ultimate/i.FS,allowableNet:netUltimate/i.FS}
+  const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:m.sc,sq:m.sq,sg:m.sg,dc:m.dc,dq:m.dq,dg:m.dg,ultimate,netUltimate,allowableGross:i.FS!=null?ultimate/i.FS:undefined,allowableNet:i.FS!=null?netUltimate/i.FS:undefined}
   return{value,method:i.method,source:'Klasik taşıma gücü literatür bağıntıları; sonuçlar TBDY tasarım direnci yerine klasik izin verilebilir değerler olarak raporlanır.',steps:[
     {symbol:'Nq',title:'Taşıma gücü katsayısı',formula:'Nq=exp(πtanφ)·tan²(45°+φ/2)',value:f.Nq},
     {symbol:'Nc',title:'Kohezyon katsayısı',formula:'Nc=(Nq−1)cotφ',value:f.Nc},
@@ -52,8 +52,8 @@ export function bearingCapacity(i:BearingInput):CalculationResult<any>{
     {symbol:'q',title:'Sürşarj',formula:i.surcharge!=null?'q = efektif temel seviyesi sürşarjı (YASS düzeltmeli)':'q=γDf',value:q,unit:'kPa'},
     {symbol:'γNγ',title:'Nγ terimi için birim hacim ağırlık',formula:'γ′ veya YASS düzeltmeli γ',value:gammaBearing,unit:'kN/m³'},
     {symbol:'qult',title:'Nihai taşıma gücü',formula:'Klasik genel taşıma gücü denklemi',value:ultimate,unit:'kPa'},
-    {symbol:'qallow',title:'İzin verilen gross',formula:'qult/FS',value:value.allowableGross,unit:'kPa'}
-  ]}
+    {symbol:'qallow',title:'İzin verilen gross',formula:'qult/FS',value:value.allowableGross,unit:'kPa',note:i.FS==null?'FS girilmedi; izin verilebilir değer üretilmedi.':undefined}
+  ],warnings:i.FS==null?['Klasik izin verilebilir taşıma gücü için güvenlik katsayısı açıkça girilmelidir; FS varsayılmadı.']:[]}
 }
 
 export interface TbdyBearingInput{
