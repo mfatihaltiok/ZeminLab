@@ -33,6 +33,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.throws(()=>stage2Settlement({B:2,L:2,q:100,method:'elastic',layers:[
     {thickness:-1,sigmaV0:100,deltaSigma:10,Es:10000}
   ]}))
+  assert.throws(()=>stage2Settlement({B:2,L:2,Df:0,qNet:100,method:'consolidation',layers:[{thickness:1,sigmaV0:100,deltaSigma:50,Cc:0.2,e0:0.7,sigmaPc:150}]}),/Cr açıkça girilmelidir/)
 }
 
 
