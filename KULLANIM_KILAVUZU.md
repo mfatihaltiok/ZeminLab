@@ -23,7 +23,7 @@
 
 ## Genel Bakış
 
-ZeminLab, geoteknik mühendisliği hesaplamaları için geliştirilmiş bir masaüstü uygulamasıdır. TBDY 2018 (Türkiye Bina Deprem Yönetmeliği) ve ilgili standartlara uygun hesaplamalar yapar.
+ZeminLab, geoteknik mühendisliği hesaplamaları için geliştirilmiş bir masaüstü uygulamasıdır. TBDY 2018 kapsamındaki kontrolleri ve ilgili mühendislik literatüründeki yöntemleri ayrı hesap yollarında sunar. Literatür bağıntıları yönetmelik şartı olarak yorumlanmamalı; sonuçlar proje verileri ve sorumlu geoteknik mühendisin incelemesiyle doğrulanmalıdır.
 
 ### Temel Özellikler
 
