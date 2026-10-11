@@ -99,7 +99,8 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
     if(input.cb!=null&&Math.abs(input.cb-diameterCb)>1e-9)throw new Error('CB katsayısı ile sondaj çapı sınıfı birbiriyle çelişiyor.')
   }
   if(input.samplerCorrection!==undefined&&input.sampler!=='without-liner')throw new Error('CS düzeltmesi yalnız iç tüpsüz numune alıcı için girilebilir.')
-  if(input.cs!==undefined&&input.cs>1&&input.sampler!=='without-liner')throw new Error('Standart numune alıcı için CS=1.00 olmalıdır; CS>1 yalnız iç tüpsüz numune alıcı için kullanılabilir.')
+  if(input.cs!==undefined&&input.cs>1&&input.sampler!=null&&input.sampler!=='without-liner')throw new Error('Standart numune alıcı için CS=1.00 olmalıdır; CS>1 yalnız iç tüpsüz numune alıcı için kullanılabilir.')
+  if(input.cs!=null&&input.cs>1&&input.sampler==null&&(input.cs<1.10||input.cs>1.30))throw new Error('CS için yalnız 1.00 veya iç tüpsüz numune alıcıda 1.10–1.30 aralığı geçerlidir.')
   if(input.sampler==='without-liner'&&input.cs!=null&&input.cs<1.10)throw new Error('İç tüpsüz numune alıcı için CS=1.10–1.30 aralığında olmalıdır.')
   if(input.cs!=null&&input.samplerCorrection!=null&&Math.abs(input.cs-input.samplerCorrection)>1e-9)throw new Error('Girilen CS ile numune alıcı düzeltmesi birbiriyle çelişiyor.')
   if(input.hammerType==='measured'&&input.energyRatio===undefined&&input.ce===undefined)throw new Error('Ölçülmüş enerji oranı seçildiğinde ER veya karşılık gelen CE açıkça girilmelidir.')
