@@ -125,13 +125,15 @@ export function foundationChecks(i:FoundationCheckInput){
   }
   const interfaceProvided=i.interfaceType!=null
   const interfaceType=i.interfaceType??'cast-in-place-soil'
+  if(interfaceProvided&&!Object.prototype.hasOwnProperty.call(interfaceLimits,interfaceType))throw new Error('Temel-zemin arayüzü geçersiz.')
   const tanLimit=interfaceProvided?interfaceLimits[interfaceType]:0
-  const rawTan=i.deltaTan??(interfaceProvided?tanLimit:0)
+  const rawTan=interfaceProvided?(i.deltaTan??tanLimit):0
   if(rawTan<0||!Number.isFinite(rawTan))throw new Error('tanδ sıfır veya pozitif ve sonlu olmalıdır.')
   if(interfaceProvided&&rawTan>tanLimit+1e-9)throw new Error('Girilen tanδ, TBDY Tablo 16.3 seçilen arayüz üst sınırını aşamaz.')
   const deltaTan=rawTan
   const warnings:string[]=[]
   if(!interfaceProvided)warnings.push('Temel-zemin arayüzü seçilmedi; arayüz dayanımı kredilendirilmedi ve nihai kontrol veri eksik olarak işaretlendi.')
+  if(!interfaceProvided&&i.deltaTan!=null)warnings.push('tanδ değeri arayüz sınıfı olmadan kullanılmadı.')
   if(i.deltaTan==null&&interfaceProvided)warnings.push('tanδ girilmedi; seçilen arayüz için TBDY Tablo 16.3 üst sınırı kullanıldı. Proje özelinde deney/veri varsa doğrudan girilmelidir.')
   const submerged=i.groundwaterDepth!=null&&i.foundationDepth!=null&&i.groundwaterDepth<=i.foundationDepth
   const seismic=Boolean(i.seismic)
