@@ -138,6 +138,41 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
   return { shaftCharacteristic, tipCharacteristic, columnCharacteristic, groupCharacteristic, designCapacity: groupCharacteristic / resistanceFactor, groupEfficiency, governingMode, layerTrace, source: 'Erol & Çekinmez Bayram (2018) Jet Enjeksiyon Yöntemi; kapasite alt kontrolleri genel geoteknik uç/şaft dayanımı bağıntılarıyla ve açık kullanıcı girdileriyle yürütülür.' }
 }
 
+export interface JetGroutQCInput {
+  requiredUcs?: number
+  measuredUcs?: number
+  requiredDiameter?: number
+  measuredDiameter?: number
+  requiredCoreSamples?: number
+  measuredCoreSamples?: number
+  continuityVerified?: boolean
+}
+export interface JetGroutQCCheck { name: string; required: string; measured: string; passed: boolean }
+export interface JetGroutQCResult { status: 'pass' | 'fail' | 'not-evaluable'; checks: JetGroutQCCheck[]; warnings: string[] }
+
+/** Checks field measurements against project-specified acceptance criteria; it does not invent universal TBDY limits. */
+export function verifyJetGroutQC(i: JetGroutQCInput): JetGroutQCResult {
+  for(const [name,value] of [['requiredUcs',i.requiredUcs],['measuredUcs',i.measuredUcs],['requiredDiameter',i.requiredDiameter],['measuredDiameter',i.measuredDiameter],['requiredCoreSamples',i.requiredCoreSamples],['measuredCoreSamples',i.measuredCoreSamples]] as const) {
+    if(value!=null&&!Number.isFinite(value))throw new Error(name+' sonlu olmalıdır.')
+  }
+  if(i.requiredUcs!=null&&i.requiredUcs<=0||i.measuredUcs!=null&&i.measuredUcs<0||i.requiredDiameter!=null&&i.requiredDiameter<=0||i.measuredDiameter!=null&&i.measuredDiameter<=0||i.requiredCoreSamples!=null&&(!Number.isInteger(i.requiredCoreSamples)||i.requiredCoreSamples<1)||i.measuredCoreSamples!=null&&(!Number.isInteger(i.measuredCoreSamples)||i.measuredCoreSamples<0))throw new Error('Jet Grout kalite kontrol değerleri fiziksel sınırlar dışında.')
+  const checks:JetGroutQCCheck[]=[]
+  if(i.requiredUcs!=null&&i.measuredUcs!=null)checks.push({name:'Tek eksenli basınç dayanımı',required:String(i.requiredUcs),measured:String(i.measuredUcs),passed:i.measuredUcs>=i.requiredUcs})
+  if(i.requiredDiameter!=null&&i.measuredDiameter!=null)checks.push({name:'Kolon çapı',required:String(i.requiredDiameter),measured:String(i.measuredDiameter),passed:i.measuredDiameter>=i.requiredDiameter})
+  if(i.requiredCoreSamples!=null&&i.measuredCoreSamples!=null)checks.push({name:'Karot numune adedi',required:String(i.requiredCoreSamples),measured:String(i.measuredCoreSamples),passed:i.measuredCoreSamples>=i.requiredCoreSamples})
+  if(i.continuityVerified!=null)checks.push({name:'Kolon sürekliliği',required:'Doğrulanmış',measured:i.continuityVerified?'Doğrulandı':'Doğrulanmadı',passed:i.continuityVerified})
+  const missing=[
+    i.requiredUcs==null?'proje UCS kabul kriteri':undefined,i.measuredUcs==null?'ölçülen UCS':undefined,
+    i.requiredDiameter==null?'proje kolon çapı kriteri':undefined,i.measuredDiameter==null?'ölçülen kolon çapı':undefined,
+    i.requiredCoreSamples==null?'gerekli karot adedi':undefined,i.measuredCoreSamples==null?'alınan karot adedi':undefined,
+    i.continuityVerified==null?'süreklilik doğrulaması':undefined
+  ].filter((x):x is string=>Boolean(x))
+  const warnings=['Kabul kriterleri proje şartnamesi/zemin iyileştirme tasarımına göre tanımlanmalıdır; bu kontrol evrensel bir TBDY kabul eşiği oluşturmaz.']
+  if(missing.length)warnings.push('Kalite kontrolü tamamlanamadı; eksik: '+missing.join(', ')+'.')
+  if(checks.some(x=>!x.passed)&&missing.length===0)warnings.push('En az bir saha kalite kontrol ölçütü proje kabul kriterini sağlamıyor.')
+  return {status:missing.length?'not-evaluable':checks.every(x=>x.passed)?'pass':'fail',checks,warnings}
+}
+
 export interface JetGroutEngineeringInput extends JetGroutAdvancedInput {
   columnFrictionAngle?: number
   soilPoissonRatio?: number
@@ -148,8 +183,9 @@ export interface JetGroutEngineeringInput extends JetGroutAdvancedInput {
   horizontalLoad?: number
   shearNormalStress?: number
   axial?: JetGroutAxialInput
+  qc?: JetGroutQCInput
 }
-export interface JetGroutEngineeringResult extends JetGroutAdvancedResult { stressConcentrationFactor:number; virtualRaft?:VirtualRaftResult; shearSafety?:ShearSafetyResult; priebeScreening?:PriebeScreeningResult; axial?:JetGroutAxialResult; screeningOnly:boolean; warnings:string[] }
+export interface JetGroutEngineeringResult extends JetGroutAdvancedResult { stressConcentrationFactor:number; virtualRaft?:VirtualRaftResult; shearSafety?:ShearSafetyResult; priebeScreening?:PriebeScreeningResult; axial?:JetGroutAxialResult; qcVerification:JetGroutQCResult; screeningOnly:boolean; warnings:string[] }
 
 export function jetGroutEngineering(i: JetGroutEngineeringInput): JetGroutEngineeringResult {
   const base = jetGroutAdvanced(i)
@@ -159,8 +195,11 @@ export function jetGroutEngineering(i: JetGroutEngineeringInput): JetGroutEngine
   const shearSafety = i.verticalLoad != null && i.horizontalLoad != null && i.foundationArea != null && i.foundationArea > 0 && i.cohesion != null && i.frictionAngle != null
     ? jetGroutShearSafety({ verticalLoad: i.verticalLoad, horizontalLoad: i.horizontalLoad, area: i.foundationArea, cohesion: i.cohesion, frictionAngle: i.frictionAngle, effectiveNormalStress: i.shearNormalStress }) : undefined
   const axial = i.axial ? jetGroutAxialCapacity(i.axial) : undefined
-  const warnings=['Jet Grout kompozit sonuçları ön tasarım/screening niteliğindedir. Nihai kapasite ve oturma için saha deneyleri, kolon sürekliliği, dayanım/kalite kontrolü ve uygun grup/blok kontrolü ayrıca doğrulanmalıdır.']
+  const qcVerification=verifyJetGroutQC(i.qc??{})
+  const warnings=['Jet Grout kompozit sonuçları ön tasarım/screening niteliğindedir. Nihai kapasite ve oturma için saha deneyleri, kolon sürekliliği, dayanım/kalite kontrolü ve uygun grup/blok kontrolü ayrıca doğrulanmalıdır.',...qcVerification.warnings]
+  if(qcVerification.status==='fail')warnings.push('Jet Grout saha kalite kontrolü proje kabul kriterlerini karşılamıyor.')
+  if(qcVerification.status==='pass')warnings.push('Jet Grout saha kalite kontrolü yalnızca girilen proje kriterleri ve ölçümler kapsamında uygun bulundu.')
   if(i.load!=null&&i.foundationArea!=null&&i.EsSoil!=null&&i.EsColumn!=null&&i.foundationThickness!=null&&i.soilPoissonRatio==null)warnings.push('Sanal radye oturması hesaplanmadı: Poisson oranı ν açıkça girilmelidir.')
   if(i.columnFrictionAngle!=null)warnings.push('Priebe bağıntısı taş kolon/vibro-replacement içindir; Jet Grout sonucu olarak uygulanmadı.')
-  return { ...base, stressConcentrationFactor: beta, virtualRaft, shearSafety, priebeScreening: undefined, axial, screeningOnly: true, warnings }
+  return { ...base, stressConcentrationFactor: beta, virtualRaft, shearSafety, priebeScreening: undefined, axial, qcVerification, screeningOnly: true, warnings }
 }
