@@ -7,7 +7,7 @@ export interface CalculationResult<T>{value:T;steps:CalculationStep[];method:str
 const rad=(d:number)=>d*Math.PI/180
 const clamp=(x:number,a:number,b:number)=>Math.max(a,Math.min(b,x))
 
-export interface BearingInput{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS:number;method:BearingMethod;waterReduction?:number}
+export interface BearingInput{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS:number;method:BearingMethod;waterReduction?:number;surcharge?:number;gammaBearing?:number}
 function factors(phiDeg:number,method:BearingMethod){
   const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi))
   const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
@@ -38,8 +38,10 @@ export function bearingCapacity(i:BearingInput):CalculationResult<any>{
   if(!['Terzaghi','Meyerhof','Hansen','Vesic'].includes(i.method))throw new Error('Desteklenmeyen klasik taşıma gücü yöntemi.')
   const gammaTerm=i.waterReduction??1
   if(!Number.isFinite(gammaTerm)||gammaTerm<0||gammaTerm>1)throw new Error('Su düzeltme katsayısı 0 ile 1 arasında olmalıdır.')
-  const f=factors(i.phi,i.method),m=classicalFactors(i.method,i.B,i.L,i.Df,f.phi,f.Nq,f.Nc),q=i.gamma*i.Df
-  const ultimate=i.c*f.Nc*m.sc*m.dc*m.ic*m.gc*m.bc+q*f.Nq*m.sq*m.dq*m.iq*m.gq*m.bq+.5*i.gamma*i.B*f.Ngamma*m.sg*m.dg*m.ig*m.gg*m.bg*gammaTerm
+  if(i.surcharge!=null&&(!Number.isFinite(i.surcharge)||i.surcharge<0))throw new Error('Taşıma gücü sürşarjı negatif olmayan sonlu değer olmalıdır.')
+  if(i.gammaBearing!=null&&(!Number.isFinite(i.gammaBearing)||i.gammaBearing<=0))throw new Error('Taşıma gücü terimi için efektif birim hacim ağırlık pozitif olmalıdır.')
+  const f=factors(i.phi,i.method),m=classicalFactors(i.method,i.B,i.L,i.Df,f.phi,f.Nq,f.Nc),q=i.surcharge??i.gamma*i.Df,gammaBearing=i.gammaBearing??i.gamma
+  const ultimate=i.c*f.Nc*m.sc*m.dc*m.ic*m.gc*m.bc+q*f.Nq*m.sq*m.dq*m.iq*m.gq*m.bq+.5*gammaBearing*i.B*f.Ngamma*m.sg*m.dg*m.ig*m.gg*m.bg*gammaTerm
   const netUltimate=ultimate-q
   const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:m.sc,sq:m.sq,sg:m.sg,dc:m.dc,dq:m.dq,dg:m.dg,ultimate,netUltimate,allowableGross:ultimate/i.FS,allowableNet:netUltimate/i.FS}
   return{value,method:i.method,source:'Klasik taşıma gücü literatür bağıntıları; sonuçlar TBDY tasarım direnci yerine klasik izin verilebilir değerler olarak raporlanır.',steps:[
