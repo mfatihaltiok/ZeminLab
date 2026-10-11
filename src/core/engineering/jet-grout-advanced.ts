@@ -92,23 +92,24 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
   if(i.groupSpacing!=null&&(!Number.isFinite(i.groupSpacing)||i.groupSpacing<=0))throw new Error('Grup aks aralığı pozitif olmalıdır.')
   if(i.resistanceFactor!=null&&(!Number.isFinite(i.resistanceFactor)||i.resistanceFactor<=0))throw new Error('Direnç katsayısı pozitif olmalıdır.')
   for(const [index,l] of i.layers.entries())if(![l.thickness,l.gamma,l.cohesion,l.frictionAngle].every(Number.isFinite)||l.thickness<=0||l.gamma<=0||l.cohesion<0||l.frictionAngle<0||l.frictionAngle>50||(l.effectiveStressAtTop!=null&&(!Number.isFinite(l.effectiveStressAtTop)||l.effectiveStressAtTop<0))||(l.effectiveStressAtBottom!=null&&(!Number.isFinite(l.effectiveStressAtBottom)||l.effectiveStressAtBottom<0))||(l.interfaceAlpha!=null&&(!Number.isFinite(l.interfaceAlpha)||l.interfaceAlpha<0||l.interfaceAlpha>1))||(l.interfaceDelta!=null&&(!Number.isFinite(l.interfaceDelta)||l.interfaceDelta<0||l.interfaceDelta>50)))throw new Error('Jet Grout tabaka '+(index+1)+' parametreleri geçersiz.')
+  for(const [index,l] of i.layers.entries())if(l.effectiveStressAtTop==null||l.effectiveStressAtBottom==null||l.interfaceAlpha==null||l.interfaceDelta==null||l.effectiveStressAtBottom<l.effectiveStressAtTop)throw new Error('Jet Grout tabaka '+(index+1)+': efektif gerilmeler ve arayüz α/δ parametreleri açıkça girilmelidir.')
   const d = i.diameter, Ab = Math.PI * d * d / 4, perimeter = Math.PI * d
   let shaftCharacteristic = 0
   const layerTrace = i.layers.map((layer, index) => {
-    const H = Math.max(0, layer.thickness)
-    const sigmaTop = Math.max(0, layer.effectiveStressAtTop ?? 0)
-    const sigmaBottom = Math.max(sigmaTop, layer.effectiveStressAtBottom ?? sigmaTop + Math.max(layer.gamma, 0) * H)
+    const H = layer.thickness
+    const sigmaTop = layer.effectiveStressAtTop!
+    const sigmaBottom = layer.effectiveStressAtBottom!
     const sigmaAvg = (sigmaTop + sigmaBottom) / 2
-    const alpha = Math.max(0, Math.min(1, layer.interfaceAlpha ?? 1))
-    const delta = Math.max(0, Math.min(89, layer.interfaceDelta ?? layer.frictionAngle)) * Math.PI / 180
+    const alpha = layer.interfaceAlpha!
+    const delta = layer.interfaceDelta! * Math.PI / 180
     const tau = Math.max(0, alpha * layer.cohesion + sigmaAvg * Math.tan(delta))
     const shaft = tau * perimeter * H
     shaftCharacteristic += shaft
     return { index, thickness: H, shaft, averageEffectiveStress: sigmaAvg }
   })
   const base = i.layers.length ? i.layers[i.layers.length - 1] : undefined
-  const sigmaBase = base ? Math.max(0, base.effectiveStressAtBottom ?? 0) : 0
-  const phiBase = base ? Math.max(0, Math.min(89, base.frictionAngle)) * Math.PI / 180 : 0
+  const sigmaBase = base ? base.effectiveStressAtBottom! : 0
+  const phiBase = base ? base.frictionAngle * Math.PI / 180 : 0
   const Nq = Math.exp(Math.PI * Math.tan(phiBase)) * Math.pow(Math.tan(Math.PI / 4 + phiBase / 2), 2)
   const tipSoil = base ? Math.max(0, base.cohesion) * ((Nq - 1) / Math.max(Math.tan(phiBase), 1e-9)) + sigmaBase * Nq : 0
   const tipCharacteristic = Math.max(0, tipSoil * Ab)
@@ -122,9 +123,9 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
   const blockArea = groupWidth * groupLength
   const blockBase = Math.max(0, tipSoil * blockArea)
   const blockShaft = i.layers.reduce((sum, layer) => {
-    const H = Math.max(0, layer.thickness), sigmaTop = Math.max(0, layer.effectiveStressAtTop ?? 0), sigmaBottom = Math.max(sigmaTop, layer.effectiveStressAtBottom ?? sigmaTop + Math.max(layer.gamma, 0) * H)
-    const sigmaAvg = (sigmaTop + sigmaBottom) / 2, alpha = Math.max(0, Math.min(1, layer.interfaceAlpha ?? 1)), delta = Math.max(0, Math.min(89, layer.interfaceDelta ?? layer.frictionAngle)) * Math.PI / 180
-    return sum + Math.max(0, alpha * layer.cohesion + sigmaAvg * Math.tan(delta)) * blockPerimeter * H
+    const H = layer.thickness, sigmaTop = layer.effectiveStressAtTop!, sigmaBottom = layer.effectiveStressAtBottom!
+    const sigmaAvg = (sigmaTop + sigmaBottom) / 2, alpha = layer.interfaceAlpha!, delta = layer.interfaceDelta! * Math.PI / 180
+    return sum + (alpha * layer.cohesion + sigmaAvg * Math.tan(delta)) * blockPerimeter * H
   }, 0)
   const blockCharacteristic = blockBase + blockShaft
   const groupCharacteristic = Math.min(columnCharacteristic * n, blockCharacteristic)
@@ -150,12 +151,13 @@ export interface JetGroutEngineeringResult extends JetGroutAdvancedResult { stre
 export function jetGroutEngineering(i: JetGroutEngineeringInput): JetGroutEngineeringResult {
   const base = jetGroutAdvanced(i)
   const beta = base.areaReplacementRatio > 0 ? base.columnLoadShare / base.areaReplacementRatio : 1
-  const virtualRaft = i.load != null && i.foundationArea != null && i.foundationArea > 0 && i.EsSoil != null && i.EsColumn != null && i.foundationThickness != null
+  const virtualRaft = i.load != null && i.foundationArea != null && i.foundationArea > 0 && i.EsSoil != null && i.EsColumn != null && i.foundationThickness != null && i.soilPoissonRatio != null
     ? virtualRaftSettlement({ load: i.load, area: i.foundationArea, treatedThickness: i.foundationThickness, untreatedModulus: i.EsSoil, treatedModulus: base.compositeModulus ?? i.EsColumn, poissonRatio: i.soilPoissonRatio }) : undefined
   const shearSafety = i.verticalLoad != null && i.horizontalLoad != null && i.foundationArea != null && i.foundationArea > 0 && i.cohesion != null && i.frictionAngle != null
     ? jetGroutShearSafety({ verticalLoad: i.verticalLoad, horizontalLoad: i.horizontalLoad, area: i.foundationArea, cohesion: i.cohesion, frictionAngle: i.frictionAngle, effectiveNormalStress: i.shearNormalStress }) : undefined
-  const priebe = i.columnFrictionAngle != null ? priebeScreening({ areaReplacementRatio: base.areaReplacementRatio, columnFrictionAngle: i.columnFrictionAngle, soilPoissonRatio: i.soilPoissonRatio, columnModulus: i.EsColumn, soilModulus: i.EsSoil }) : undefined
   const axial = i.axial ? jetGroutAxialCapacity(i.axial) : undefined
   const warnings=['Jet Grout kompozit sonuçları ön tasarım/screening niteliğindedir. Nihai kapasite ve oturma için saha deneyleri, kolon sürekliliği, dayanım/kalite kontrolü ve uygun grup/blok kontrolü ayrıca doğrulanmalıdır.']
-  return { ...base, stressConcentrationFactor: beta, virtualRaft, shearSafety, priebeScreening: priebe, axial, screeningOnly: true, warnings }
+  if(i.load!=null&&i.foundationArea!=null&&i.EsSoil!=null&&i.EsColumn!=null&&i.foundationThickness!=null&&i.soilPoissonRatio==null)warnings.push('Sanal radye oturması hesaplanmadı: Poisson oranı ν açıkça girilmelidir.')
+  if(i.columnFrictionAngle!=null)warnings.push('Priebe bağıntısı taş kolon/vibro-replacement içindir; Jet Grout sonucu olarak uygulanmadı.')
+  return { ...base, stressConcentrationFactor: beta, virtualRaft, shearSafety, priebeScreening: undefined, axial, screeningOnly: true, warnings }
 }
