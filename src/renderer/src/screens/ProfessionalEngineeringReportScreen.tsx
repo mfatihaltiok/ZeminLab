@@ -47,7 +47,7 @@ function buildBearingSection(p: ReturnType<typeof useProjectInfo>, profile?: Ide
         topDepth: x.topDepth,
         bottomDepth: x.bottomDepth,
         gamma: unitWeightToBase(x.gamma ?? soil.unitWeight, p.unitSystem),
-        gammaSat: unitWeightToBase(x.gammaSat ?? x.gamma ?? soil.saturatedUnitWeight, p.unitSystem),
+        gammaSat: x.gammaSat == null && soil.saturatedUnitWeight == null ? undefined : unitWeightToBase(x.gammaSat ?? soil.saturatedUnitWeight, p.unitSystem),
         cohesion: stressToBase(x.cohesion ?? soil.cohesion, p.unitSystem),
         phi: x.frictionAngle ?? soil.frictionAngle
       }))
