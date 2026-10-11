@@ -23,6 +23,7 @@ export function JetGroutEngineeringScreen(){
   const qcRequiredCoreSamples=j.qcRequiredCoreSamples?.toString()??'',qcMeasuredCoreSamples=j.qcMeasuredCoreSamples?.toString()??''
   const layout=j.layout??'square'
   const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)&&projectLoad>0&&projectArea>0
+  const qcResult=useMemo(()=>verifyJetGroutQC({requiredUcs:num(qcRequiredUcs)==null?undefined:stressToBase(num(qcRequiredUcs)!,p.unitSystem),measuredUcs:num(qcMeasuredUcs)==null?undefined:stressToBase(num(qcMeasuredUcs)!,p.unitSystem),requiredDiameter:num(qcRequiredDiameter),measuredDiameter:num(qcMeasuredDiameter),requiredCoreSamples:num(qcRequiredCoreSamples),measuredCoreSamples:num(qcMeasuredCoreSamples),continuityVerified:j.qcContinuityVerified,constructionLogsVerified:j.qcConstructionLogsVerified,testReportReviewed:j.qcTestReportReviewed}),[p.unitSystem,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed])
   const r=useMemo(()=>{
     if(!ready)return undefined
     return jetGroutEngineering({
@@ -94,9 +95,10 @@ export function JetGroutEngineeringScreen(){
         {symbol:'β',title:'Gerilme yoğunlaşma katsayısı',formula:'ηc/ar',value:r.stressConcentrationFactor}
       ]}/><div className="inline-empty">{r.sourceNote}</div></Card>
       {r.virtualRaft&&<Card title="SANAL RADYE · OTURMA KARŞILAŞTIRMASI"><div className="metric-strip"><Metric label="İyileştirilmemiş" value={(r.virtualRaft.untreatedSettlement*1000).toFixed(2)} unit="mm"/><Metric label="İyileştirilmiş" value={(r.virtualRaft.treatedSettlement*1000).toFixed(2)} unit="mm"/><Metric label="Azalma" value={r.virtualRaft.reductionPercent.toFixed(1)} unit="%"/></div></Card>}
-      <Card title="SAHA KALİTE KONTROLÜ"><div className="metric-strip"><Metric label="Durum" value={r.qcVerification.status==='pass'?'UYGUN':r.qcVerification.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK'}/><Metric label="Kontrol ölçütü" value={r.qcVerification.checks.length}/></div>{r.qcVerification.checks.length>0&&<div className="table-wrap"><table><thead><tr><th>Ölçüt</th><th>Kriter</th><th>Ölçüm</th><th>Durum</th></tr></thead><tbody>{r.qcVerification.checks.map((x,i)=><tr key={i}><td>{x.name}</td><td>{x.required}</td><td>{x.measured}</td><td>{x.passed?'UYGUN':'UYGUN DEĞİL'}</td></tr>)}</tbody></table></div>}<div className="engineering-note">{r.qcVerification.warnings.join(' ')}</div></Card>
+      
       {r.shearSafety&&<Card title="KAYMA GÜVENLİĞİ"><div className="metric-strip"><Metric label="τ" value={r.shearSafety.shearStress.toFixed(2)} unit="kPa"/><Metric label="τdirenç" value={r.shearSafety.shearResistance.toFixed(2)} unit="kPa"/><Metric label="FS" value={r.shearSafety.FS.toFixed(2)}/></div></Card>}
       {r.priebeScreening&&<Card title="PRIEBE · YALNIZCA REFERANS"><div className="metric-strip"><Metric label="n₀" value={r.priebeScreening.n0.toFixed(3)}/><Metric label="n₁" value={r.priebeScreening.n1.toFixed(3)}/></div><div className="inline-empty">{r.priebeScreening.warning}</div></Card>}
       </>}
-  </Frame>
+       <Card title="SAHA KALİTE KONTROLÜ"><div className="metric-strip"><Metric label="Durum" value={qcResult.status==='pass'?'UYGUN':qcResult.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK'}/><Metric label="Kontrol ölçütü" value={qcResult.checks.length}/></div>{qcResult.checks.length>0&&<div className="table-wrap"><table><thead><tr><th>Ölçüt</th><th>Kriter</th><th>Ölçüm</th><th>Durum</th></tr></thead><tbody>{qcResult.checks.map((x,i)=><tr key={i}><td>{x.name}</td><td>{x.required}</td><td>{x.measured}</td><td>{x.passed?'UYGUN':'UYGUN DEĞİL'}</td></tr>)}</tbody></table></div>}<div className="engineering-note">{qcResult.warnings.join(' ')}</div></Card>
+   </Frame>
 }
