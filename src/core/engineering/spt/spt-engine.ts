@@ -24,7 +24,7 @@ export interface SptEngineInput{
 export interface SptTraceStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string}
 export interface SptEngineResult{
   nField:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number
-  n1_60_dilatancy?:number;alpha?:number;beta?:number;n1_60f?:number;dilatancyApplied:boolean;hasAssumptions:boolean;trace:SptTraceStep[];warnings:string[]
+  n1_60_dilatancy?:number;alpha?:number;beta?:number;n1_60f?:number;dilatancyApplied:boolean;overburdenCorrectionApplied:boolean;hasAssumptions:boolean;trace:SptTraceStep[];warnings:string[]
 }
 
 function finitePositive(value:number|undefined){return value!==undefined&&Number.isFinite(value)&&value>0}
@@ -179,5 +179,5 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
     trace.push({symbol:'(N1)60,d',title:'Dilatansi düzeltmesi',formula:'15+0.5[(N1)60−15]',value:n1_60_dilatancy,note:'Yalnız yöntem açıkça gerektiriyorsa kullanılmalıdır.'})
   }
   warnings.push(...assumptions)
-  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,alpha,beta,n1_60f,dilatancyApplied,hasAssumptions:ceResolved.assumption||assumptions.length>0||stressAssumption,trace,warnings}
+  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,alpha,beta,n1_60f,dilatancyApplied,overburdenCorrectionApplied:normalizedForOverburden,hasAssumptions:ceResolved.assumption||assumptions.length>0||stressAssumption,trace,warnings}
 }
