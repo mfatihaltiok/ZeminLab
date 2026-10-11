@@ -134,6 +134,8 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.throws(() => calculateSpt({nField:10,energyRatio:40,hammerType:'measured',effectiveStress:100,rodLengthM:5}), /ER %45–%160/)
   const compatNoFines=sptCorrection({depth:3,nField:10},100)
   assert.equal(compatNoFines.N160f,undefined)
+  const compatUnknownSoil=sptCorrection({depth:3,nField:10,fines:20},25)
+  assert.equal(compatUnknownSoil.N160f,undefined)
   const clayCN=sptCorrection({depth:3,nField:10,soil:'CL',fines:20},25)
   const sandCN=sptCorrection({depth:3,nField:10,soil:'SP',fines:20},25)
   assert.equal(clayCN.CN,1)
