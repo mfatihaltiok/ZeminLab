@@ -25,7 +25,7 @@ const clamp=(x:number,min:number,max:number)=>Math.max(min,Math.min(max,x))
 function factors(phiDeg:number,method:SurfaceFoundationMethod){
   const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi))
   const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
-  const Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
+  const Nc=phi===0?(method==='Terzaghi'?5.7:5.14):(Nq-1)/Math.max(t,1e-12)
   let Ngamma=0
   if(phi>0){
     if(method==='Meyerhof')Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
@@ -324,7 +324,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   return{
     Nq:ef.Nq,Nc:ef.Nc,Ngamma:ef.Ngamma,...mf,surcharge:water.surcharge,gammaBelow:representativeGamma,ex,ey,Be,Le,effectiveArea,qk,qt,qo,utilization,adequate,effectiveDepth:2*Bp,
     qAvg,qMax,qMin,contactState,coreContact,
-    representativeC,representativePhi,representativeGamma,ultimateClassical:qk,allowableClassical:i.safetyFactor!=null?qk/i.safetyFactor:undefined,
+    representativeC,representativePhi,representativeGamma,ultimateClassical:method==='TBDY-2018'?undefined:qk,allowableClassical:method!=='TBDY-2018'&&i.safetyFactor!=null?qk/i.safetyFactor:undefined,
     undrainedQk:i.undrainedCu!=null?i.undrainedCu*5.14*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge:undefined,
     layeredScreeningOnly:Boolean(i.layers?.length),finalDesignEligible,
     layerChecks:checks,warnings,method,foundationType,
