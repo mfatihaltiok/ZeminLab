@@ -130,7 +130,7 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const applyOverburden=input.applyOverburden??true
   const clayCode=(input.soilCode??'').trim().toUpperCase().replace(/[\s_]/g,'')
   const inferredClay=['CL','CH','CLAY','KIL','KİL','CVL','CEH','SACL','GRCL','ANCL'].includes(clayCode)||clayCode.startsWith('CI')
-  const knownNonClay=/^(SP|SW|SM|SC|GP|GW|GM|GC|ML|MH|OL|OH|PT)([-/].*)?$/.test(clayCode)||['SAND','SANDY','KUM','KUMU','KUMLU','SILT','SILTY','SILTLI','GRAVEL','GRAVELLY','CAKIL','ÇAKIL'].includes(clayCode)
+  const knownNonClay=/^(SP|SW|SM|SC|GP|GW|GM|GC|ML|MH|OL|OH|PT)([-/].*)?$/.test(clayCode)||['SA','GRSA','SISA','CLSA','SI','SAND','SANDY','KUM','KUMU','KUMLU','SILT','SILTY','SILTLI','GRAVEL','GRAVELLY','CAKIL','ÇAKIL'].includes(clayCode)
   const soilClassKnown=input.claySoil!=null||inferredClay||knownNonClay
   const claySoil=input.claySoil??inferredClay
   let cn=1
