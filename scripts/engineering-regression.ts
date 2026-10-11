@@ -434,6 +434,9 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(result.rows[0].beta,1.1543167672515497,1e-12)
   assert.ok(result.rows[0].FS !== undefined)
   assert.equal(result.rows[0].conclusion,'SIVILAŞMA RİSKİ VAR')
+  assert.equal(result.rows[0].postLiquefactionTrigger,'FS<1.10')
+  assert.equal(result.rows[0].postLiquefactionEvaluation,'required')
+  assert.ok(result.warnings.some(w=>w.includes('16.6.10')))
 }
 
 {
