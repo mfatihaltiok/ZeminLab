@@ -78,21 +78,24 @@ export function calculateSubgradeReaction(i: SubgradeReactionInput): SubgradeRea
     throw new Error('Erol & Çekinmez yönteminde zemin tipi kohezyonlu veya kohezyonsuz olarak seçilmelidir.')
   }
 
-  const ratio = L / i.B
+  // Erol & Çekinmez 6.15–6.16 bağıntılarındaki B/L sayısal olarak ft tabanındadır.
+  // Girdiler metre olduğundan yalnız geometri ft'ye çevrilir; Kv1 ve çıktı birimi değişmez.
+  const Bft=i.B/0.3048,Lft=L/0.3048
+  const ratio = Lft / Bft
   let ks: number
   let formula: string
 
   if (i.soilType === 'cohesive') {
     if (Math.abs(L - i.B) <= 1e-9) {
-      ks = i.Kv1 / i.B
+      ks = i.Kv1 / Bft
       formula = 'Kv = Kv1 / B  (Denk. 6.15a)'
     } else {
-      ks = i.Kv1 * (ratio + 0.5) / (1.5 * ratio * i.B)
-      formula = 'Kv = Kv1·(mB + 0.5)/(1.5·mB·B)  (Denk. 6.15b)'
+      ks = i.Kv1 * (ratio + 0.5) / (1.5 * ratio * Bft)
+      formula = 'Kv = Kv1·(m+0.5)/(1.5·m·Bft)  (Denk. 6.15b)'
     }
   } else {
-    ks = i.Kv1 * Math.pow(i.B + 1, 2) / (4 * Math.pow(i.B, 2))
-    formula = 'Kv = Kv1·(B + 1)²/(4·B²)  (Denk. 6.16)'
+    ks = i.Kv1 * Math.pow(Bft + 1, 2) / (4 * Math.pow(Bft, 2))
+    formula = 'Kv = Kv1·(Bft + 1)²/(4·Bft²)  (Denk. 6.16)'
   }
 
   return {
@@ -101,6 +104,6 @@ export function calculateSubgradeReaction(i: SubgradeReactionInput): SubgradeRea
     unit,
     formula,
     source: 'Erol & Çekinmez (2014), Geoteknik Mühendisliğinde Saha Deneyleri, Bölüm 6.8.1, Denk. 6.15a–6.16, s.272.',
-    assumptions: [`Kv1 = ${unit}`, 'Kv1, 30 cm × 30 cm plaka yükleme deneyinden alınır.', `Zemin tipi: ${i.soilType === 'cohesive' ? 'kohezyonlu' : 'kohezyonsuz'}`, 'B ve L = m']
+    assumptions: [`Kv1 = ${unit}`, 'Kv1, 30 cm × 30 cm plaka yükleme deneyinden alınır.', `Zemin tipi: ${i.soilType === 'cohesive' ? 'kohezyonlu' : 'kohezyonsuz'}`, 'B ve L girdileri m; Erol & Çekinmez ölçek bağıntıları için ft değerine dönüştürülür.']
   }
 }
