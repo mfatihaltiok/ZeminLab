@@ -57,6 +57,7 @@ export let latestIdealizedSettlementResult: ReturnType<typeof calculateIdealized
 
 export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile?: IdealizedSoilProfile; boreholes?: BoreholeRecord[] }) {
   const p = useProjectInfo()
+  const updateProjectInfo=useProjectInfo().updateProjectInfo
   const [method, setMethod] = useState<IdealizedSettlementMethod>('burland-burbidge')
   const [ksMethod, setKsMethod] = useState<SubgradeReactionMethod>('erol-plate')
   const [kv1Input, setKv1Input] = useState('')
@@ -67,6 +68,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
   const qGross = finite(f.structuralWeight) && finite(f.footingWidth) && finite(f.footingLength)
     ? forceToBase(f.structuralWeight, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
     : 0
+  const setTime=(key:'settlementTimeYears'|'secondaryStartTimeYears',raw:string)=>{if(!profile)return;const value=raw.trim()===''?undefined:Number(raw);if(value!==undefined&&(!Number.isFinite(value)||value<0||(key==='secondaryStartTimeYears'&&value===0)))return;updateProjectInfo({idealizedSoilProfile:{...profile,[key]:value}})}
 
   const result = useMemo(() => {
     if (!profile || profile.status !== 'SABİTLENDİ') return undefined
@@ -78,8 +80,9 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       Df: f.footingDepth,
       qGross,
       groundwaterDepth: b?.groundwaterDepth ?? p.soilParameters.groundwaterDepth,
+      timeYears:profile.settlementTimeYears,secondaryStartTimeYears:profile.secondaryStartTimeYears
     })
-  }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth, p.soilParameters.groundwaterDepth])
+  }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth, p.soilParameters.groundwaterDepth,profile?.settlementTimeYears,profile?.secondaryStartTimeYears])
 
   latestIdealizedSettlementResult = result
 
@@ -149,6 +152,8 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
           <Metric label="L" value={f.footingLength || '—'} unit="m" />
           <Metric label="Df" value={f.footingDepth || '—'} unit="m" />
           <Metric label="q" value={qGross ? stressFromBase(qGross, p.unitSystem) : '—'} unit={PROJECT_UNIT_LABELS.stress} />
+          <label>Hesap süresi t (yıl)<input type="number" min="0" step="0.1" value={profile?.settlementTimeYears??''} disabled={!profile} onChange={e=>setTime('settlementTimeYears',e.target.value)}/></label>
+          <label>İkincil oturma başlangıcı t₁ (yıl)<input type="number" min="0.01" step="0.1" value={profile?.secondaryStartTimeYears??''} disabled={!profile} onChange={e=>setTime('secondaryStartTimeYears',e.target.value)}/></label>
         </div>
       </Card>
 
