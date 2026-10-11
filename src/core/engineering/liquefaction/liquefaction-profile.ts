@@ -51,7 +51,7 @@ function rdAtDepth(z:number){
   if(d<=30)return .744-.008*d
   return .50
 }
-function normalizedSoilCode(code:string){return code.trim().toUpperCase().replace(/İ/g,'I').replace(/[\\s_]/g,'')}
+function normalizedSoilCode(code:string){return code.trim().toUpperCase().replace(/İ/g,'I').replace(/[\s_]/g,'')}
 function recognizedSoilCode(code:string){
   const c=normalizedSoilCode(code)
   return isClaySoilCode(c)||['SA','GRSA','SISA','CLSA','SM','SC','SI','ML','MH','SP','SW','GW','GP','GM','GC','OL','OH','PT','SAND','SILT','GRAVEL','KUM','KIL','CAKIL'].includes(c)||c.includes('KUM')||c.includes('SAND')||c.includes('GRAVEL')||c.includes('SILT')
