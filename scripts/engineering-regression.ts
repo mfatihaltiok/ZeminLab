@@ -797,6 +797,8 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.ok(wet.ultimate<dry.ultimate)
   assert.throws(()=>classicalBearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:NaN,FS:3,method:'Meyerhof'}))
   const base=stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:30,method:'Meyerhof'})
+  assert.equal(base.value.allowableGross,undefined)
+  assert.ok(base.warnings.some(w=>w.includes('FS varsayılmadı')))
   const extra=stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:30,method:'Meyerhof',surcharge:50})
   assert.ok(extra.value.characteristic>base.value.characteristic)
   const submerged=stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,gammaSat:19,waterTableDepth:0,c:10,phi:30,method:'Meyerhof'})
