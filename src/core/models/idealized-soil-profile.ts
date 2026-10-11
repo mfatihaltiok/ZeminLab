@@ -32,6 +32,7 @@ export interface IdealizedSoilLayer {
   plasticityIndex?: number
   finesContent?: number
   cohesion?: number
+  undrainedCu?: number
   frictionAngle?: number
   compressionIndexCc?: number
   recompressionIndexCr?: number
