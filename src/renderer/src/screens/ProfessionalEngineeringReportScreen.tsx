@@ -80,8 +80,8 @@ function buildBearingSection(p: ReturnType<typeof useProjectInfo>, profile?: Ide
         { label: 'Karakteristik Taşıma Gücü (qk)', value: fmt(result.value.qk), unit: 'kPa' },
         { label: 'Tasarım Taşıma Gücü (qt)', value: fmt(result.value.qt), unit: 'kPa' },
         { label: 'Uygulanan Basınç (q₀)', value: fmt(result.value.qo), unit: 'kPa' },
-        { label: 'Kullanım Oranı (η)', value: fmt(result.value.utilization * 100, 1), unit: '%', status: result.value.utilization <= 1 ? 'ok' : 'fail' },
-        { label: 'Yeterlilik', value: result.value.adequate ? 'UYGUN' : 'UYGUN DEĞİL', unit: '', status: result.value.adequate ? 'ok' : 'fail' }
+        { label: 'Kullanım Oranı (η)', value: fmt(result.value.utilization * 100, 1), unit: '%', status: result.finalDesignEligible ? (result.value.utilization <= 1 ? 'ok' : 'fail') : 'warning' },
+        { label: 'Tasarım durumu', value: result.finalDesignEligible ? (result.value.adequate ? 'UYGUN' : 'UYGUN DEĞİL') : 'ÖN DEĞERLENDİRME — NİHAİ TASARIM DEĞİL', unit: '', status: result.finalDesignEligible ? (result.value.adequate ? 'ok' : 'fail') : 'warning' }
       ],
       notes: result.warnings
     }
