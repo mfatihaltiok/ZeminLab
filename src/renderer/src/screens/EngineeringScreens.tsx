@@ -56,7 +56,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
       Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:unitWeightToBase(l.unitWeight??p.soilParameters.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(l.saturatedUnitWeight??p.soilParameters.saturatedUnitWeight??0,p.unitSystem),soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex})),
       spt:rows,sptCorrection:p.sptCorrections,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth
     })}catch{return undefined}
-  },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,p.geophysical.soilGroup,p.soilParameters.liquefactionContinuousOrThickLens,p.sptCorrections,validSpt])
+  },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,p.geophysical.soilGroup,p.soilParameters.liquefactionContinuousOrThickLens,p.soilParameters.saturatedUnitWeight,p.soilParameters.unitWeight,p.unitSystem,p.foundationParameters.footingDepth,p.sptCorrections,validSpt])
 
   return <Frame screen="liquefaction">
     <Source>{SOURCE_NOTES.liquefaction} 16.6.1 kapsam koşulları, 16.6.2–16.6.6 tetiklenme koşulları ve Ek 16B hesabı aynı sonuç zincirinde gösterilir. Sıvılaşma sonrası yerdeğiştirme otomatik hesaplanmaz; FS<1.10 olduğunda 16.6.7/16.6.9/16.6.10 değerlendirmesi zorunlu olarak işaretlenir.</Source>
