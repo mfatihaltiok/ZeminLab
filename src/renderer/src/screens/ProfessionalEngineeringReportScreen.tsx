@@ -208,8 +208,8 @@ function buildLiquefactionSection(
       }
     })
     const result = liquefactionProfile({
-      Mw: p.seismic.magnitude!, Sds: sds!, gwt: b.groundwaterDepth!,
-      layers: b.lithology.map(l => ({
+      Mw: p.seismic.magnitude!, Sds: sds!, gwt: b!.groundwaterDepth!,
+      layers: b!.lithology.map(l => ({
         top: l.from, bottom: l.to,
         gamma: unitWeightToBase(l.unitWeight ?? p.soilParameters.unitWeight, p.unitSystem),
         gammaSat: unitWeightToBase(l.saturatedUnitWeight ?? p.soilParameters.saturatedUnitWeight ?? 0, p.unitSystem),
