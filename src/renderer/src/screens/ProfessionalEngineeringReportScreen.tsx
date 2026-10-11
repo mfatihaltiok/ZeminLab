@@ -255,7 +255,7 @@ function buildLiquefactionSection(
     }
   } catch (error) {
     return {
-      id: '5', title: 'Sıvılaşma ve Sıvılaşma Sonrası Etkiler',
+      id: '5-'+index, title: 'Sıvılaşma ve Sıvılaşma Sonrası Etkiler',
       subtitle: 'Hesap üretilemedi', method: 'TBDY 2018 Bölüm 16.6 + Ek 16B',
       source: 'ZeminLab sıvılaşma motoru',
       inputs: [{ label: 'Sondaj', value: b?.name ?? '—', unit: '' }],
