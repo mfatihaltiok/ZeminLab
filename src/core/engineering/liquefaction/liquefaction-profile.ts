@@ -40,7 +40,7 @@ function stressAtDepth(depth:number,layers:LiquefactionSoilLayer[],gwt:number,ga
     gwt,
     gammaW
   )
-  return{sigmaV:r.sigmaV,porePressure:r.porePressure,sigmaVPrime:Math.max(.01,r.sigmaVPrime),covered:r.covered}
+  return{sigmaV:r.sigmaV,porePressure:r.porePressure,sigmaVPrime:r.sigmaVPrime,covered:r.covered}
 }
 function rdAtDepth(z:number){
   const d=Math.max(z,0)
@@ -61,6 +61,10 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
   if(!finite(input.Mw)||input.Mw<=0)throw new Error('Mw geçerli olmalıdır.')
   if(!finite(input.Sds)||input.Sds<0)throw new Error('SDS geçerli olmalıdır.')
   if(!finite(input.gwt)||input.gwt<0)throw new Error('Sıvılaşma değerlendirmesi için geçerli YASS gerekir.')
+  if(input.layers.some(l=>![l.top,l.bottom,l.gamma,l.gammaSat].every(finite)||l.top<0||l.bottom<=l.top||l.gamma<=0||l.gammaSat<=0))throw new Error('Sıvılaşma zemin tabakalarının derinlik ve birim hacim ağırlıkları geçersiz.')
+  const orderedLayers=[...input.layers].sort((a,b)=>a.top-b.top)
+  for(let k=1;k<orderedLayers.length;k++)if(orderedLayers[k].top<orderedLayers[k-1].bottom-1e-9)throw new Error('Sıvılaşma zemin profili çakışan tabakalar içeremez.')
+  if(input.spt.some(s=>!finite(s.depth)||s.depth<0||!Number.isInteger(s.nField)||s.nField<0))throw new Error('SPT derinliği ve ham N değeri geçerli olmalıdır.')
   const gammaW=input.gammaW??9.81
   if(!finite(gammaW)||gammaW<=0)throw new Error('Su birim hacim ağırlığı pozitif olmalıdır.')
   const warnings:string[]=[]
@@ -71,7 +75,8 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
   const rows=input.spt.filter(x=>finite(x.depth)&&x.depth>=0).sort((a,b)=>a.depth-b.depth).map((record):LiquefactionProfileRow=>{
     const layer=input.layers.find(l=>record.depth>=l.top&&record.depth<l.bottom)
     const calculatedStress=stressAtDepth(record.depth,input.layers,input.gwt,gammaW)
-    const stress=record.stressSnapshot?{sigmaV:record.stressSnapshot.sigmaV0,porePressure:record.stressSnapshot.porePressureU0,sigmaVPrime:Math.max(.01,record.stressSnapshot.effectiveStressV0),covered:record.depth}:calculatedStress
+    if(record.stressSnapshot){const snap=record.stressSnapshot;if(![snap.sigmaV0,snap.porePressureU0,snap.effectiveStressV0].every(finite)||snap.sigmaV0<0||snap.porePressureU0<0||snap.effectiveStressV0<0||snap.effectiveStressV0>snap.sigmaV0+1e-6)throw new Error('SPT test-zamanı gerilme snapshotı fiziksel olarak geçersiz.');}
+    const stress=record.stressSnapshot?{sigmaV:record.stressSnapshot.sigmaV0,porePressure:record.stressSnapshot.porePressureU0,sigmaVPrime:record.stressSnapshot.effectiveStressV0,covered:record.depth}:calculatedStress
     const fineContent=record.fineContent??layer?.finesContent,pi=record.plasticityIndex??layer?.plasticityIndex
     const clayContent=record.clayContent??layer?.clayContent,soil=record.soil??layer?.soil
     const claySoil=isClaySoilCode(soil)
