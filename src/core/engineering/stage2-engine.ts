@@ -33,7 +33,7 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
     const r=calculateSurfaceFoundation({
       B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma,gamma2:i.gammaSat??i.gamma,c:i.c,phi:i.phi,
       verticalLoad:V,horizontalLoad:H,momentX:i.momentX??0,momentY:i.momentY??0,
-      groundSlope:i.soilSlope??0,baseSlope:i.baseSlope??0,resistanceFactor:1.4,method:'TBDY-2018',
+      groundSlope:i.soilSlope??0,baseSlope:i.baseSlope??0,resistanceFactor:1.4,additionalSurcharge:i.surcharge??0,method:'TBDY-2018',
       groundwaterDepth:i.waterTableDepth,undrainedCu:i.undrainedCu,
       layers:mappedLayers
     })
