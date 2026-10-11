@@ -235,6 +235,16 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   let layerData:ReturnType<typeof equivalentLayerParameters>=null
   let layeredComplete=true
   if(i.layers?.length){
+    let profileCursor=0
+    for(const layer of [...i.layers].sort((a,b)=>a.topDepth-b.topDepth)){
+      if(layer.topDepth>profileCursor+1e-9){layeredComplete=false;break}
+      profileCursor=Math.max(profileCursor,layer.bottomDepth)
+      if(profileCursor>=i.Df+2*Bp-1e-9)break
+    }
+    if(profileCursor<i.Df+2*Bp-1e-9)layeredComplete=false
+    if(!layeredComplete)warnings.push('Tabakalı zemin profili yüzeyden temel altındaki 2B′ etki derinliğine kadar sürekli değil; sürşarj/katmanlı nihai değerlendirme tamamlanmış sayılmaz.')
+  }
+  if(i.layers?.length){
     layerData=equivalentLayerParameters(i.layers,i.Df,2*Bp,i.groundwaterDepth)
     if(!layerData){
       layeredComplete=false
@@ -253,7 +263,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
     }
   }
 
-  if(layerData?.complete && i.layers?.length){
+  if(layerData?.complete && layeredComplete && i.layers?.length){
     const ordered=[...i.layers].filter(l=>l.bottomDepth>l.topDepth&&l.topDepth<i.Df).sort((a,b)=>a.topDepth-b.topDepth)
     let sigmaBase=0
     for(const l of ordered){
