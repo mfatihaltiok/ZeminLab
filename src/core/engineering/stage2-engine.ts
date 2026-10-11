@@ -22,7 +22,11 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
   if(i.B<=0||i.L<=0||i.Df<0||i.gamma<=0||i.c<0||i.phi<0||i.phi>50)throw new Error('Taşıma gücü girdileri fiziksel sınırlar dışında.')
   if(V<0||!Number.isFinite(V)||!Number.isFinite(H))throw new Error('Düşey ve yatay yükler geçerli olmalıdır.')
   if(i.FS!=null&&(!Number.isFinite(i.FS)||i.FS<=0))throw new Error('Güvenlik katsayısı pozitif olmalıdır.')
-  if(i.layers?.some(x=>!Number.isFinite(x.thickness)||x.thickness<=0||!Number.isFinite(x.c)||x.c<0||!Number.isFinite(x.phi)||x.phi<0||x.phi>50||!Number.isFinite(x.gamma)||x.gamma<=0))throw new Error('Taşıma gücü tabaka parametreleri geçersiz.')
+  if(i.waterTableDepth!=null&&(!Number.isFinite(i.waterTableDepth)||i.waterTableDepth<0))throw new Error('YASS derinliği negatif olmayan sonlu bir değer olmalıdır.')
+  if(i.surcharge!=null&&(!Number.isFinite(i.surcharge)||i.surcharge<0))throw new Error('Ek sürşarj negatif olmayan sonlu bir değer olmalıdır.')
+  if(i.waterTableDepth!=null&&i.gammaSat==null)throw new Error('YASS tanımlandığında γsat girilmelidir.')
+  if(i.gammaSat!=null&&(!Number.isFinite(i.gammaSat)||i.gammaSat<=9.80665))throw new Error('γsat, su birim hacim ağırlığından büyük ve sonlu olmalıdır.')
+  if(i.layers?.some(x=>!Number.isFinite(x.thickness)||x.thickness<=0||!Number.isFinite(x.c)||x.c<0||!Number.isFinite(x.phi)||x.phi<0||x.phi>50||!Number.isFinite(x.gamma)||x.gamma<=0||(x.gammaSat!=null&&(!Number.isFinite(x.gammaSat)||x.gammaSat<=0))))throw new Error('Taşıma gücü tabaka parametreleri geçersiz.')
   let layerTop=i.Df
   const mappedLayers=i.layers?.map(x=>{const layer={topDepth:layerTop,bottomDepth:layerTop+x.thickness,gamma:x.gamma,gammaSat:x.gammaSat??x.gamma,cohesion:x.c,phi:x.phi};layerTop+=x.thickness;return layer})
   if(design==='tbdy-2018'){
@@ -38,7 +42,17 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
       method:'TBDY 2018',source:r.source,warnings:r.warnings,steps:r.steps
     }
   }
-  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,c:i.c,phi:i.phi,FS:i.FS??3,method:i.method})
+  let surcharge=i.surcharge??0,gammaBearing=i.gamma
+  if(i.waterTableDepth==null){surcharge+=i.gamma*i.Df}
+  else{
+    const gammaSub=i.gammaSat!-9.80665,gwt=i.waterTableDepth
+    surcharge+=gwt<i.Df?i.gamma*gwt+gammaSub*(i.Df-gwt):i.gamma*i.Df
+    if(gwt<=i.Df)gammaBearing=gammaSub
+    else if(gwt<=i.Df+i.B)gammaBearing=gammaSub+((gwt-i.Df)/i.B)*(i.gamma-gammaSub)
+    if(gwt<=i.Df+i.B)warnings.push('Klasik hesapta YASS etkisi sürşarj ve Nγ terimi için efektif birim hacim ağırlıkla dikkate alındı.')
+  }
+  if(i.layers?.length)warnings.push('Klasik yöntem katmanlı zemin parametrelerini hesapta kullanmaz; katmanlı nihai değerlendirme için TBDY yüzeysel temel motoru ve zemin profili analizi gerekir.')
+  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,gammaBearing,surcharge,c:i.c,phi:i.phi,FS:i.FS??3,method:i.method})
   if((i.momentX??0)!==0||(i.momentY??0)!==0)warnings.push('Klasik taşıma gücü API merkezi düşey yük varsayar; momentli temas için TBDY motoru kullanılmalıdır.')
   return{
     value:{Nq:r.value.Nq,Nc:r.value.Nc,Ngamma:r.value.Ngamma,sc:r.value.sc,sq:r.value.sq,sgamma:r.value.sg,dc:r.value.dc,dq:r.value.dq,dgamma:r.value.dg,ic:r.value.ic,iq:r.value.iq,igamma:r.value.ig,characteristic:r.value.ultimate,designResistance:undefined,allowableGross:r.value.allowableGross,qApplied:V/Math.max(i.B*i.L,1e-9),BEffective:i.B,LEffective:i.L,ex:0,ey:0,qSurcharge:i.gamma*i.Df,resistanceFactor:undefined},
