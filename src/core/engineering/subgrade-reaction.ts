@@ -30,8 +30,9 @@ export function calculateSubgradeReaction(i: SubgradeReactionInput): SubgradeRea
   const L = i.L ?? i.B
   if (!Number.isFinite(L) || L <= 0) throw new Error('Temel uzunluğu L m cinsinden sıfırdan büyük olmalıdır.')
 
-  const unit = i.unitSystem === 'kN-m' ? 'kN/m³' : 'tonf/m³'
-  const stressUnit = i.unitSystem === 'kN-m' ? 'kN/m²' : 'tonf/m²'
+  const unitSystem=i.unitSystem??'kN-m'
+  const unit = unitSystem === 'kN-m' ? 'kN/m³' : 'tonf/m³'
+  const stressUnit = unitSystem === 'kN-m' ? 'kN/m²' : 'tonf/m²'
 
   if (i.method === 'q/s') {
     if (i.q == null || !Number.isFinite(i.q) || i.q < 0) {
@@ -57,8 +58,10 @@ export function calculateSubgradeReaction(i: SubgradeReactionInput): SubgradeRea
     if (i.nu == null || !Number.isFinite(i.nu) || i.nu <= -1 || i.nu >= 0.5) {
       throw new Error('ν için -1 < ν < 0.5 aralığında değer gereklidir.')
     }
+    const EsBase=unitSystem==='ton-m'?i.Es*9.80665:i.Es
     const equivalentWidth = Math.sqrt(i.B * L)
-    const ks = i.Es / (equivalentWidth * (1 - i.nu * i.nu))
+    const ksBase = EsBase / (equivalentWidth * (1 - i.nu * i.nu))
+    const ks=unitSystem==='ton-m'?ksBase/9.80665:ksBase
     return {
       ks,
       method: 'elastic',
@@ -82,22 +85,24 @@ export function calculateSubgradeReaction(i: SubgradeReactionInput): SubgradeRea
   // Girdiler metre olduğundan yalnız geometri ft'ye çevrilir; Kv1 ve çıktı birimi değişmez.
   const Bft=i.B/0.3048,Lft=L/0.3048
   const ratio = Lft / Bft
-  let ks: number
+  const Kv1Base=unitSystem==='ton-m'?i.Kv1*9.80665:i.Kv1
+  let ksBase: number
   let formula: string
 
   if (i.soilType === 'cohesive') {
     if (Math.abs(L - i.B) <= 1e-9) {
-      ks = i.Kv1 / Bft
+      ksBase = Kv1Base / Bft
       formula = 'Kv = Kv1 / B  (Denk. 6.15a)'
     } else {
-      ks = i.Kv1 * (ratio + 0.5) / (1.5 * ratio * Bft)
+      ksBase = Kv1Base * (ratio + 0.5) / (1.5 * ratio * Bft)
       formula = 'Kv = Kv1·(m+0.5)/(1.5·m·Bft)  (Denk. 6.15b)'
     }
   } else {
-    ks = i.Kv1 * Math.pow(Bft + 1, 2) / (4 * Math.pow(Bft, 2))
+    ksBase = Kv1Base * Math.pow(Bft + 1, 2) / (4 * Math.pow(Bft, 2))
     formula = 'Kv = Kv1·(Bft + 1)²/(4·Bft²)  (Denk. 6.16)'
   }
 
+  const ks=unitSystem==='ton-m'?ksBase/9.80665:ksBase
   return {
     ks,
     method: 'erol-plate',
