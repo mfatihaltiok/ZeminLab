@@ -15,11 +15,15 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
   const B=Number(f.footingWidth),L=Number(f.footingLength),Df=Number(f.footingDepth)
   const gamma1=unitWeightToBase(Number(soil.unitWeight),p.unitSystem),gamma2=unitWeightToBase(Number(soil.saturatedUnitWeight),p.unitSystem)
   const c=stressToBase(Number(soil.cohesion),p.unitSystem),phi=Number(soil.frictionAngle)
-  const N=forceToBase(Number(f.verticalLoad),p.unitSystem),cu=soil.undrainedCohesion==null?undefined:stressToBase(Number(soil.undrainedCohesion),p.unitSystem)
+  const N=forceToBase(Number(f.structuralWeight),p.unitSystem),cu=soil.undrainedCohesion==null?undefined:stressToBase(Number(soil.undrainedCohesion),p.unitSystem)
+  const gammaW=9.80665,gwt=soil.groundwaterDepth,gammaSub=gamma2-gammaW
+  const classicalSurcharge=gwt==null?gamma1*Df:gwt<Df?gamma1*gwt+gammaSub*(Df-gwt):gamma1*Df
+  const classicalGammaBearing=gwt==null||gwt>Df+B?gamma1:gwt<=Df?gammaSub:gammaSub+((gwt-Df)/B)*(gamma1-gammaSub)
   const Vx=forceToBase(Number(f.vtX),p.unitSystem),Vy=forceToBase(Number(f.vtY),p.unitSystem),H=Math.hypot(Vx,Vy)
   const Mx=momentToBase(Number(f.momentX),p.unitSystem),My=momentToBase(Number(f.momentY),p.unitSystem)
-  const valid=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<50&&Number.isFinite(N)&&N>=0&&Number.isFinite(FS)&&FS>0
-  const layered=useMemo(()=>profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:unitWeightToBase(x.gamma??soil.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(x.gammaSat??x.gamma??soil.saturatedUnitWeight,p.unitSystem),cohesion:stressToBase(x.cohesion??soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle})).filter(x=>x.bottomDepth>x.topDepth),[profile,soil,p.unitSystem])
+  const waterValid=gwt==null||gwt>Df+B||(Number.isFinite(gamma2)&&gamma2>gammaW)
+  const valid=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<=50&&Number.isFinite(N)&&N>0&&Number.isFinite(FS)&&FS>0&&waterValid
+  const layered=useMemo(()=>profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:unitWeightToBase(x.gamma??soil.unitWeight,p.unitSystem),gammaSat:x.gammaSat==null&&soil.saturatedUnitWeight==null?undefined:unitWeightToBase(x.gammaSat??soil.saturatedUnitWeight,p.unitSystem),cohesion:stressToBase(x.cohesion??soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle})).filter(x=>x.bottomDepth>x.topDepth),[profile,soil,p.unitSystem])
   const calculation=useMemo(()=>{
     if(!valid)return {result:null,error:'Temel, zemin veya yük girdileri tamamlanmalı.'}
     try{
@@ -30,7 +34,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
       }),error:null}
     }catch(e){return{result:null,error:e instanceof Error?e.message:String(e)}}
   },[valid,B,L,Df,gamma1,gamma2,c,phi,N,H,Mx,My,soil.surfaceSlope,soil.foundationBaseSlope,f.foundationType,soil.groundwaterDepth,cu,layered])
-  const generic=useMemo(()=>valid?(['Terzaghi','Meyerhof','Hansen','Vesic'] as BearingMethod[]).map(m=>({method:m,result:bearingCapacityEngine({B,L,Df,gamma:gamma1,c,phi,FS,method:m}).value})):[],[valid,B,L,Df,gamma1,c,phi,FS])
+  const generic=useMemo(()=>valid?(['Terzaghi','Meyerhof','Hansen','Vesic'] as BearingMethod[]).map(m=>({method:m,result:bearingCapacityEngine({B,L,Df,gamma:gamma1,gammaBearing:classicalGammaBearing,surcharge:classicalSurcharge,c,phi,FS,method:m}).value})):[],[valid,B,L,Df,gamma1,classicalGammaBearing,classicalSurcharge,c,phi,FS])
   const r=calculation.result?.value
   const stress=(v:number)=>stressFromBase(v,p.unitSystem)
   const force=(v:number)=>forceFromBase(v,p.unitSystem)
@@ -48,7 +52,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
       <Metric label="Klasik FS" value={FS.toFixed(2)}/><Metric label="γRv" value="1.40"/>
     </div></Card>
     <Card title="KLASİK YÖNTEMLER"><Table headers={['Yöntem','qult','qallow gross','qallow net']} rows={generic.map(x=>[x.method,x.result.ultimate.toFixed(2)+' kPa',x.result.allowableGross.toFixed(2)+' kPa',x.result.allowableNet.toFixed(2)+' kPa'])}/><div className="engineering-note">Bu dört sütun klasik izin verilebilir taşıma gücüdür; TBDY tasarım dayanımı değildir.</div></Card>
-    <div className="metric-strip"><Metric label="TBDY qk" value={stress(r.qk).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="TBDY qt" value={stress(r.qt).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="q0" value={stress(r.qo).toFixed(2)} unit={units.stress}/><Metric label="B′ / L′" value={r.Be.toFixed(3)+' / '+r.Le.toFixed(3)} unit="m"/><Metric label="Kullanım" value={(r.utilization*100).toFixed(1)} unit="%"/><Metric label="Kontrol" value={r.layeredScreeningOnly?'ÖN KONTROL':p.geophysical.soilGroup==='ZF'&&!p.geophysical.siteSpecificResponseAnalysisCompleted?'ÖZEL SAHA ANALİZİ GEREKLİ':r.adequate?'UYGUN':'YETERSİZ'}/></div>
+    <div className="metric-strip"><Metric label="TBDY qk" value={stress(r.qk).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="TBDY qt" value={stress(r.qt).toFixed(2)} unit={units.stress} tone="primary"/><Metric label="q0" value={stress(r.qo).toFixed(2)} unit={units.stress}/><Metric label="B′ / L′" value={r.Be.toFixed(3)+' / '+r.Le.toFixed(3)} unit="m"/><Metric label="Kullanım" value={(r.utilization*100).toFixed(1)} unit="%"/><Metric label="Kontrol" value={(r.layeredScreeningOnly||!calculation.result?.finalDesignEligible)?'ÖN KONTROL':p.geophysical.soilGroup==='ZF'&&!p.geophysical.siteSpecificResponseAnalysisCompleted?'ÖZEL SAHA ANALİZİ GEREKLİ':r.adequate?'UYGUN':'YETERSİZ'}/></div>
     {r.warnings.length>0&&<Card title="TBDY UYARILARI"><div className="inline-empty">{r.warnings.join(' ')}</div></Card>}
     <CalculationTrace title="TBDY 2018 16.8 hesap zinciri" source={calculation.result?.source??SOURCE_NOTES.bearing} rows={calculation.result?.steps??[]}/>
   </Frame>

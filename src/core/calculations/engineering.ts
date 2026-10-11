@@ -33,7 +33,7 @@ export function bearingCapacity(i:{B:number;L:number;Df:number;gamma:number;c:nu
 export function tbdyBearingCapacity(i:SurfaceFoundationInput){return calculateSurfaceFoundation({...i,method:'TBDY-2018',resistanceFactor:i.resistanceFactor??1.4})}
 
 export function bearingCapacityStage2(i:Stage2BearingInput){return stage2BearingCapacity(i)}
-export function settlement(i:{B:number;q:number;Es:number;nu:number;layers?:{thickness:number;Cc?:number;e0?:number;sigma0?:number;dSigma?:number}[]}){return settlementEngine(i).value}
+export function settlement(i:{B:number;q:number;Es:number;nu:number;layers?:{thickness:number;Cc?:number;e0?:number;sigma0?:number;dSigma?:number}[]}){return settlementEngine(i)}
 export function settlementStage2(i:Stage2SettlementInput){return stage2Settlement(i)}
 export function liquefaction(i:{Mw:number;Sds:number;depth:number;N160f:number;sigmaV:number;sigmaVPrime:number}){return liquefactionEngine(i)}
 export function liquefactionProfile(i:LiquefactionProfileInput){return liquefactionProfileEngine(i)}

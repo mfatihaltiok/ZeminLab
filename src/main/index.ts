@@ -4,8 +4,8 @@ import { promises as fs } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
-const projectSaveFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
-const projectOpenFilter=[{name:'FALUZMN Projesi',extensions:['falu']}]
+const projectSaveFilter=[{name:'ZeminLab Projesi',extensions:['falu']}]
+const projectOpenFilter=[{name:'ZeminLab Projesi',extensions:['falu']}]
 const pdfFilter=[{name:'PDF Belgesi',extensions:['pdf']}]
 const PROJECT_SCHEMA_VERSION=1
 const FIELD_CACHE_SCHEMA_VERSION=1
@@ -23,7 +23,7 @@ function createWindow():void{
 }
 
 app.whenReady().then(()=>{
-  electronApp.setAppUserModelId('com.faluzmn.app')
+  electronApp.setAppUserModelId('com.zeminlab.app')
   app.on('browser-window-created',(_,window)=>optimizer.watchWindowShortcuts(window))
 
   const writeProjectFile=async(filePath:string,payload:unknown)=>{
@@ -39,26 +39,26 @@ app.whenReady().then(()=>{
   }
 
   ipcMain.handle('project:save',async(_event,payload:unknown,currentPath?:string)=>{
-    const filePath=currentPath??await chooseProjectSavePath('FALUZMN Projesini Kaydet','Yeni Proje.falu')
+    const filePath=currentPath??await chooseProjectSavePath('ZeminLab Projesini Kaydet','Yeni ZeminLab Projesi.falu')
     if(!filePath)return null
     return await writeProjectFile(filePath,payload)
   })
 
   ipcMain.handle('project:save-as',async(_event,payload:unknown,currentPath?:string)=>{
-    const defaultName=currentPath?currentPath.split(/[\\/]/).pop()??'Yeni Proje.falu':'Yeni Proje.falu'
-    const filePath=await chooseProjectSavePath('FALUZMN Projesini Farklı Kaydet',defaultName)
+    const defaultName=currentPath?currentPath.split(/[\\/]/).pop()??'Yeni ZeminLab Projesi.falu':'Yeni ZeminLab Projesi.falu'
+    const filePath=await chooseProjectSavePath('ZeminLab Projesini Farklı Kaydet',defaultName)
     if(!filePath)return null
     return await writeProjectFile(filePath,payload)
   })
 
   ipcMain.handle('project:open',async()=>{
-    const result=await dialog.showOpenDialog({title:'FALUZMN Projesi Aç',properties:['openFile'],filters:projectOpenFilter})
+    const result=await dialog.showOpenDialog({title:'ZeminLab Projesi Aç',properties:['openFile'],filters:projectOpenFilter})
     if(result.canceled||!result.filePaths[0])return null
     const filePath=result.filePaths[0]
     const raw=await fs.readFile(filePath,'utf8')
     const envelope=JSON.parse(raw) as {format?:string;version?:number;data?:unknown}
-    if(envelope.format!=='FALUZMN'||typeof envelope.version!=='number'||envelope.data===undefined)throw new Error('Geçersiz veya desteklenmeyen FALUZMN proje dosyası.')
-    if(envelope.version>PROJECT_SCHEMA_VERSION)throw new Error(`Bu proje dosyası daha yeni bir FALUZMN sürümüne ait (v${envelope.version}).`)
+    if(envelope.format!=='FALUZMN'||typeof envelope.version!=='number'||envelope.data===undefined)throw new Error('Geçersiz veya desteklenmeyen ZeminLab proje dosyası.')
+    if(envelope.version>PROJECT_SCHEMA_VERSION)throw new Error(`Bu proje dosyası daha yeni bir ZeminLab sürümüne ait (v${envelope.version}).`)
     return{filePath,data:envelope.data,version:envelope.version}
   })
 
@@ -97,7 +97,7 @@ app.whenReady().then(()=>{
   ipcMain.handle('report:export-pdf',async event=>{
     const window=BrowserWindow.fromWebContents(event.sender)
     if(!window)return null
-    const result=await dialog.showSaveDialog(window,{title:'Mühendislik Raporunu PDF Olarak Kaydet',defaultPath:'FALUZMN-Mühendislik-Raporu.pdf',filters:pdfFilter})
+    const result=await dialog.showSaveDialog(window,{title:'Mühendislik Raporunu PDF Olarak Kaydet',defaultPath:'ZeminLab-Mühendislik-Raporu.pdf',filters:pdfFilter})
     if(result.canceled||!result.filePath)return null
     const pdf=await window.webContents.printToPDF({landscape:false,pageSize:'A4',printBackground:true,displayHeaderFooter:false,margins:{top:0,bottom:0,left:0,right:0}})
     const filePath=result.filePath.endsWith('.pdf')?result.filePath:`${result.filePath}.pdf`

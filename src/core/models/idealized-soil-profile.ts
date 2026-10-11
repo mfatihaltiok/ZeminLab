@@ -32,12 +32,14 @@ export interface IdealizedSoilLayer {
   plasticityIndex?: number
   finesContent?: number
   cohesion?: number
+  undrainedCu?: number
   frictionAngle?: number
   compressionIndexCc?: number
   recompressionIndexCr?: number
   initialVoidRatio?: number
   preconsolidationPressure?: number
   secondaryCompressionIndex?: number
+  elasticModulus?: number
   constrainedModulus?: number
   oedometricModulus?: number
   poissonRatio?: number
@@ -62,6 +64,10 @@ export interface IdealizedSoilProfile {
   layers: IdealizedSoilLayer[]
   methodology: string
   unitSystem?: UnitSystem
+  settlementGroundwaterBoreholeId?: string
+  settlementMethod?: 'burland-burbidge' | 'elasticity' | '2to1-layer' | 'boussinesq' | 'janbu' | 'schmertmann'
+  settlementTimeYears?: number
+  secondaryStartTimeYears?: number
   notes?: string
 }
 
