@@ -29,6 +29,8 @@ export interface JetGroutProjectParameters{
   qcRequiredCoreSamples?:number
   qcMeasuredCoreSamples?:number
   qcContinuityVerified?:boolean
+  qcConstructionLogsVerified?:boolean
+  qcTestReportReviewed?:boolean
 }
 export interface GeophysicalParameters{vs30?:number;soilGroup?:'ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF';soilGroupSource?:'VS30'|'USER'|'SITE_SPECIFIC';siteSpecificResponseAnalysisCompleted?:boolean;source?:string;notes?:string}
 export interface SeismicParameters{
