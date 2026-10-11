@@ -81,7 +81,7 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
   for (const [index,l] of layers.entries()) {
     const values=[l.thickness,l.sigma0,l.deltaSigma,l.Es,l.mv,l.Cc,l.e0,l.Cr,l.sigmaPc]
     if(values.some(v=>v!==undefined&&!Number.isFinite(v)))throw new Error('Oturma katmanı '+(index+1)+': parametreler sonlu olmalıdır.')
-    if(l.thickness<=0||l.deltaSigma<0||l.Es!=null&&l.Es<=0||l.mv!=null&&l.mv<0||l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<=-1||l.Cr!=null&&l.Cr<0||l.sigmaPc!=null&&l.sigmaPc<=0)throw new Error('Oturma katmanı '+(index+1)+': fiziksel olmayan parametre.')
+    if(l.thickness<=0||l.deltaSigma<0||l.Es!=null&&l.Es<=0||l.mv!=null&&l.mv<0||l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<0||l.Cr!=null&&l.Cr<0||l.sigmaPc!=null&&l.sigmaPc<=0)throw new Error('Oturma katmanı '+(index+1)+': fiziksel olmayan parametre.')
     const H = l.thickness
     const ds = l.deltaSigma
     let s = 0
@@ -94,7 +94,7 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
       s = H * l.mv * ds
       consolidation += s
       type = 'oedometer'
-    } else if (l.Cc != null && l.e0 != null && l.sigma0 > 0 && l.Cc >= 0 && l.e0 > -1) {
+    } else if (l.Cc != null && l.e0 != null && l.sigma0 > 0 && l.Cc >= 0 && l.e0 >= 0) {
       const sigma1 = l.sigma0 + ds
       const spc = l.sigmaPc ?? l.sigma0
       const Cr = Math.max(0, l.Cr ?? l.Cc)
