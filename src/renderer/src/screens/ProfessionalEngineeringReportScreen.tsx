@@ -417,6 +417,8 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
         { label: 'Kompozit Modül', value: result.compositeModulus ? fmt(result.compositeModulus) : '—', unit: result.compositeModulus ? 'kPa' : '' },
         { label: 'Karakteristik kapasite / talep', value: result.capacityFS==null?'—':fmt(result.capacityFS), unit: '—' },
         { label: 'İzin verilebilir kompozit kapasite', value: result.allowableCapacity==null?'FS girilmedi':fmt(result.allowableCapacity), unit: result.allowableCapacity==null?'':'kPa' },
+        { label: 'Tasarım kullanım oranı', value: result.designUtilization==null?'FS girilmedi':fmt(result.designUtilization*100,1), unit: result.designUtilization==null?'':'%', status: result.designAdequate==null?'warning':result.designAdequate?'ok':'fail' },
+        { label: 'Kompozit ön kontrol', value: result.designAdequate==null?'VERİ EKSİK':result.designAdequate?'YETERLİ':'YETERSİZ', unit: '', status: result.designAdequate==null?'warning':result.designAdequate?'ok':'fail' },
         { label: 'Kolon Yük Paylaşımı', value: fmt(result.columnLoadShare * 100, 1), unit: '%' },
         { label: 'Zemin Yük Paylaşımı', value: fmt(result.soilLoadShare * 100, 1), unit: '%' },
         { label: 'Saha kalite kontrolü', value: result.qcVerification.status==='pass'?'UYGUN':result.qcVerification.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK', unit: '', status: result.qcVerification.status==='pass'?'ok':result.qcVerification.status==='fail'?'fail':'warning' }
