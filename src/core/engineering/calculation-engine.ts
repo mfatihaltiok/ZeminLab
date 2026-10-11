@@ -48,7 +48,8 @@ export function bearingCapacity(i:BearingInput):CalculationResult<any>{
     {symbol:'Nq',title:'Taşıma gücü katsayısı',formula:'Nq=exp(πtanφ)·tan²(45°+φ/2)',value:f.Nq},
     {symbol:'Nc',title:'Kohezyon katsayısı',formula:'Nc=(Nq−1)cotφ',value:f.Nc},
     {symbol:'Nγ',title:'Birim hacim ağırlığı katsayısı',formula:'Seçilen yöntemin Nγ bağıntısı',value:f.Ngamma},
-    {symbol:'q',title:'Sürşarj',formula:'q=γDf',value:q,unit:'kPa'},
+    {symbol:'q',title:'Sürşarj',formula:i.surcharge!=null?'q = efektif temel seviyesi sürşarjı (YASS düzeltmeli)':'q=γDf',value:q,unit:'kPa'},
+    {symbol:'γNγ',title:'Nγ terimi için birim hacim ağırlık',formula:'γ′ veya YASS düzeltmeli γ',value:gammaBearing,unit:'kN/m³'},
     {symbol:'qult',title:'Nihai taşıma gücü',formula:'Klasik genel taşıma gücü denklemi',value:ultimate,unit:'kPa'},
     {symbol:'qallow',title:'İzin verilen gross',formula:'qult/FS',value:value.allowableGross,unit:'kPa'}
   ]}
