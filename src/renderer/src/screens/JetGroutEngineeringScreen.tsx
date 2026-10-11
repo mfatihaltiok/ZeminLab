@@ -22,7 +22,7 @@ export function JetGroutEngineeringScreen(){
   const qcRequiredDiameter=j.qcRequiredDiameter?.toString()??'',qcMeasuredDiameter=j.qcMeasuredDiameter?.toString()??''
   const qcRequiredCoreSamples=j.qcRequiredCoreSamples?.toString()??'',qcMeasuredCoreSamples=j.qcMeasuredCoreSamples?.toString()??''
   const layout=j.layout??'square'
-  const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)
+  const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)&&projectLoad>0&&projectArea>0
   const r=useMemo(()=>{
     if(!ready)return undefined
     return jetGroutEngineering({
