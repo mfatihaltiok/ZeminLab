@@ -196,7 +196,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(required.some(x=>!finite(x)))throw new Error('Temel geometrisi, zemin parametreleri ve düşey yük sonlu sayılar olmalıdır.')
   if(i.B<=0||i.L<=0||i.Df<0)throw new Error('Temel B ve L pozitif, Df negatif olmayan değer olmalıdır.')
   if(i.gamma1<=0)throw new Error('γ doğal birim hacim ağırlığı pozitif olmalıdır.')
-  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=gammaW))throw new Error('YASS tanımlandıysa γsat, γw=9.80665 kN/m³ değerinden büyük olmalıdır.')
+  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&i.groundwaterDepth!<=i.Df+i.B&&(!finite(i.gamma2)||i.gamma2!<=gammaW))throw new Error('YASS, temel tabanından B derinliğine kadar etkiliyse γsat, γw=9.80665 kN/m³ değerinden büyük olmalıdır.')
   if((i.groundSlope??0)<0||(i.groundSlope??0)>=90||(i.baseSlope??0)<0||(i.baseSlope??0)>=90)throw new Error('Arazi ve temel tabanı eğimleri 0°≤β<90° aralığında olmalıdır.')
   if(i.additionalSurcharge!=null&&i.additionalSurcharge<0)throw new Error('Ek sürşarj negatif olamaz.')
   if(i.c<0||i.verticalLoad<=0)throw new Error('c negatif olamaz; taşıma gücü hesabı için düşey yük pozitif olmalıdır.')
