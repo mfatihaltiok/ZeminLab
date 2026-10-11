@@ -196,7 +196,9 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(required.some(x=>!finite(x)))throw new Error('Temel geometrisi, zemin parametreleri ve düşey yük sonlu sayılar olmalıdır.')
   if(i.B<=0||i.L<=0||i.Df<0)throw new Error('Temel B ve L pozitif, Df negatif olmayan değer olmalıdır.')
   if(i.gamma1<=0)throw new Error('γ doğal birim hacim ağırlığı pozitif olmalıdır.')
-  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=0))throw new Error('YASS tanımlandıysa γsat pozitif olmalıdır.')
+  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=gammaW))throw new Error('YASS tanımlandıysa γsat, γw=9.80665 kN/m³ değerinden büyük olmalıdır.')
+  if((i.groundSlope??0)<0||(i.groundSlope??0)>=90||(i.baseSlope??0)<0||(i.baseSlope??0)>=90)throw new Error('Arazi ve temel tabanı eğimleri 0°≤β<90° aralığında olmalıdır.')
+  if(i.additionalSurcharge!=null&&i.additionalSurcharge<0)throw new Error('Ek sürşarj negatif olamaz.')
   if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük negatif olamaz.')
   if(!finite(i.phi)||i.phi<0||i.phi>50)throw new Error('φ 0° ile 50° arasında olmalıdır.')
   for(const [name,value] of [['ek sürşarj',i.additionalSurcharge],['yatay yük',i.horizontalLoad],['Mx',i.momentX],['My',i.momentY],['arazi eğimi',i.groundSlope],['temel tabanı eğimi',i.baseSlope],['YASS derinliği',i.groundwaterDepth],['Cu',i.undrainedCu],['direnç katsayısı',i.resistanceFactor],['güvenlik katsayısı',i.safetyFactor]] as const){if(value!==undefined&&!finite(value))throw new Error(name+' sonlu bir sayı olmalıdır.')}
@@ -204,7 +206,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(i.undrainedCu!=null&&i.undrainedCu<0)throw new Error('Cu negatif olamaz.')
   if(i.additionalSurcharge!=null&&i.additionalSurcharge<0)throw new Error('Ek sürşarj negatif olamaz.')
   if(i.groundwaterDepth!=null&&i.groundwaterDepth<0)throw new Error('YASS derinliği negatif olamaz.')
-  if(i.layers?.some(l=>![l.topDepth,l.bottomDepth,l.gamma,l.cohesion,l.phi].every(finite)||l.topDepth<0||l.bottomDepth<=l.topDepth||l.gamma<=0||l.cohesion<0||l.phi<0||l.phi>50||(l.gammaSat!=null&&(!finite(l.gammaSat)||l.gammaSat<=0))))throw new Error('Tabakalı zemin verilerinde derinlik, birim hacim ağırlık, kohezyon veya sürtünme açısı geçersiz.')
+  if(i.layers?.some(l=>![l.topDepth,l.bottomDepth,l.gamma,l.cohesion,l.phi].every(finite)||l.topDepth<0||l.bottomDepth<=l.topDepth||l.gamma<=0||l.cohesion<0||l.phi<0||l.phi>50||(l.gammaSat!=null&&(!finite(l.gammaSat)||l.gammaSat<=gammaW))))throw new Error('Tabakalı zemin verilerinde derinlik, birim hacim ağırlık, kohezyon veya sürtünme açısı geçersiz.')
   if(i.layers?.length){const ordered=[...i.layers].sort((a,b)=>a.topDepth-b.topDepth);for(let k=1;k<ordered.length;k++)if(ordered[k].topDepth<ordered[k-1].bottomDepth-1e-9)throw new Error('Tabakalı zemin profili çakışan derinlik aralıkları içeremez.')}
   const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad
   const Vh=Math.abs(i.horizontalLoad??0)
