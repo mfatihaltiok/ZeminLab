@@ -212,8 +212,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       const Iz=schmertmannIz(zMid,B,L,qNet,sigmaPeak)
       const C1=qNet>0?Math.max(.5,1-.5*baseStress.effective/qNet):1
       const C2=finite(input.timeYears)&&input.timeYears!>=.1?1+.2*Math.log10(input.timeYears!/.1):1
-      const C3=ratio>=10?1:Math.max(.73,1.03-.03*ratio)
-      if(finite(Es)&&Es>0)immediate=C1*C2*C3*qNet*Iz*thickness/Es*1000
+      if(finite(Es)&&Es>0)immediate=C1*C2*qNet*Iz*thickness/Es*1000
       else{status='VERİ EKSİK';note='Schmertmann için bağımsız Young modülü Es gerekir; M/Moed yerine kullanılamaz.'}
     }
     if(finite(layer.secondaryCompressionIndex)&&layer.secondaryCompressionIndex!>=0&&finite(input.timeYears)&&input.timeYears!>0){
