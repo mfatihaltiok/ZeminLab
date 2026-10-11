@@ -78,7 +78,7 @@ export function Foundation(){
   const cu=soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem)
   const N=forceToBase(f.structuralWeight,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
   const ready=f.footingWidth>0&&f.footingLength>0&&N>0&&f.foundationInterface!==undefined
-  const tanDeltaLimit=f.foundationInterface==='cast-in-place-soil'?.6:f.foundationInterface==='precast-soil'?.4:f.foundationInterface==='concrete-concrete'||f.foundationInterface==='concrete-bedrock'?.5:undefined
+  const tanDeltaLimit=f.foundationInterface==='cast-in-place-soil'?0.6:f.foundationInterface==='precast-soil'?0.4:(f.foundationInterface==='concrete-concrete'||f.foundationInterface==='concrete-bedrock')?0.5:undefined
   let r:ReturnType<typeof foundationChecks>|undefined
   let calculationError:string|undefined
   if(ready&&f.foundationInterface){
