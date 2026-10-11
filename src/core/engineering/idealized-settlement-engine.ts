@@ -107,15 +107,18 @@ function schmertmannIz(z:number,B:number,L:number,qNet:number,sigmaPeak:number){
   return izPeak*(1-z/zBottom)
 }
 function consolidationSettlement(layer:IdealizedSoilLayer,thickness:number,sigma0:number,sigma1:number){
-  if(!finite(layer.compressionIndexCc)||!finite(layer.initialVoidRatio)||sigma0<=0||sigma1<=sigma0)return{value:0,ok:false,crAssumed:false}
-  const Cc=layer.compressionIndexCc!,crProvided=finite(layer.recompressionIndexCr)&&layer.recompressionIndexCr!>=0,Cr=crProvided?layer.recompressionIndexCr!:Cc,e0=layer.initialVoidRatio!,pc=finite(layer.preconsolidationPressure)&&layer.preconsolidationPressure!>sigma0?layer.preconsolidationPressure!:sigma0
+  if(!finite(layer.compressionIndexCc)||!finite(layer.initialVoidRatio)||sigma0<=0||sigma1<=sigma0)return{value:0,ok:false,crAssumed:false,note:'Konsolidasyon için geçerli Cc, e0, σ′v0 ve σ′v1 gereklidir.'}
+  const Cc=layer.compressionIndexCc!,e0=layer.initialVoidRatio!,pcProvided=finite(layer.preconsolidationPressure),pc=pcProvided?layer.preconsolidationPressure!:sigma0,crProvided=finite(layer.recompressionIndexCr)&&layer.recompressionIndexCr!>=0
+  if(pc<sigma0)return{value:0,ok:false,crAssumed:false,note:'σ′pc başlangıç efektif gerilmesinden küçük; konsolidasyon girdisi tutarsız.'}
+  if(pc>sigma0&&!crProvided)return{value:0,ok:false,crAssumed:false,note:'Aşırı konsolide katmanda σ′pc>σ′v0 olduğunda laboratuvardan Cr girilmelidir; Cc yerine varsayılamaz.'}
+  const Cr=crProvided?layer.recompressionIndexCr!:Cc
   let strain=0
   if(sigma1<=pc)strain=Cr*Math.log10(sigma1/sigma0)
   else{
-    strain=Cr*Math.log10(Math.max(pc/sigma0,1))
-    strain+=Cc*Math.log10(Math.max(sigma1/pc,1))
+    strain=Cr*Math.log10(pc/sigma0)
+    strain+=Cc*Math.log10(sigma1/pc)
   }
-  return{value:Math.max(0,thickness*strain/(1+e0)*1000),ok:true,crAssumed:!crProvided}
+  return{value:Math.max(0,thickness*strain/(1+e0)*1000),ok:true,crAssumed:false,note:pcProvided?undefined:'σ′pc girilmedi; normal konsolide davranış (σ′pc=σ′v0) varsayıldı.'}
 }
 
 export function calculateIdealizedSettlement(input:IdealizedSettlementInput):IdealizedSettlementResult{
@@ -176,7 +179,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       if(cohesive){
         methodName='Kil/kohezyonlu tabaka: konsolidasyon'
         const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective)
-        if(r.ok){consolidation=r.value;if(r.crAssumed)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): Geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.');if(layer.preconsolidationPressure==null||layer.preconsolidationPressure<=midStress.effective)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): σ′pc girilmedi veya başlangıç gerilmesinden yüksek değil; normal konsolide varsayımı kullanıldı.')}else{status='VERİ EKSİK';note='Cc, e0 ve başlangıç efektif gerilmesi gerekir.'}
+        if(r.ok){consolidation=r.value;if(r.note)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): '+r.note)}else{status='VERİ EKSİK';note=r.note??'Konsolidasyon için Cc, e0, σ′pc ve başlangıç efektif gerilmesi gerekir.'}
       }else{
         methodName='Burland & Burbidge (1985)'
         const r=burlandSettlement(layer,qNet,B,L,zTop,zBottom,influenceDepth,zMid,gwt);immediate=r.value;note=r.note
