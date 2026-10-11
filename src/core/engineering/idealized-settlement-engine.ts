@@ -180,8 +180,8 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     }else if(method==='elasticity'){
       methodName='Elastik tabaka gerinimi'
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
-      if(finite(M)&&M>0&&finite(layer.poissonRatio)&&layer.poissonRatio>-1&&layer.poissonRatio<0.5)immediate=deltaSigma*thickness*(1-layer.poissonRatio**2)/M*1000
-      else{status='VERİ EKSİK';note='Constrained/oedometric modül ve geçerli Poisson oranı gerekir.'}
+      if(finite(M)&&M>0)immediate=deltaSigma*thickness/M*1000
+      else{status='VERİ EKSİK';note='Constrained/oedometric modül gerekir.'}
       if(cohesive){const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective);if(r.ok){consolidation=r.value;if(r.crAssumed)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): Geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.')}else status='VERİ EKSİK'}
     }else if(method==='boussinesq'){
       methodName='Boussinesq alan integrasyonu + elastik tabaka'
@@ -191,7 +191,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     }else if(method==='2to1-layer'){
       methodName='2:1 gerilme yayılımı + elastik tabaka'
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
-      if(finite(M)&&M>0&&finite(layer.poissonRatio)&&layer.poissonRatio>-1&&layer.poissonRatio<0.5)immediate=deltaSigma*thickness*(1-layer.poissonRatio**2)/M*1000;else{status='VERİ EKSİK';note='Constrained/oedometric modül ve geçerli Poisson oranı gerekir.'}
+      if(finite(M)&&M>0)immediate=deltaSigma*thickness/M*1000;else{status='VERİ EKSİK';note='Constrained/oedometric modül gerekir.'}
     }else if(method==='janbu'){
       methodName='Janbu — M0/M1 verisi gerekli'
       status='VERİ EKSİK'
