@@ -37,7 +37,8 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
   const sds=p.seismic.sds
   const validSpt=useMemo(()=>b?[...b.spt].filter(x=>x.testType==='SPT'&&Number.isFinite(x.n2)&&Number.isFinite(x.n3)).sort((a,c)=>a.depth-c.depth):[],[b])
   const profileInput=useMemo(()=>{
-    if(!b||b.groundwaterDepth==null||sds==null||p.seismic.magnitude==null||validSpt.length===0)return undefined
+    const saturatedWeightsComplete=Boolean(b&&b.lithology.length>0&&b.lithology.every(l=>unitWeightToBase(l.saturatedUnitWeight??p.soilParameters.saturatedUnitWeight??0,p.unitSystem)>9.80665))
+    if(!b||b.groundwaterDepth==null||sds==null||p.seismic.magnitude==null||validSpt.length===0||!saturatedWeightsComplete)return undefined
     const rows:LiquefactionSptRecord[]=validSpt.map(record=>{
       const lab=labs.filter(x=>x.boreholeId===b.id).filter(x=>record.depth>=x.depth&&record.depth<=(x.depthTo??x.depth+.5)).sort((x,y)=>Math.abs(x.depth-record.depth)-Math.abs(y.depth-record.depth))[0]
       const layer=b.lithology.find(x=>record.depth>=x.from&&record.depth<x.to)
@@ -51,10 +52,10 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
         stressSnapshot:record.testStressSnapshot
       }
     })
-    return liquefactionProfile({
-      Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:unitWeightToBase(l.unitWeight??p.soilParameters.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(l.saturatedUnitWeight??l.unitWeight??p.soilParameters.saturatedUnitWeight??p.soilParameters.unitWeight,p.unitSystem),soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex})),
+    try{return liquefactionProfile({
+      Mw:p.seismic.magnitude,Sds:sds,gwt:b.groundwaterDepth,layers:b.lithology.map(l=>({top:l.from,bottom:l.to,gamma:unitWeightToBase(l.unitWeight??p.soilParameters.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(l.saturatedUnitWeight??p.soilParameters.saturatedUnitWeight??0,p.unitSystem),soil:l.code,finesContent:l.finesContent,plasticityIndex:l.plasticityIndex})),
       spt:rows,sptCorrection:p.sptCorrections,dts:p.seismic.dts,soilGroup:p.geophysical.soilGroup,continuousOrThickLens:p.soilParameters.liquefactionContinuousOrThickLens,foundationDepth:p.foundationParameters.footingDepth
-    })
+    })}catch{return undefined}
   },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,p.geophysical.soilGroup,p.soilParameters.liquefactionContinuousOrThickLens,p.sptCorrections,validSpt])
 
   return <Frame screen="liquefaction">
@@ -62,7 +63,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
     {!b?<Card title="SONDAJ GEREKLİ"><div className="inline-empty">Sıvılaşma için sondaj ve SPT verisi gerekir.</div></Card>:
       <><Card title="HESAP KAPSAMI"><div className="form-grid"><label>Sondaj<select value={b.id} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><Metric label="DTS" value={p.seismic.dts??'—'}/><Metric label="SDS" value={sds?.toFixed(3)??'—'}/><Metric label="Mw" value={p.seismic.magnitude??'—'}/><Metric label="YASS" value={b.groundwaterDepth??'—'}/><Metric label="SPT" value={validSpt.length}/><Metric label="CE" value={p.sptCorrections.ce.toFixed(2)}/><Metric label="CB" value={p.sptCorrections.cb.toFixed(2)}/><Metric label="CS" value={p.sptCorrections.cs.toFixed(2)}/><Metric label="CR" value="SPT başına"/></div></Card>
         {!profileInput?
-          <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">YASS, SDS, Mw ve geçerli SPT kayıtları birlikte bulunmalıdır. YASS bilinmiyorsa 16.6.2 kapsamında sıvılaşma değerlendirmesi başlatılmaz.</div></Card>:
+          <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">YASS, SDS, Mw, γsat, laboratuvar sınıflandırması ve geçerli SPT kayıtları birlikte bulunmalıdır. Test-zamanı gerilme snapshotı eksikse satır nihai olarak değerlendirilemez.</div></Card>:
           <><div className="metric-strip"><Metric label="TBDY zorunluluğu" value={profileInput.mandatoryByProject?'EVET':'DTS/zemin koşuluna bağlı'}/></div>
             {profileInput.warnings.length>0&&<Card title="TBDY UYARILARI"><div className="inline-empty">{profileInput.warnings.join(' ')}</div></Card>}
             <Card title="SPT · SIVILAŞMA DERİNLİK TABLOSU"><div className="table-wrap"><table><thead><tr><th>z</th><th>Zemin</th><th>FC%</th><th>PI</th><th>σ′v</th><th>CN</th><th>CR</th><th>N60</th><th>(N1)60</th><th>(N1)60f</th><th>CRR7.5</th><th>CSR</th><th>FS</th><th>Sonuç</th><th>Post-sıvılaşma</th></tr></thead><tbody>{profileInput.rows.map((row,i)=><tr key={i}><td>{row.depth.toFixed(2)}</td><td>{row.soil??'—'}</td><td>{row.fineContent?.toFixed(1)??'—'}</td><td>{row.plasticityIndex?.toFixed(1)??'—'}</td><td>{row.sigmaVPrime.toFixed(2)}</td><td>{row.cn.toFixed(3)}</td><td>{row.cr.toFixed(2)}</td><td>{row.n60.toFixed(2)}</td><td>{row.n1_60.toFixed(2)}</td><td>{row.n1_60f.toFixed(2)}</td><td>{row.crrM75?.toFixed(4)??'—'}</td><td>{row.tauEarthquake?.toFixed(2)??'—'}</td><td>{row.FS?.toFixed(3)??'—'}</td><td>{row.conclusion}</td><td>{row.postLiquefactionEvaluation==='required'?'GEREKLİ':row.postLiquefactionEvaluation==='review'?'ETKİLERİ İNCELE':row.postLiquefactionEvaluation==='not-required'?'KAPSAM DIŞI':'VERİ EKSİK'}</td></tr>)}</tbody></table></div></Card>
