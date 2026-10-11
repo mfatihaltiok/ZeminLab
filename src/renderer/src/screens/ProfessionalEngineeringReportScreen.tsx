@@ -265,16 +265,18 @@ function buildLiquefactionSection(
   }
 }
 
-function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile?: IdealizedSoilProfile): ReportSection | null {
+function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile: IdealizedSoilProfile | undefined, boreholes: BoreholeRecord[]): ReportSection | null {
   const f = p.foundationParameters
+  const profileBorehole=boreholes.find(x=>profile?.sourceBoreholeIds.includes(x.id))??boreholes[0]
   const B = f.footingWidth, L = f.footingLength, Df = f.footingDepth
   if (!profile || profile.status !== 'SABİTLENDİ' || !(B > 0 && L > 0 && Df >= 0)) return null
 
   try {
     const qGross = forceToBase(f.structuralWeight, p.unitSystem) / (B * L)
     const result = calculateIdealizedSettlement({
-      profile, method: 'elasticity', B, L, Df, qGross,
-      groundwaterDepth: p.soilParameters.groundwaterDepth
+      profile, method: profile.settlementMethod??'burland-burbidge', B, L, Df, qGross,
+      groundwaterDepth: profileBorehole?.groundwaterDepth??p.soilParameters.groundwaterDepth,
+      timeYears:profile.settlementTimeYears,secondaryStartTimeYears:profile.secondaryStartTimeYears
     })
     const steps: ReportCalculationStep[] = result.layers.flatMap((layer, index) => ([
       { index: index * 3 + 1, symbol: 'Δσz', title: 'Katman ' + (index + 1) + ' gerilme artışı', formula: '2:1: Δσz=q·B·L/[(B+z)(L+z)]', value: layer.deltaSigma, unit: 'kPa', note: layer.note ?? layer.status },
@@ -420,7 +422,7 @@ export function ProfessionalEngineeringReport({ profile }: Props) {
     const foundation = buildFoundationCheckSection(p)
     if (foundation) result.push(foundation)
     
-    const settlement = buildSettlementSection(p, profile)
+    const settlement = buildSettlementSection(p, profile, boreholes)
     if (settlement) result.push(settlement)
 
     const liquefactionSections = boreholes.length ? boreholes.map((borehole, index) => buildLiquefactionSection(p, borehole, labs, index)) : [buildLiquefactionSection(p, undefined, labs, 0)]
