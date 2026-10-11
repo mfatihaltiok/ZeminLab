@@ -50,6 +50,8 @@ function buildBearingSection(p: ReturnType<typeof useProjectInfo>, profile?: Ide
       }))
     })
 
+    const designEligible = result.finalDesignEligible && !(p.geophysical.soilGroup === 'ZF' && !p.geophysical.siteSpecificResponseAnalysisCompleted)
+    const designWarnings = [...result.warnings, ...(p.geophysical.soilGroup === 'ZF' && !p.geophysical.siteSpecificResponseAnalysisCompleted ? ['ZF zemin grubu için TBDY 16.5.1.3 sahaya özel zemin davranış analizi tamamlanmadan nihai tasarım uygunluğu verilemez.'] : [])]
     const steps: ReportCalculationStep[] = result.steps.map((s, i) => ({
       index: i + 1,
       symbol: s.symbol,
@@ -81,10 +83,10 @@ function buildBearingSection(p: ReturnType<typeof useProjectInfo>, profile?: Ide
         { label: 'Karakteristik Taşıma Gücü (qk)', value: fmt(result.value.qk), unit: 'kPa' },
         { label: 'Tasarım Taşıma Gücü (qt)', value: fmt(result.value.qt), unit: 'kPa' },
         { label: 'Uygulanan Basınç (q₀)', value: fmt(result.value.qo), unit: 'kPa' },
-        { label: 'Kullanım Oranı (η)', value: fmt(result.value.utilization * 100, 1), unit: '%', status: result.finalDesignEligible ? (result.value.utilization <= 1 ? 'ok' : 'fail') : 'warning' },
-        { label: 'Tasarım durumu', value: result.finalDesignEligible ? (result.value.adequate ? 'UYGUN' : 'UYGUN DEĞİL') : 'ÖN DEĞERLENDİRME — NİHAİ TASARIM DEĞİL', unit: '', status: result.finalDesignEligible ? (result.value.adequate ? 'ok' : 'fail') : 'warning' }
+        { label: 'Kullanım Oranı (η)', value: fmt(result.value.utilization * 100, 1), unit: '%', status: designEligible ? (result.value.utilization <= 1 ? 'ok' : 'fail') : 'warning' },
+        { label: 'Tasarım durumu', value: designEligible ? (result.value.adequate ? 'UYGUN' : 'UYGUN DEĞİL') : 'ÖN DEĞERLENDİRME — NİHAİ TASARIM DEĞİL', unit: '', status: designEligible ? (result.value.adequate ? 'ok' : 'fail') : 'warning' }
       ],
-      notes: result.warnings
+      notes: designWarnings
     }
   } catch {
     return null
@@ -138,7 +140,7 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
       ],
       steps,
       results: [
-        { label: 'Kayma Güvenlik Oranı', value: fmt(result.slidingFS), unit: '', status: result.slidingSafeResultant ? 'ok' : 'fail' },
+        { label: 'Kayma Güvenlik Oranı', value: result.evaluable ? fmt(result.slidingFS) : 'VERİ EKSİK', unit: '', status: !result.evaluable ? 'warning' : result.slidingSafeResultant ? 'ok' : 'fail' },
         { label: 'Kayma Kapasitesi', value: fmt(result.slidingCapacityResultant), unit: 'kN' },
         { label: 'Yatay Yük Sonucu', value: fmt(result.horizontalResultant), unit: 'kN' },
         { label: 'Temas Durumu', value: result.contactArea > 0 ? 'TAM KISMI TEMAS' : 'TEMAS YOK', unit: '', status: result.contactArea > 0 ? 'ok' : 'fail' }
