@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { useProjectInfo } from '../../../core/state/project-store'
 import { forceToBase, stressToBase, unitWeightToBase, momentToBase } from '../../../core/units/project-units'
-import { bearingCapacity, tbdyBearingCapacity, foundationChecks, jetGroutAdvanced, subgradeReaction } from '../../../core/calculations/engineering'
+import { bearingCapacity, tbdyBearingCapacity, foundationChecks } from '../../../core/calculations/engineering'
+import { jetGroutEngineering, verifyJetGroutQC } from '../../../core/engineering/jet-grout-advanced'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { calculateIdealizedSettlement } from '../../../core/engineering/idealized-settlement-engine'
 import { EngineeringReportProfessional, type ReportSection, type ReportCalculationStep } from '../components/EngineeringReportProfessional'
@@ -314,12 +315,22 @@ function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile?: 
   }
 }
 
-function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSection | null {
+function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSection {
   const j = p.jetGrout
-  if (!(j.columnDiameter && j.columnDiameter > 0 && j.spacing && j.spacing > 0 && j.qSoil && j.qSoil > 0 && j.qColumn && j.qColumn > 0)) return null
-
+  const qcInput={
+    requiredUcs:j.qcRequiredUcs==null?undefined:stressToBase(j.qcRequiredUcs,p.unitSystem),
+    measuredUcs:j.qcMeasuredUcs==null?undefined:stressToBase(j.qcMeasuredUcs,p.unitSystem),
+    requiredDiameter:j.qcRequiredDiameter,measuredDiameter:j.qcMeasuredDiameter,
+    requiredCoreSamples:j.qcRequiredCoreSamples,measuredCoreSamples:j.qcMeasuredCoreSamples,
+    continuityVerified:j.qcContinuityVerified
+  }
+  const designInputsComplete=Boolean(j.columnDiameter&&j.columnDiameter>0&&j.spacing&&j.spacing>0&&j.qSoil&&j.qSoil>0&&j.qColumn&&j.qColumn>0)
+  if(!designInputsComplete){
+    const qc=verifyJetGroutQC(qcInput)
+    return {id:'4',title:'Jet Grout Zemin İyileştirme ve Saha Kalite Kontrolü',subtitle:'Kompozit tasarım girdileri ve saha doğrulaması',method:'Ön değerlendirme / proje kabul kriterleri',source:'Erol & Çekinmez Bayram (2018); proje kalite kontrol şartnamesi',inputs:[{label:'Kolon çapı',value:fmt(j.columnDiameter),unit:'m'},{label:'Kolon aralığı',value:fmt(j.spacing),unit:'m'}],steps:[],results:[{label:'Kompozit hesap',value:'GİRDİ EKSİK',unit:'',status:'warning'},{label:'Saha kalite kontrolü',value:qc.status==='pass'?'UYGUN':qc.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK',unit:'',status:qc.status==='pass'?'ok':qc.status==='fail'?'fail':'warning'}],notes:qc.warnings}
+  }
   try {
-    const result = jetGroutAdvanced({
+    const result = jetGroutEngineering({
       columnDiameter: j.columnDiameter,
       spacing: j.spacing,
       layout: j.layout ?? 'square',
@@ -329,7 +340,13 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
       cColumn: j.cColumn == null ? undefined : stressToBase(j.cColumn, p.unitSystem),
       EsSoil: j.EsSoil == null ? undefined : stressToBase(j.EsSoil, p.unitSystem),
       EsColumn: j.EsColumn == null ? undefined : stressToBase(j.EsColumn, p.unitSystem),
-      FS: 3
+      load:forceToBase(p.foundationParameters.structuralWeight,p.unitSystem),
+      foundationArea:p.foundationParameters.footingWidth*p.foundationParameters.footingLength,
+      foundationThickness:j.foundationThickness,soilPoissonRatio:j.soilPoissonRatio,
+      verticalLoad:forceToBase(p.foundationParameters.structuralWeight,p.unitSystem),
+      horizontalLoad:Math.hypot(forceToBase(p.foundationParameters.vtX,p.unitSystem),forceToBase(p.foundationParameters.vtY,p.unitSystem)),
+      cohesion:j.interfaceCohesion==null?undefined:stressToBase(j.interfaceCohesion,p.unitSystem),frictionAngle:j.interfaceFrictionAngle,
+      qc:qcInput
     })
 
     const steps: ReportCalculationStep[] = [
@@ -360,9 +377,10 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
         { label: 'Kompozit Taşıma Gücü', value: fmt(result.compositeCapacity), unit: 'kPa' },
         { label: 'Kompozit Modül', value: result.compositeModulus ? fmt(result.compositeModulus) : '—', unit: result.compositeModulus ? 'kPa' : '' },
         { label: 'Kolon Yük Paylaşımı', value: fmt(result.columnLoadShare * 100, 1), unit: '%' },
-        { label: 'Zemin Yük Paylaşımı', value: fmt(result.soilLoadShare * 100, 1), unit: '%' }
+        { label: 'Zemin Yük Paylaşımı', value: fmt(result.soilLoadShare * 100, 1), unit: '%' },
+        { label: 'Saha kalite kontrolü', value: result.qcVerification.status==='pass'?'UYGUN':result.qcVerification.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK', unit: '', status: result.qcVerification.status==='pass'?'ok':result.qcVerification.status==='fail'?'fail':'warning' }
       ],
-      notes: ['Kompozit parametreler ön tasarım/screening niteliğindedir. Nihai tasarım için saha deneyleri ve kalite kontrol gereklidir.']
+      notes: [...result.warnings, 'Kompozit parametreler ön tasarım/screening niteliğindedir. Nihai tasarım için saha deneyleri ve kalite kontrol gereklidir.']
     }
   } catch {
     return null
