@@ -256,6 +256,8 @@ export function calculateNumberOfColumns(
   spacing: number,
   layout: 'square' | 'triangular' = 'square'
 ): number {
+  if(![foundationWidth,foundationLength,spacing].every(Number.isFinite)||foundationWidth<=0||foundationLength<=0||spacing<=0)throw new Error('Temel boyutları ve kolon aralığı pozitif sonlu değerler olmalıdır.')
+  if(layout!=='square'&&layout!=='triangular')throw new Error('Desteklenmeyen Jet Grout yerleşim düzeni.')
   const colsX = Math.ceil(foundationWidth / spacing) + 1
   const colsY = Math.ceil(foundationLength / spacing) + 1
   
@@ -276,6 +278,8 @@ export function calculateImprovementRatio(
   spacing: number,
   layout: 'square' | 'triangular' = 'square'
 ): number {
+  if(![columnDiameter,spacing].every(Number.isFinite)||columnDiameter<=0||spacing<=0||spacing<columnDiameter)throw new Error('Kolon çapı ve aralığı pozitif olmalı; aralık çapından küçük olamaz.')
+  if(layout!=='square'&&layout!=='triangular')throw new Error('Desteklenmeyen Jet Grout yerleşim düzeni.')
   const columnArea = Math.PI * (columnDiameter / 2) ** 2
   
   if (layout === 'square') {
