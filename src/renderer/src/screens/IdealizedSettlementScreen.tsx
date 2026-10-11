@@ -65,7 +65,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
   const b = boreholes.find(x => x.id === selected) ?? boreholes[0]
   const f = p.foundationParameters
   const qGross = finite(f.verticalLoad) && finite(f.footingWidth) && finite(f.footingLength)
-    ? forceToBase(f.verticalLoad, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
+    ? forceToBase(f.structuralWeight, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
     : 0
 
   const result = useMemo(() => {
@@ -77,7 +77,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       L: f.footingLength,
       Df: f.footingDepth,
       qGross,
-      groundwaterDepth: b?.groundwaterDepth,
+      groundwaterDepth: b?.groundwaterDepth ?? p.soilParameters.groundwaterDepth,
     })
   }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth])
 
@@ -88,13 +88,14 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
     if (f.footingWidth <= 0 || f.footingLength <= 0) return undefined
     const common = { B: f.footingWidth, L: f.footingLength, method: ksMethod, unitSystem: 'kN-m' as const }
     if (ksMethod === 'q/s') {
-      if (!result || result.totalSettlement <= 0 || qGross <= 0) return undefined
+      if (!result || !result.ready || result.totalSettlement <= 0 || qGross <= 0) return undefined
       return subgradeReaction({ ...common, q: qGross, settlement: result.totalSettlement / 1000 })
     }
     if (ksMethod === 'elastic') {
       const Es = surfaceLayer?.constrainedModulus ?? surfaceLayer?.oedometricModulus
       if (!Es || Es <= 0) return undefined
-      return subgradeReaction({ ...common, Es, nu: surfaceLayer?.poissonRatio ?? 0.30 })
+      if (surfaceLayer?.poissonRatio == null) return undefined
+      return subgradeReaction({ ...common, Es: stressToBase(Es, profile?.unitSystem ?? p.unitSystem), nu: surfaceLayer.poissonRatio })
     }
     const kv1Project = Number(kv1Input)
     if (!Number.isFinite(kv1Project) || kv1Project <= 0) return undefined
