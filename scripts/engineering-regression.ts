@@ -651,7 +651,7 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   const designInput = {
     columnDiameter: 0.6,
     spacing: 1.5,
-    layout: 'square',
+    layout: 'square' as const,
     soilUnitWeight: 18,
     soilCohesion: 10,
     soilFrictionAngle: 25,
