@@ -12,12 +12,15 @@ const num=(value:string)=>value===''?undefined:Number(value)
 export function JetGroutEngineeringScreen(){
   const p=useProjectInfo(),f=p.foundationParameters,j=p.jetGrout,units=projectUnits(p.unitSystem)
   const projectArea=Math.max(0,f.footingWidth*f.footingLength)
-  const projectLoad=forceToBase(f.verticalLoad,p.unitSystem)
+  const projectLoad=forceToBase(f.structuralWeight,p.unitSystem)
   const projectH=Math.hypot(forceToBase(f.vtX,p.unitSystem),forceToBase(f.vtY,p.unitSystem))
-  const set=(key:keyof typeof j,value:number|undefined|string)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
+  const set=(key:keyof typeof j,value:number|undefined|string|boolean)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
   const d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=j.qSoil?.toString()??'',column=j.qColumn?.toString()??''
   const soilEs=j.EsSoil?.toString()??'',columnEs=j.EsColumn?.toString()??'',soilC=j.cSoil?.toString()??'',columnC=j.cColumn?.toString()??''
   const thickness=j.foundationThickness?.toString()??'',nu=j.soilPoissonRatio?.toString()??'',c=j.interfaceCohesion?.toString()??'',angle=j.interfaceFrictionAngle?.toString()??''
+  const qcRequiredUcs=j.qcRequiredUcs?.toString()??'',qcMeasuredUcs=j.qcMeasuredUcs?.toString()??''
+  const qcRequiredDiameter=j.qcRequiredDiameter?.toString()??'',qcMeasuredDiameter=j.qcMeasuredDiameter?.toString()??''
+  const qcRequiredCoreSamples=j.qcRequiredCoreSamples?.toString()??'',qcMeasuredCoreSamples=j.qcMeasuredCoreSamples?.toString()??''
   const layout=j.layout??'square'
   const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)
   const r=useMemo(()=>{
@@ -30,9 +33,16 @@ export function JetGroutEngineeringScreen(){
       foundationThickness:Number(thickness)>0?Number(thickness):undefined,
       soilPoissonRatio:nu!==''&&Number.isFinite(Number(nu))&&Number(nu)>-1&&Number(nu)<0.5?Number(nu):undefined,
       columnFrictionAngle:Number(phi)>0?Number(phi):undefined,cohesion:Number(c)>0?Number(c):undefined,
-      frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH
+      frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH,
+      qc:{
+        requiredUcs:qcRequiredUcs===''?undefined:stressToBase(Number(qcRequiredUcs),p.unitSystem),
+        measuredUcs:qcMeasuredUcs===''?undefined:stressToBase(Number(qcMeasuredUcs),p.unitSystem),
+        requiredDiameter:num(qcRequiredDiameter),measuredDiameter:num(qcMeasuredDiameter),
+        requiredCoreSamples:num(qcRequiredCoreSamples),measuredCoreSamples:num(qcMeasuredCoreSamples),
+        continuityVerified:j.qcContinuityVerified
+      }
     })
-  },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,projectLoad,projectArea,projectH])
+  },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,projectLoad,projectArea,projectH])
   latestJetGroutResult=r
 
   return <Frame screen="jet-grout">
@@ -51,6 +61,15 @@ export function JetGroutEngineeringScreen(){
       <Field label="Zemin Poisson oranı ν" value={nu} onChange={v=>set('soilPoissonRatio',num(v))}/>
       <Field label={"Arayüz c′ ("+units.stress+")"} value={c} onChange={v=>set('interfaceCohesion',num(v))}/>
       <Field label="Arayüz φ′ (°)" value={angle} onChange={v=>set('interfaceFrictionAngle',num(v))}/>
+      <details><summary>SAHA KALİTE KONTROLÜ — PROJE KABUL KRİTERLERİ</summary><div className="form-grid">
+        <Field label={"Gerekli UCS ("+units.stress+")"} value={qcRequiredUcs} onChange={v=>set('qcRequiredUcs',num(v))}/>
+        <Field label={"Ölçülen UCS ("+units.stress+")"} value={qcMeasuredUcs} onChange={v=>set('qcMeasuredUcs',num(v))}/>
+        <Field label="Gerekli minimum çap (m)" value={qcRequiredDiameter} onChange={v=>set('qcRequiredDiameter',num(v))}/>
+        <Field label="Ölçülen minimum çap (m)" value={qcMeasuredDiameter} onChange={v=>set('qcMeasuredDiameter',num(v))}/>
+        <Field label="Gerekli karot adedi" value={qcRequiredCoreSamples} onChange={v=>set('qcRequiredCoreSamples',num(v))}/>
+        <Field label="Alınan karot adedi" value={qcMeasuredCoreSamples} onChange={v=>set('qcMeasuredCoreSamples',num(v))}/>
+        <label><input type="checkbox" checked={j.qcContinuityVerified??false} onChange={e=>set('qcContinuityVerified',e.target.checked)}/> Kolon sürekliliği saha verisiyle doğrulandı</label>
+      </div><p className="engineering-note">Kabul değerleri proje şartnamesinden girilmelidir; bu bölüm genel bir TBDY sınır değeri tanımlamaz.</p></details>
       <Metric label="Temel alanı" value={projectArea.toFixed(2)} unit="m²"/>
       <Metric label="G+Q" value={projectLoad.toFixed(2)} unit="kN"/>
       <Metric label="H" value={projectH.toFixed(2)} unit="kN"/>
@@ -73,6 +92,7 @@ export function JetGroutEngineeringScreen(){
         {symbol:'β',title:'Gerilme yoğunlaşma katsayısı',formula:'ηc/ar',value:r.stressConcentrationFactor}
       ]}/><div className="inline-empty">{r.sourceNote}</div></Card>
       {r.virtualRaft&&<Card title="SANAL RADYE · OTURMA KARŞILAŞTIRMASI"><div className="metric-strip"><Metric label="İyileştirilmemiş" value={(r.virtualRaft.untreatedSettlement*1000).toFixed(2)} unit="mm"/><Metric label="İyileştirilmiş" value={(r.virtualRaft.treatedSettlement*1000).toFixed(2)} unit="mm"/><Metric label="Azalma" value={r.virtualRaft.reductionPercent.toFixed(1)} unit="%"/></div></Card>}
+      <Card title="SAHA KALİTE KONTROLÜ"><div className="metric-strip"><Metric label="Durum" value={r.qcVerification.status==='pass'?'UYGUN':r.qcVerification.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK'}/><Metric label="Kontrol ölçütü" value={r.qcVerification.checks.length}/></div>{r.qcVerification.checks.length>0&&<div className="table-wrap"><table><thead><tr><th>Ölçüt</th><th>Kriter</th><th>Ölçüm</th><th>Durum</th></tr></thead><tbody>{r.qcVerification.checks.map((x,i)=><tr key={i}><td>{x.name}</td><td>{x.required}</td><td>{x.measured}</td><td>{x.passed?'UYGUN':'UYGUN DEĞİL'}</td></tr>)}</tbody></table></div>}<div className="engineering-note">{r.qcVerification.warnings.join(' ')}</div></Card>
       {r.shearSafety&&<Card title="KAYMA GÜVENLİĞİ"><div className="metric-strip"><Metric label="τ" value={r.shearSafety.shearStress.toFixed(2)} unit="kPa"/><Metric label="τdirenç" value={r.shearSafety.shearResistance.toFixed(2)} unit="kPa"/><Metric label="FS" value={r.shearSafety.FS.toFixed(2)}/></div></Card>}
       {r.priebeScreening&&<Card title="PRIEBE · YALNIZCA REFERANS"><div className="metric-strip"><Metric label="n₀" value={r.priebeScreening.n0.toFixed(3)}/><Metric label="n₁" value={r.priebeScreening.n1.toFixed(3)}/></div><div className="inline-empty">{r.priebeScreening.warning}</div></Card>}
       </>}
