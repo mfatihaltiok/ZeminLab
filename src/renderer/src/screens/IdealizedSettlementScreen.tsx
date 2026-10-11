@@ -3,7 +3,7 @@ import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '..
 import { subgradeReaction } from '../../core/calculations/engineering'
 import type { IdealizedSoilProfile } from '../../core/models/idealized-soil-profile'
 import type { BoreholeRecord } from '../../core/models/field-data'
-import { forceToBase, forceFromBase, stressFromBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
+import { forceToBase, forceFromBase, stressFromBase, stressToBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
 import type { SubgradeReactionMethod, SubgradeSoilType } from '../../core/engineering/subgrade-reaction'
 import { useProjectInfo } from '../../core/state/project-store'
 import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
@@ -79,7 +79,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       qGross,
       groundwaterDepth: b?.groundwaterDepth ?? p.soilParameters.groundwaterDepth,
     })
-  }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth])
+  }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth, p.soilParameters.groundwaterDepth])
 
   latestIdealizedSettlementResult = result
 
