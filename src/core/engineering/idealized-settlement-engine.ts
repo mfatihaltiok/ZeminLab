@@ -138,11 +138,10 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   let overlaps=false
   for(let k=1;k<layers.length;k++)if(layers[k].topDepth<layers[k-1].bottomDepth-1e-9)overlaps=true
   if(invalidInput||invalidLayer||overlaps)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSecondary:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,invalidInput?'Temel, yük, YASS veya zaman girdileri geçersiz.':invalidLayer?'Zemin profilinde derinlik, γ, γsat, ν veya e0 parametreleri geçersiz.':'Zemin profili çakışan tabakalar içeriyor.'],source:'ZeminLab idealize zemin profili oturma motoru'}
-  const baseStress=effectiveStressAtDepth(layers,Df,gwt)
   const ratio=L/Math.max(B,1e-9)
   const influenceDepth=method==='burland-burbidge'?1.4*Math.pow(B/.3,.75)*.3:method==='schmertmann'?(ratio>=10?4*B:2*B):method==='boussinesq'?boussinesqInfluenceDepth(B,L,.10):method==='janbu'?Math.max(B,1):2*B
   const coverageLimit=Df+influenceDepth
-  let coverageCursor=Df
+  let coverageCursor=0
   let coverageOk=true
   for(const layer of layers){
     if(layer.bottomDepth<=coverageCursor)continue
@@ -152,8 +151,12 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     if(coverageCursor>=coverageLimit-1e-9)break
   }
   if(coverageCursor<coverageLimit-1e-9)coverageOk=false
-  if(!coverageOk)warnings.push('Temel altındaki oturma etki derinliğinde profil sürekliliği veya γ verisi eksik; eksik tabaka sıfır gerilme ile geçiştirilmez.')
+  if(!coverageOk){
+    warnings.push('Zemin profili yüzeyden temel altındaki oturma etki derinliğine kadar sürekli değil veya γ/γsat verisi eksik; eksik tabaka sıfır gerilme ile geçiştirilmez.')
+    return {method,layers:[],totalImmediate:0,totalConsolidation:0,totalSecondary:0,totalSettlement:0,influenceDepth,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings,source:'ZeminLab idealize zemin profili oturma motoru'}
+  }
   if(method==='burland-burbidge'&&layers.some(layer=>finite(layer.representativeN60)&&(layer.representativeN60!<5||layer.representativeN60!>60)))warnings.push('Burland–Burbidge korelasyonunda N60, kaynak yöntemin 5–60 uygulama aralığına sınırlandırıldı; aralık dışındaki tabakalar için bağımsız doğrulama gerekir.')
+  const baseStress=effectiveStressAtDepth(layers,Df,gwt)
   const rawQNet=qGross-baseStress.effective
   const qNet=Math.max(0,rawQNet)
   if(qNet<=0)warnings.push('Temel seviyesinde net ilave basınç sıfır/negatif; yükleme oturması hesabı geçerli değildir.')
