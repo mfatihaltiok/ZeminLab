@@ -157,9 +157,9 @@ export function verifyJetGroutQC(i: JetGroutQCInput): JetGroutQCResult {
   }
   if(i.requiredUcs!=null&&i.requiredUcs<=0||i.measuredUcs!=null&&i.measuredUcs<0||i.requiredDiameter!=null&&i.requiredDiameter<=0||i.measuredDiameter!=null&&i.measuredDiameter<=0||i.requiredCoreSamples!=null&&(!Number.isInteger(i.requiredCoreSamples)||i.requiredCoreSamples<1)||i.measuredCoreSamples!=null&&(!Number.isInteger(i.measuredCoreSamples)||i.measuredCoreSamples<0))throw new Error('Jet Grout kalite kontrol değerleri fiziksel sınırlar dışında.')
   const checks:JetGroutQCCheck[]=[]
-  if(i.requiredUcs!=null&&i.measuredUcs!=null)checks.push({name:'Tek eksenli basınç dayanımı',required:String(i.requiredUcs),measured:String(i.measuredUcs),passed:i.measuredUcs>=i.requiredUcs})
-  if(i.requiredDiameter!=null&&i.measuredDiameter!=null)checks.push({name:'Kolon çapı',required:String(i.requiredDiameter),measured:String(i.measuredDiameter),passed:i.measuredDiameter>=i.requiredDiameter})
-  if(i.requiredCoreSamples!=null&&i.measuredCoreSamples!=null)checks.push({name:'Karot numune adedi',required:String(i.requiredCoreSamples),measured:String(i.measuredCoreSamples),passed:i.measuredCoreSamples>=i.requiredCoreSamples})
+  if(i.requiredUcs!=null&&i.measuredUcs!=null)checks.push({name:'Tek eksenli basınç dayanımı',required:String(i.requiredUcs)+' kPa',measured:String(i.measuredUcs)+' kPa',passed:i.measuredUcs>=i.requiredUcs})
+  if(i.requiredDiameter!=null&&i.measuredDiameter!=null)checks.push({name:'Kolon çapı',required:String(i.requiredDiameter)+' m',measured:String(i.measuredDiameter)+' m',passed:i.measuredDiameter>=i.requiredDiameter})
+  if(i.requiredCoreSamples!=null&&i.measuredCoreSamples!=null)checks.push({name:'Karot numune adedi',required:String(i.requiredCoreSamples)+' adet',measured:String(i.measuredCoreSamples)+' adet',passed:i.measuredCoreSamples>=i.requiredCoreSamples})
   if(i.continuityVerified!=null)checks.push({name:'Kolon sürekliliği',required:'Doğrulanmış',measured:i.continuityVerified?'Doğrulandı':'Doğrulanmadı',passed:i.continuityVerified})
   const missing=[
     i.requiredUcs==null?'proje UCS kabul kriteri':undefined,i.measuredUcs==null?'ölçülen UCS':undefined,
