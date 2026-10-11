@@ -64,6 +64,7 @@ export interface IdealizedSoilProfile {
   layers: IdealizedSoilLayer[]
   methodology: string
   unitSystem?: UnitSystem
+  settlementMethod?: 'burland-burbidge' | 'elasticity' | '2to1-layer' | 'boussinesq' | 'janbu' | 'schmertmann'
   settlementTimeYears?: number
   secondaryStartTimeYears?: number
   notes?: string
