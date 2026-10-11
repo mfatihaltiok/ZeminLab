@@ -94,7 +94,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
         energyRatio:record.energyRatio,hammerType:record.hammerType,boreholeDiameterMm:record.boreholeDiameterMm,
         sampler:record.sampler,samplerCorrection:record.samplerCorrection,rodLengthM:record.rodLengthM
       }),
-      effectiveStress:stress.sigmaVPrime,fineContent,claySoil,claySoilSource,applyOverburden:true,applyDilatancy:false
+      effectiveStress:stress.sigmaVPrime,fineContent,soilCode:soil,claySoil:claySoil?true:undefined,claySoilSource,applyOverburden:true,applyDilatancy:false
     })
     const fines=fineContent; const alpha=npt.alpha??NaN,beta=npt.beta??NaN; const n1_60f=npt.n1_60f??NaN
     const saturated=record.depth>=input.gwt-1e-9,within20=record.depth<=20+1e-9
