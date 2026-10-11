@@ -359,6 +359,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(layered.representativeC,20)
   assert.ok(layered.representativePhi>20&&layered.representativePhi<30)
   assert.equal(layered.finalDesignEligible,false)
+  assert.equal(layered.adequate,false)
   assert.equal(layered.layeredScreeningOnly,true)
   assert.ok(layered.warnings.some(w=>w.includes('nihai tasarım')||w.includes('screening')))
 }
@@ -468,6 +469,9 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   const result=calculateIdealizedSettlement({profile,method:'2to1-layer',B:2,L:2,Df:0,qGross:100,groundwaterDepth:50})
   assert.equal(result.netFoundationPressure,100)
   assert.ok(result.layers[0].deltaSigma>0)
+  const noWater=calculateIdealizedSettlement({profile,method:'2to1-layer',B:2,L:2,Df:0,qGross:100})
+  assert.equal(noWater.ready,false)
+  assert.ok(noWater.warnings.some(w=>w.includes('YASS')))
 }
 
 
@@ -791,6 +795,7 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.throws(()=>stressSpread21({q:-1,B:2,L:2,z:1}))
   assert.throws(()=>layerSettlement([{thickness:-1,sigma0:100,deltaSigma:10,Es:10000}]))
   assert.throws(()=>schmertmannSettlement(100,[{thickness:1,Es:0,Iz:0.5}]))
+  assert.throws(()=>layerSettlement([{thickness:1,sigma0:100,deltaSigma:10,Cc:0.2,Es:10000}]),/Cc ve e0 birlikte/)
   assert.throws(()=>jetGroutAdvanced({columnDiameter:0.6,spacing:1.5,qSoil:-1,qColumn:1000}))
   const ks=calculateSubgradeReaction({B:2,L:4,Es:20000,nu:0.3,method:'elastic',unitSystem:'kN-m'})
   assert.ok(Number.isFinite(ks.ks)&&ks.ks>0)
