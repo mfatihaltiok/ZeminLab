@@ -16,6 +16,7 @@ export interface SptEngineInput{
   effectiveStress?:number
   fineContent?:number
   claySoil?:boolean
+  soilCode?:string
   claySoilSource?:string
   applyOverburden?:boolean
   applyDilatancy?:boolean
@@ -127,7 +128,9 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const n60=input.nField*ce*cb*cs*cr
   const sigma=input.effectiveStress
   const applyOverburden=input.applyOverburden??true
-  const claySoil=input.claySoil===true
+  const clayCode=(input.soilCode??'').trim().toUpperCase().replace(/[\\s_]/g,'')
+  const inferredClay=['CL','CH','CLAY','KIL','KİL'].includes(clayCode)||clayCode.startsWith('CI')
+  const claySoil=input.claySoil??inferredClay
   let cn=1
   if(applyOverburden){
     if(claySoil){
