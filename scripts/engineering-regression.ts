@@ -55,7 +55,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   const stress=effectiveStressAtDepth(10,[{top:0,bottom:4,gamma:18,gammaSat:19},{top:4,bottom:12,gamma:19,gammaSat:20}],6)
   approx(stress.sigmaV,190)
   approx(stress.porePressure,9.80665*4)
-  approx(stress.sigmaVPrime,150.76)
+  approx(stress.sigmaVPrime,190-9.80665*4)
   approx(stress.covered,10)
 }
 
