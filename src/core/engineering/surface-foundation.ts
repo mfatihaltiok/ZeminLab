@@ -213,6 +213,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const groundSlope=Math.abs(i.groundSlope??0),baseSlope=Math.abs(i.baseSlope??0)
   if(groundSlope>=90||baseSlope>=90||groundSlope+baseSlope>=90)throw new Error('Arazi ve temel tabanı eğimleri geçersiz.')
   const warnings:string[]=[]
+  if(i.groundwaterDepth==null)warnings.push('YASS girilmedi; hesap kuru zemin kabulüyle ön değerlendirme olarak üretildi. Nihai tasarım için YASS derinliği doğrulanmalıdır.')
   const ex=N>0?(i.momentY??0)/N:0,ey=N>0?(i.momentX??0)/N:0
   if(N===0&&(i.momentX!==0||i.momentY!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
   const coreContact=Math.abs(ex)<=i.B/6+1e-12&&Math.abs(ey)<=i.L/6+1e-12
@@ -287,7 +288,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(contactState==='PARTIAL')warnings.push('Kısmi temas alanı compression-only lineer basınç dağılımından nümerik olarak çözüldü; qmin=0 ve qmax gerçek temas alanı üzerinden raporlanır.')
   let adequate=qo<=qt&&contactState!=='NO_CONTACT'&&!i.layers?.length
   if(finite(qMax)&&qk>0&&qMax>1.25*qk)warnings.push('TBDY 2018 16.7.3.3: Kenar taban basıncı qmax='+qMax.toFixed(2)+' kPa, 1.25×qk='+(1.25*qk).toFixed(2)+' kPa sınırını aşıyor. Temel boyutları veya yük eksantrisitesi gözden geçirilmelidir.')
-  const finalDesignEligible=!i.layers?.length && contactState!=='NO_CONTACT' && Number.isFinite(qk) && Number.isFinite(qt)
+  const finalDesignEligible=!i.layers?.length && i.groundwaterDepth!=null && contactState!=='NO_CONTACT' && Number.isFinite(qk) && Number.isFinite(qt)
   if(i.layers?.length&&layerData?.complete)warnings.push('Tabakalı zemin için 2B′ etki derinliğinde eşdeğer parametre + aktif tabaka yerel kontrolleri yalnız muhafazakâr ön değerlendirmedir. TBDY 16.8.3.3 tabakaların etkisinin dikkate alınmasını ister; çok-tabakalı kayma yüzeyi yöntemi bu modülde uygulanmadığından sonuç nihai tasarım uygunluğu olarak işaretlenmez.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: sürşarj ve γ′/ağırlıklı γ dikkate alındı.')
   if(groundSlope>0)warnings.push('Arazi eğimi katsayıları genel kabul görmüş Vesic tipi bağıntılarla uygulanmıştır; β<φ′ koşulu kontrol edildi.')
