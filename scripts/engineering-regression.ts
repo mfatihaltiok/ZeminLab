@@ -469,6 +469,11 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   const result=calculateIdealizedSettlement({profile,method:'2to1-layer',B:2,L:2,Df:0,qGross:100,groundwaterDepth:50})
   assert.equal(result.netFoundationPressure,100)
   assert.ok(result.layers[0].deltaSigma>0)
+  const esOnlyProfile={...profile,layers:profile.layers.map(layer=>({...layer,elasticModulus:20000,constrainedModulus:undefined,oedometricModulus:undefined}))}
+  const schmertmannEs=calculateIdealizedSettlement({profile:esOnlyProfile,method:'schmertmann',B:2,L:2,Df:0,qGross:100,groundwaterDepth:50,schmertmannC1:1,schmertmannC2:1})
+  assert.equal(schmertmannEs.ready,true)
+  const noM=calculateIdealizedSettlement({profile:esOnlyProfile,method:'2to1-layer',B:2,L:2,Df:0,qGross:100,groundwaterDepth:50})
+  assert.equal(noM.ready,false)
   const noWater=calculateIdealizedSettlement({profile,method:'2to1-layer',B:2,L:2,Df:0,qGross:100})
   assert.equal(noWater.ready,false)
   assert.ok(noWater.warnings.some(w=>w.includes('YASS')))
