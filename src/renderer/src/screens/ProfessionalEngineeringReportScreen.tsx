@@ -369,20 +369,26 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
     return {id:'4',title:'Jet Grout Zemin İyileştirme ve Saha Kalite Kontrolü',subtitle:'Kompozit tasarım girdileri ve saha doğrulaması',method:'Ön değerlendirme / proje kabul kriterleri',source:'Erol & Çekinmez Bayram (2018); proje kalite kontrol şartnamesi',inputs:[{label:'Kolon çapı',value:fmt(j.columnDiameter),unit:'m'},{label:'Kolon aralığı',value:fmt(j.spacing),unit:'m'}],steps:[],results:[{label:'Kompozit hesap',value:'GİRDİ EKSİK',unit:'',status:'warning'},{label:'Saha kalite kontrolü',value:qc.status==='pass'?'UYGUN':qc.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK',unit:'',status:qc.status==='pass'?'ok':qc.status==='fail'?'fail':'warning'}],notes:qc.warnings}
   }
   try {
+    const N=forceToBase(p.foundationParameters.structuralWeight,p.unitSystem)
+    const ex=N>0?momentToBase(p.foundationParameters.momentY,p.unitSystem)/N:0,ey=N>0?momentToBase(p.foundationParameters.momentX,p.unitSystem)/N:0
+    const effectiveWidth=p.foundationParameters.footingWidth-2*Math.abs(ex),effectiveLength=p.foundationParameters.footingLength-2*Math.abs(ey)
+    if(N<=0||effectiveWidth<=0||effectiveLength<=0)throw new Error('Jet Grout ön kontrolü için pozitif yük ve momentleri içeren etkin temel alanı gereklidir.')
+    const effectiveArea=effectiveWidth*effectiveLength
     const result = jetGroutEngineering({
       columnDiameter: j.columnDiameter,
       spacing: j.spacing,
       layout: j.layout ?? 'square',
       qSoil: stressToBase(j.qSoil, p.unitSystem),
       qColumn: stressToBase(j.qColumn, p.unitSystem),
+      FS:j.safetyFactor,
       cSoil: j.cSoil == null ? undefined : stressToBase(j.cSoil, p.unitSystem),
       cColumn: j.cColumn == null ? undefined : stressToBase(j.cColumn, p.unitSystem),
       EsSoil: j.EsSoil == null ? undefined : stressToBase(j.EsSoil, p.unitSystem),
       EsColumn: j.EsColumn == null ? undefined : stressToBase(j.EsColumn, p.unitSystem),
-      load:forceToBase(p.foundationParameters.structuralWeight,p.unitSystem),
-      foundationArea:p.foundationParameters.footingWidth*p.foundationParameters.footingLength,
+      load:N,
+      foundationArea:effectiveArea,
       foundationThickness:j.foundationThickness,soilPoissonRatio:j.soilPoissonRatio,
-      verticalLoad:forceToBase(p.foundationParameters.structuralWeight,p.unitSystem),
+      verticalLoad:N,
       horizontalLoad:Math.hypot(forceToBase(p.foundationParameters.vtX,p.unitSystem),forceToBase(p.foundationParameters.vtY,p.unitSystem)),
       cohesion:j.interfaceCohesion==null?undefined:stressToBase(j.interfaceCohesion,p.unitSystem),frictionAngle:j.interfaceFrictionAngle,
       qc:qcInput
@@ -423,7 +429,7 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
         { label: 'Zemin Yük Paylaşımı', value: fmt(result.soilLoadShare * 100, 1), unit: '%' },
         { label: 'Saha kalite kontrolü', value: result.qcVerification.status==='pass'?'UYGUN':result.qcVerification.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK', unit: '', status: result.qcVerification.status==='pass'?'ok':result.qcVerification.status==='fail'?'fail':'warning' }
       ],
-      notes: [...result.warnings, result.sourceNote, 'Kompozit parametreler ön tasarım/screening niteliğindedir. Nihai tasarım için saha deneyleri ve kalite kontrol gereklidir.']
+      notes: [...result.warnings, `Moment etkisi B′=${fmt(effectiveWidth)} m, L′=${fmt(effectiveLength)} m etkin alanı ile hesaba katıldı.`, result.sourceNote, 'Kompozit parametreler ön tasarım/screening niteliğindedir. Nihai tasarım için saha deneyleri ve kalite kontrol gereklidir.']
     }
   } catch(error) {
     return {id:'4',title:'Jet Grout Zemin İyileştirme',subtitle:'Kompozit zemin ön değerlendirmesi',method:'Hesap doğrulaması',source:'Erol & Çekinmez Bayram (2018)',inputs:[],steps:[],results:[{label:'Hesap durumu',value:'HESAPLANAMADI',unit:'',status:'warning'}],notes:[error instanceof Error?error.message:'Jet Grout hesabı doğrulanamadı.']}
