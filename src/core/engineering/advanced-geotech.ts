@@ -244,6 +244,6 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
     treatedSettlementFactor,
     layout,
     source: 'Erol & Çekinmez Bayram (2018), Jet Enjeksiyon Yöntemi, Yüksel Proje, Ankara',
-    sourceNote: 'Kompozit parametreler alan oranı üzerinden ön değerlendirilir. '+(i.FS==null?'Güvenlik katsayısı girilmediğinden izin verilebilir kapasite üretilmedi. ':'İzin verilebilir kompozit kapasite karakteristik kapasitenin girilen FS değerine bölünmesiyle hesaplandı. ')+'Kolon kapasitesi ve nihai tasarım, imalat doğrulaması/zemin tabakası bazlı kontroller ile ayrıca ele alınmalıdır.'
+    sourceNote: 'Kompozit parametreler alan oranı üzerinden ön değerlendirilir. qSoil/qColumn girdilerinin yeraltı suyu ve efektif gerilme düzeltmeleri kaynak hesabında yapılmış olmalıdır; bu model bunları ayrıca hesaplamaz. '+(i.FS==null?'Güvenlik katsayısı girilmediğinden izin verilebilir kapasite üretilmedi. ':'İzin verilebilir kompozit kapasite karakteristik kapasitenin girilen FS değerine bölünmesiyle hesaplandı. ')+'Kolon kapasitesi ve nihai tasarım, imalat doğrulaması/zemin tabakası bazlı kontroller ile ayrıca ele alınmalıdır.'
   }
 }
