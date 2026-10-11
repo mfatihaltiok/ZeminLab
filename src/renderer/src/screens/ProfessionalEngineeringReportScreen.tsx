@@ -267,7 +267,7 @@ function buildLiquefactionSection(
 
 function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile: IdealizedSoilProfile | undefined, boreholes: BoreholeRecord[]): ReportSection | null {
   const f = p.foundationParameters
-  const profileBorehole=boreholes.find(x=>profile?.sourceBoreholeIds.includes(x.id))??boreholes[0]
+  const profileBorehole=boreholes.find(x=>x.id===profile?.settlementGroundwaterBoreholeId)??boreholes.find(x=>profile?.sourceBoreholeIds.includes(x.id))??boreholes[0]
   const B = f.footingWidth, L = f.footingLength, Df = f.footingDepth
   if (!profile || profile.status !== 'SABİTLENDİ' || !(B > 0 && L > 0 && Df >= 0)) return null
 
