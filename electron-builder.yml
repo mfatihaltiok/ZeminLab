@@ -1,5 +1,5 @@
 appId: com.zeminlab.app
-productName: FALUZMN
+productName: ZeminLab
 directories:
   buildResources: build
 files:
@@ -11,7 +11,7 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 extraResources:
 win:
-  executableName: FALUZMN
+  executableName: ZeminLab
 nsis:
   artifactName: ${productName}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -32,7 +32,7 @@ linux:
     - AppImage
     - snap
     - deb
-  maintainer: FALUZMN
+  maintainer: ZeminLab
   category: Science
 appImage:
   artifactName: ${name}-${version}.${ext}
