@@ -111,6 +111,7 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
   try {
     const result = foundationChecks({
       B, L, N, Vx, Vy, Mx, My,
+      deltaTan: f.foundationTanDelta,
       cu: soil.undrainedCohesion == null ? undefined : stressToBase(soil.undrainedCohesion, p.unitSystem),
       groundwaterDepth: soil.groundwaterDepth,
       foundationDepth: f.footingDepth,
@@ -125,8 +126,10 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
       { index: 2, symbol: 'ey', title: 'y yönünde eksantrisite', formula: 'ey = Mx / N', value: result.ey, unit: 'm' },
       { index: 3, symbol: 'B\'', title: 'Etkin genişlik', formula: 'B\' = B - 2|ex|', value: B - 2 * Math.abs(result.ex), unit: 'm' },
       { index: 4, symbol: 'L\'', title: 'Etkin uzunluk', formula: 'L\' = L - 2|ey|', value: L - 2 * Math.abs(result.ey), unit: 'm' },
-      { index: 5, symbol: 'Rth', title: 'Sürtünme direnci', formula: 'Rth = N·tanδ / γRh', value: result.slidingCapacityResultant, unit: 'kN' },
-      { index: 6, symbol: 'Vh', title: 'Yatay yük sonucu', formula: 'Vh = √(Vx² + Vy²)', value: result.horizontalResultant, unit: 'kN' }
+      { index: 5, symbol: 'Rth', title: 'Sürtünme direnci', formula: result.slidingMode==='undrained-cu'?'Rth = Ac·Cu / γRh':'Rth = N·tanδ / γRh', value: result.frictionResistanceDesign, unit: 'kN' },
+      { index: 6, symbol: '0.3Rpt', title: 'Pasif direnç katkısı', formula: '0.30·Rpt', value: 0.30*result.passiveResistanceDesign, unit: 'kN' },
+      { index: 7, symbol: 'Rdesign', title: 'Toplam tasarım kayma direnci', formula: 'Rth + 0.30·Rpt', value: result.slidingCapacityResultant, unit: 'kN' },
+      { index: 8, symbol: 'Vh', title: 'Yatay yük sonucu', formula: 'Vh = √(Vx² + Vy²)', value: result.horizontalResultant, unit: 'kN' }
     ]
 
     return {
