@@ -132,6 +132,7 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
   return { immediate, consolidation, total: immediate + consolidation, layers: details, warnings }
 }
 
+export interface SchmertmannLayer { thickness: number; Es: number; Iz: number }
 export function schmertmannSettlement(q: number, layers: SchmertmannLayer[], C1: number, C2: number) {
   if(![q,C1,C2].every(Number.isFinite)||q<0||C1<=0||C2<=0)throw new Error('Schmertmann hesabında q≥0 ve C1/C2>0 sonlu olmalıdır.')
   for(const [index,l] of layers.entries())if(![l.thickness,l.Es,l.Iz].every(Number.isFinite)||l.thickness<=0||l.Es<=0||l.Iz<0)throw new Error('Schmertmann katmanı '+(index+1)+': kalınlık/Es pozitif, Iz negatif olmayan sonlu değer olmalıdır.')
