@@ -4,7 +4,7 @@ export type SurfaceFoundationMethod='TBDY-2018'|'Terzaghi'|'Meyerhof'|'Hansen'|'
 export interface SurfaceFoundationLayer{topDepth:number;bottomDepth:number;gamma:number;gammaSat?:number;cohesion:number;phi:number;name?:string}
 export interface SurfaceFoundationInput{
   B:number;L:number;Df:number;gamma1:number;gamma2?:number;c:number;phi:number;verticalLoad:number;horizontalLoad?:number;momentX?:number;momentY?:number
-  groundSlope?:number;baseSlope?:number;resistanceFactor?:number;method?:SurfaceFoundationMethod;safetyFactor?:number;undrainedCu?:number
+  groundSlope?:number;baseSlope?:number;resistanceFactor?:number;method?:SurfaceFoundationMethod;safetyFactor?:number;undrainedCu?:number;additionalSurcharge?:number
   foundationType?:FoundationType;unitSystem?:UnitSystem;groundwaterDepth?:number;layers?:SurfaceFoundationLayer[]
 }
 export interface SurfaceFoundationStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string;source?:string}
@@ -199,9 +199,10 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=0))throw new Error('YASS tanımlandıysa γsat pozitif olmalıdır.')
   if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük negatif olamaz.')
   if(!finite(i.phi)||i.phi<0||i.phi>50)throw new Error('φ 0° ile 50° arasında olmalıdır.')
-  for(const [name,value] of [['yatay yük',i.horizontalLoad],['Mx',i.momentX],['My',i.momentY],['arazi eğimi',i.groundSlope],['temel tabanı eğimi',i.baseSlope],['YASS derinliği',i.groundwaterDepth],['Cu',i.undrainedCu],['direnç katsayısı',i.resistanceFactor],['güvenlik katsayısı',i.safetyFactor]] as const){if(value!==undefined&&!finite(value))throw new Error(name+' sonlu bir sayı olmalıdır.')}
+  for(const [name,value] of [['ek sürşarj',i.additionalSurcharge],['yatay yük',i.horizontalLoad],['Mx',i.momentX],['My',i.momentY],['arazi eğimi',i.groundSlope],['temel tabanı eğimi',i.baseSlope],['YASS derinliği',i.groundwaterDepth],['Cu',i.undrainedCu],['direnç katsayısı',i.resistanceFactor],['güvenlik katsayısı',i.safetyFactor]] as const){if(value!==undefined&&!finite(value))throw new Error(name+' sonlu bir sayı olmalıdır.')}
   if(i.horizontalLoad!=null&&i.horizontalLoad<0)throw new Error('Yatay yük büyüklüğü negatif girilemez; yön ayrı temsil edilmelidir.')
   if(i.undrainedCu!=null&&i.undrainedCu<0)throw new Error('Cu negatif olamaz.')
+  if(i.additionalSurcharge!=null&&i.additionalSurcharge<0)throw new Error('Ek sürşarj negatif olamaz.')
   if(i.groundwaterDepth!=null&&i.groundwaterDepth<0)throw new Error('YASS derinliği negatif olamaz.')
   if(i.layers?.some(l=>![l.topDepth,l.bottomDepth,l.gamma,l.cohesion,l.phi].every(finite)||l.topDepth<0||l.bottomDepth<=l.topDepth||l.gamma<=0||l.cohesion<0||l.phi<0||l.phi>50||(l.gammaSat!=null&&(!finite(l.gammaSat)||l.gammaSat<=0))))throw new Error('Tabakalı zemin verilerinde derinlik, birim hacim ağırlık, kohezyon veya sürtünme açısı geçersiz.')
   if(i.layers?.length){const ordered=[...i.layers].sort((a,b)=>a.topDepth-b.topDepth);for(let k=1;k<ordered.length;k++)if(ordered[k].topDepth<ordered[k-1].bottomDepth-1e-9)throw new Error('Tabakalı zemin profili çakışan derinlik aralıkları içeremez.')}
@@ -260,6 +261,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
     water.gammaBelow=layerData.gamma??water.gammaBelow
   }
 
+  water.surcharge += i.additionalSurcharge ?? 0
   const rf=method==='TBDY-2018'?1.4:1
   if(method==='TBDY-2018'&&i.resistanceFactor!=null&&Math.abs(i.resistanceFactor-1.4)>1e-9)throw new Error('TBDY 2018 Tablo 16.2 için γRv=1.40 kullanılmalıdır; farklı direnç katsayısı kabul edilmez.')
   const ef=factors(representativePhi,method)
