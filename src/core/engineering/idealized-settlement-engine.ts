@@ -138,7 +138,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   const layers=[...profile.layers].sort((a,b)=>a.topDepth-b.topDepth)
   const gwt=finite(input.groundwaterDepth)?input.groundwaterDepth!:-1
   if(profile.status!=='SABİTLENDİ')warnings.push('İdealize Zemin Profili SABİTLENDİ durumunda değil.')
-  const invalidInput=![B,L,Df,qGross].every(finite)||B<=0||L<=0||Df<0||qGross<=0||(input.groundwaterDepth==null||!finite(input.groundwaterDepth)||input.groundwaterDepth<0)||input.timeYears!=null&&(!finite(input.timeYears)||input.timeYears<0)||input.secondaryStartTimeYears!=null&&(!finite(input.secondaryStartTimeYears)||input.secondaryStartTimeYears<=0)
+  const invalidInput=![B,L,Df,qGross].every(finite)||B<=0||L<=0||Df<0||qGross<=0||(input.groundwaterDepth==null||!finite(input.groundwaterDepth)||input.groundwaterDepth<0)||input.timeYears!=null&&(!finite(input.timeYears)||input.timeYears<0)||input.secondaryStartTimeYears!=null&&(!finite(input.secondaryStartTimeYears)||input.secondaryStartTimeYears<=0)||!['burland-burbidge','elasticity','2to1-layer','boussinesq','janbu','schmertmann'].includes(method)
   if(invalidInput)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSecondary:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Temel, yük, YASS veya zaman girdileri geçersiz.'],source:'ZeminLab idealize zemin profili oturma motoru'}
   const ratio=L/B
   const influenceDepth=method==='burland-burbidge'?1.4*Math.pow(B/.3,.75)*.3:method==='schmertmann'?(ratio>=10?4*B:2*B):method==='boussinesq'?boussinesqInfluenceDepth(B,L,.10):method==='janbu'?Math.max(B,1):2*B
