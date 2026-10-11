@@ -125,6 +125,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     gamma:layer.gamma==null?undefined:unitWeightToBase(layer.gamma,sourceUnit),
     gammaSat:layer.gammaSat==null?undefined:unitWeightToBase(layer.gammaSat,sourceUnit),
     cohesion:layer.cohesion==null?undefined:stressToBase(layer.cohesion,sourceUnit),
+    elasticModulus:layer.elasticModulus==null?undefined:stressToBase(layer.elasticModulus,sourceUnit),
     constrainedModulus:layer.constrainedModulus==null?undefined:stressToBase(layer.constrainedModulus,sourceUnit),
     oedometricModulus:layer.oedometricModulus==null?undefined:stressToBase(layer.oedometricModulus,sourceUnit),
     preconsolidationPressure:layer.preconsolidationPressure==null?undefined:stressToBase(layer.preconsolidationPressure,sourceUnit)
