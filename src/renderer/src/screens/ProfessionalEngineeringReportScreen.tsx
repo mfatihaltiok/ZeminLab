@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { useProjectInfo } from '../../../core/state/project-store'
 import { forceToBase, stressToBase, unitWeightToBase, momentToBase } from '../../../core/units/project-units'
-import { bearingCapacity, tbdyBearingCapacity, foundationChecks, settlement, liquefactionProfile, jetGroutAdvanced, subgradeReaction } from '../../../core/calculations/engineering'
+import { bearingCapacity, tbdyBearingCapacity, foundationChecks, liquefactionProfile, jetGroutAdvanced, subgradeReaction } from '../../../core/calculations/engineering'
+import { calculateIdealizedSettlement } from '../../../core/engineering/idealized-settlement-engine'
 import { EngineeringReportProfessional, type ReportSection, type ReportCalculationStep } from '../components/EngineeringReportProfessional'
 import { TechnicalSection, type TechnicalSectionLayer, type TechnicalSectionMarker } from '../components/TechnicalSection'
 import type { BoreholeRecord, LaboratoryRecord } from '../../../core/models/field-data'
@@ -105,11 +106,13 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
   try {
     const result = foundationChecks({
       B, L, N, Vx, Vy, Mx, My,
-      cu: soil.undrainedCohesion,
+      cu: soil.undrainedCohesion == null ? undefined : stressToBase(soil.undrainedCohesion, p.unitSystem),
       groundwaterDepth: soil.groundwaterDepth,
       foundationDepth: f.footingDepth,
       passiveResistanceCharacteristic: forceToBase(f.passiveResistanceCharacteristic, p.unitSystem),
-      usePassiveResistance: f.usePassiveResistance
+      usePassiveResistance: f.usePassiveResistance,
+      seismic: true,
+      interfaceType: f.foundationInterface
     })
 
     const steps: ReportCalculationStep[] = [
@@ -149,48 +152,52 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
 
 function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile?: IdealizedSoilProfile): ReportSection | null {
   const f = p.foundationParameters
-  const B = f.footingWidth, L = f.footingLength
-
-  if (!profile || profile.status !== 'SABİTLENDİ' || !(B > 0 && L > 0)) return null
+  const B = f.footingWidth, L = f.footingLength, Df = f.footingDepth
+  if (!profile || profile.status !== 'SABİTLENDİ' || !(B > 0 && L > 0 && Df >= 0)) return null
 
   try {
     const qGross = forceToBase(f.structuralWeight, p.unitSystem) / (B * L)
-    const result = settlement({
-      B, q: qGross,
-      Es: profile.layers[0]?.constrainedModulus ?? profile.layers[0]?.oedometricModulus ?? 10000,
-      nu: profile.layers[0]?.poissonRatio ?? 0.3
+    const result = calculateIdealizedSettlement({
+      profile, method: 'elasticity', B, L, Df, qGross,
+      groundwaterDepth: p.soilParameters.groundwaterDepth
     })
-
-    const steps: ReportCalculationStep[] = result.steps.map((s, i) => ({
-      index: i + 1,
-      symbol: s.symbol,
-      title: s.title,
-      formula: s.formula,
-      value: s.value ?? '—',
-      unit: s.unit ?? ''
-    }))
+    const steps: ReportCalculationStep[] = result.layers.flatMap((layer, index) => ([
+      { index: index * 3 + 1, symbol: 'Δσz', title: 'Katman ' + (index + 1) + ' gerilme artışı', formula: '2:1: Δσz=q·B·L/[(B+z)(L+z)]', value: layer.deltaSigma, unit: 'kPa', note: layer.note ?? layer.status },
+      { index: index * 3 + 2, symbol: 'si', title: 'Katman ' + (index + 1) + ' ani oturma', formula: 'si=Δσz·H·(1−ν²)/M', value: layer.immediateSettlement, unit: 'mm', note: layer.status },
+      { index: index * 3 + 3, symbol: 'sc', title: 'Katman ' + (index + 1) + ' konsolidasyon oturması', formula: 'Cc/Cr, e0 ve efektif gerilmelerle', value: layer.consolidationSettlement, unit: 'mm', note: layer.status }
+    ]))
 
     return {
       id: '3',
       title: 'Oturma Hesabı',
-      subtitle: 'Elastik + Konsolidasyon',
-      method: 'Elastik Teori',
-      source: 'TBDY 2018 Bölüm 16.8.3.4',
+      subtitle: 'Katman bazlı 2:1 gerilme dağılımı + elastik ve konsolidasyon bileşenleri',
+      method: 'İdealize Zemin Profili · Elastik tabaka integrasyonu',
+      source: result.source,
       inputs: [
         { label: 'Temel Genişliği (B)', value: fmt(B), unit: 'm' },
-        { label: 'Net Oturma Basıncı (q)', value: fmt(qGross), unit: 'kPa' },
-        { label: 'Elastisite Modülü (Es)', value: fmt(result.value.immediate > 0 ? qGross * B * (1 - 0.3 * 0.3) / result.value.immediate : 0), unit: 'kPa' }
+        { label: 'Temel Uzunluğu (L)', value: fmt(L), unit: 'm' },
+        { label: 'Temel Derinliği (Df)', value: fmt(Df), unit: 'm' },
+        { label: 'Brüt temel basıncı (q)', value: fmt(qGross), unit: 'kPa' },
+        { label: 'Yeraltı suyu derinliği', value: fmt(p.soilParameters.groundwaterDepth), unit: 'm' },
+        { label: 'Zemin profili', value: profile.status, unit: '' }
       ],
       steps,
       results: [
-        { label: 'Ani (Elastik) Oturma', value: fmt(result.value.immediate * 1000, 1), unit: 'mm' },
-        { label: 'Konsolidasyon Oturması', value: fmt(result.value.consolidation * 1000, 1), unit: 'mm' },
-        { label: 'Toplam Oturma', value: fmt(result.value.total * 1000, 1), unit: 'mm', status: result.value.total * 1000 < 25 ? 'ok' : 'warning' }
+        { label: 'Ani oturma', value: fmt(result.totalImmediate, 2), unit: 'mm', status: result.ready ? 'ok' : 'warning' },
+        { label: 'Konsolidasyon oturması', value: fmt(result.totalConsolidation, 2), unit: 'mm', status: result.ready ? 'ok' : 'warning' },
+        { label: 'Toplam oturma', value: fmt(result.totalSettlement, 2), unit: 'mm', status: result.ready && result.totalSettlement < 25 ? 'ok' : 'warning' },
+        { label: 'Hesap durumu', value: result.ready ? 'GİRDİLER TAMAM' : 'VERİ EKSİK — NİHAİ SONUÇ DEĞİL', unit: '', status: result.ready ? 'ok' : 'warning' }
       ],
-      notes: result.value.total * 1000 > 50 ? ['Toplam oturma 50 mm sınırını aşıyor. Zemin iyileştirme veya derin temel düşünülmelidir.'] : undefined
+      notes: result.warnings
     }
-  } catch {
-    return null
+  } catch (error) {
+    return {
+      id: '3', title: 'Oturma Hesabı', subtitle: 'Hesap üretilemedi',
+      method: 'İdealize Zemin Profili', source: 'ZeminLab oturma motoru',
+      inputs: [{ label: 'Temel B/L/Df', value: [B, L, Df].map(v => fmt(v)).join(' / '), unit: 'm' }],
+      steps: [], results: [{ label: 'Hesap durumu', value: 'VERİ EKSİK / GEÇERSİZ', unit: '', status: 'warning' }],
+      notes: [error instanceof Error ? error.message : 'Oturma girdileri doğrulanamadı.']
+    }
   }
 }
 
@@ -203,12 +210,12 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
       columnDiameter: j.columnDiameter,
       spacing: j.spacing,
       layout: j.layout ?? 'square',
-      qSoil: j.qSoil,
-      qColumn: j.qColumn,
-      cSoil: j.cSoil,
-      cColumn: j.cColumn,
-      EsSoil: j.EsSoil,
-      EsColumn: j.EsColumn,
+      qSoil: stressToBase(j.qSoil, p.unitSystem),
+      qColumn: stressToBase(j.qColumn, p.unitSystem),
+      cSoil: j.cSoil == null ? undefined : stressToBase(j.cSoil, p.unitSystem),
+      cColumn: j.cColumn == null ? undefined : stressToBase(j.cColumn, p.unitSystem),
+      EsSoil: j.EsSoil == null ? undefined : stressToBase(j.EsSoil, p.unitSystem),
+      EsColumn: j.EsColumn == null ? undefined : stressToBase(j.EsColumn, p.unitSystem),
       FS: 3
     })
 
