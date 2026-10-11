@@ -872,7 +872,8 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
 
 {
   approx(stressSpread21({q:100,B:2,L:2,z:1}).deltaSigma,100*4/9,1e-12)
-  assert.throws(()=>stressSpread21({q:-1,B:2,L:2,z:1}))
+  assert.throws(()=>stressSpread21({q:-1,B:2,L:2,z:1}),/q≥0/)
+  assert.throws(()=>stressSpread21({q:100,B:0,L:2,z:1}),/B\/L>0/)
   assert.throws(()=>layerSettlement([{thickness:-1,sigma0:100,deltaSigma:10,Es:10000}]))
   assert.throws(()=>schmertmannSettlement(100,[{thickness:1,Es:0,Iz:0.5}],1,1))
   const noM=layerSettlement([{thickness:1,sigma0:100,deltaSigma:10,Es:10000}])
