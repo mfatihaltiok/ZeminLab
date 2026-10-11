@@ -280,7 +280,7 @@ function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile: I
       timeYears:profile.settlementTimeYears,secondaryStartTimeYears:profile.secondaryStartTimeYears
     })
     const stressFormula=result.method==='boussinesq'?'Boussinesq dikdörtgen alan integrasyonu':result.method==='schmertmann'?'Schmertmann Iz gerinim integrasyonu':result.method==='burland-burbidge'?'Burland & Burbidge N60 tabanlı bağıntı':'2:1: Δσz=q·B·L/[(B+z)(L+z)]'
-    const immediateFormula=result.method==='schmertmann'?'si=C1·C2·C3·qnet·Iz·H/Es':result.method==='burland-burbidge'?'Burland & Burbidge korelasyonu; kohezyonlu katman konsolidasyonu ayrıca eklenir':'si=Σ(Δσz·H/M)'
+    const immediateFormula=result.method==='schmertmann'?'si=C1·C2·qnet·Iz·H/Es':result.method==='burland-burbidge'?'Burland & Burbidge korelasyonu; kohezyonlu katman konsolidasyonu ayrıca eklenir':'si=Σ(Δσz·H/M)'
     const steps: ReportCalculationStep[] = result.layers.flatMap((layer, index) => ([
       { index: index * 4 + 1, symbol: 'Δσz', title: 'Katman ' + (index + 1) + ' gerilme artışı', formula: stressFormula, value: layer.deltaSigma, unit: 'kPa', note: layer.note ?? layer.status },
       { index: index * 4 + 2, symbol: 'si', title: 'Katman ' + (index + 1) + ' ani oturma', formula: immediateFormula, value: layer.immediateSettlement, unit: 'mm', note: layer.status },
