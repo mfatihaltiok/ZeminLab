@@ -52,6 +52,7 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
     else if(gwt<=i.Df+i.B)gammaBearing=gammaSub+((gwt-i.Df)/i.B)*(i.gamma-gammaSub)
     if(gwt<=i.Df+i.B)warnings.push('Klasik hesapta YASS etkisi sürşarj ve Nγ terimi için efektif birim hacim ağırlıkla dikkate alındı.')
   }
+  if(i.waterTableDepth==null)warnings.push('YASS girilmedi; klasik sonuç kuru zemin kabulüyle ön değerlendirmedir.')
   if(i.layers?.length)warnings.push('Klasik yöntem katmanlı zemin parametrelerini hesapta kullanmaz; katmanlı nihai değerlendirme için TBDY yüzeysel temel motoru ve zemin profili analizi gerekir.')
   const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,gammaBearing,surcharge,c:i.c,phi:i.phi,FS:i.FS??3,method:i.method})
   if(H>0)warnings.push('Klasik taşıma gücü API yatay yük ve kayma güvenliğini değerlendirmez; temel kayma kontrolü ayrı yapılmalıdır.')
