@@ -51,9 +51,9 @@ function ReportHeader({ data }: { data: EngineeringReportData }) {
   return (
     <div className="erp-header">
       <div className="erp-header-left">
-        <div className="erp-logo">FL</div>
+        <div className="erp-logo">ZL</div>
         <div className="erp-header-text">
-          <h1>FALUZMN</h1>
+          <h1>ZeminLab</h1>
           <p>Geoteknik Mühendisliği Hesaplama Yazılımı</p>
         </div>
       </div>

@@ -7,8 +7,9 @@ export function tbdy2018Liquefaction(i:TBDYLiquefactionInput):TBDYLiquefactionRe
   const warnings:string[]=[]
   if(!Number.isFinite(i.depth)||i.depth<0)throw new Error('SPT derinliği negatif olmayan sonlu bir değer olmalıdır.')
   if(!Number.isFinite(i.totalStress)||i.totalStress<0)throw new Error('Toplam düşey gerilme sıfır veya pozitif olmalıdır.')
-  if(!Number.isFinite(i.effectiveStress)||i.effectiveStress<=0)throw new Error('Sıvılaşma hesabı için efektif düşey gerilme pozitif olmalıdır.')
-  if(!Number.isFinite(i.rawSPT)||i.rawSPT<0)throw new Error('Ham SPT N değeri sıfır veya pozitif olmalıdır.')
+  if(!Number.isFinite(i.effectiveStress)||i.effectiveStress<=0||i.effectiveStress>i.totalStress)throw new Error('Sıvılaşma hesabı için 0<σ′v0≤σv0 olmalıdır.')
+  if(!Number.isInteger(i.rawSPT)||i.rawSPT<0)throw new Error('Ham SPT N değeri sıfır veya pozitif bir tamsayı olmalıdır.')
+  if(i.normalizedSpt){const n=i.normalizedSpt;if(![n.CN,n.N160,n.N160f].every(Number.isFinite)||n.CN<=0||n.CN>1.70||n.N160<0||n.N160f<0)throw new Error('Önceden hesaplanan normalize SPT değerleri fiziksel aralıkta olmalıdır.')}
   for(const [name,value] of [['CE',i.CE],['CB',i.CB],['CR',i.CR],['CS',i.CS],['SDS',i.SDS],['Mw',i.Mw],['finesContent',i.finesContent]] as const){
     if(!Number.isFinite(value))throw new Error(name+' geçerli bir sayı olmalıdır.')
   }

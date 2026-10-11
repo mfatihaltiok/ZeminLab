@@ -29,7 +29,7 @@ const finiteOr=(x:unknown,d:number)=>finite(x)?x:d
 
 export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFoundationResult{
   const p=normalizeProjectInfo(input.project),missing:string[]=[],failed:string[]=[],warnings:string[]=[],trace:FinalFoundationResult['trace']=[]
-  const soilGroup=p.geophysical.soilGroup??p.soilParameters.classification.code
+  const soilGroup=p.geophysical.soilGroup
   const zfSiteSpecificRequired=soilGroup==='ZF'
   if(zfSiteSpecificRequired && !p.geophysical.siteSpecificResponseAnalysisCompleted)missing.push('ZF için sahaya özel zemin davranış analizi')
   if(p.seismic.dts===undefined)missing.push('TBDY tasarım deprem sınıfı (DTS)')
@@ -47,6 +47,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   if(input.actions && !input.actions.designAction)missing.push('Temele aktarılan kuvvetlerin nihai tasarım etkisi olarak işaretlenmesi')
   if(input.actions && !input.actions.source?.trim())missing.push('Tasarım kuvvetlerinin kaynağı')
   if(!input.actions)missing.push('Yapıdan temele aktarılan nihai tasarım etkileri')
+  if(!input.surfaceLayers?.length)missing.push('Taşıma gücü nihai değerlendirmesi için yüzeyden temel altındaki etki derinliğine kadar tabakalı zemin profili')
   if(!finite(N)||!finite(Vx)||!finite(Vy)||!finite(Mx)||!finite(My))missing.push('Temele aktarılan tasarım kuvvetleri')
 
   let bearing:ReturnType<typeof calculateSurfaceFoundation>|undefined
@@ -60,18 +61,20 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
         gamma1:sp.unitWeight,gamma2:sp.saturatedUnitWeight,c:sp.cohesion,phi:sp.frictionAngle,
         verticalLoad:N,horizontalLoad:Math.hypot(Vx,Vy),momentX:Mx,momentY:My,
         groundSlope:sp.surfaceSlope,baseSlope:sp.foundationBaseSlope,
-        resistanceFactor:fp.resistanceFactorRv,method:'TBDY-2018',safetyFactor:fp.safetyFactor,
+        resistanceFactor:fp.resistanceFactorRv,method:'TBDY-2018',
         foundationType:fp.foundationType,groundwaterDepth:sp.groundwaterDepth,
         layers:input.surfaceLayers,undrainedCu:sp.undrainedCohesion
       })
-      trace.push({check:'Taşıma gücü',status:bearing.adequate&&bearing.finalDesignEligible?'UYGUN':'UYGUN DEĞİL',source:'TBDY 2018 16.8.2–16.8.3',details:'q0='+bearing.qo.toFixed(3)+' kPa; qt='+bearing.qt.toFixed(3)+' kPa'})
-      if(!bearing.adequate||!bearing.finalDesignEligible)failed.push('Taşıma gücü')
+      const bearingStatus=!bearing.finalDesignEligible?'VERİ EKSİK':bearing.adequate?'UYGUN':'UYGUN DEĞİL'
+      trace.push({check:'Taşıma gücü',status:bearingStatus,source:'TBDY 2018 16.8.2–16.8.3',details:'q0='+bearing.qo.toFixed(3)+' kPa; qt='+bearing.qt.toFixed(3)+' kPa'})
+      if(!bearing.finalDesignEligible)missing.push('Taşıma gücü için nihai tasarım girdileri/profil koşulları tamamlanmalı')
+      else if(!bearing.adequate)failed.push('Taşıma gücü')
       warnings.push(...bearing.warnings)
 
       const resolvedInterface=input.foundationInterface ?? fp.foundationInterface
       const si:FoundationCheckInput={
         B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,
-        deltaTan:undefined,cu:sp.undrainedCohesion,
+        deltaTan:fp.foundationTanDelta,cu:sp.undrainedCohesion,
         groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,
         passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,
         usePassiveResistance:fp.usePassiveResistance,
@@ -83,8 +86,13 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       const slideStatus=!sliding?'VERİ EKSİK':sliding.evaluable?(sliding.slidingSafeResultant?'UYGUN':'UYGUN DEĞİL'):'VERİ EKSİK'
       trace.push({check:'Kayma',status:slideStatus,source:'TBDY 2018 16.8.4',details:sliding?('Vh='+sliding.horizontalResultant.toFixed(3)+'; R='+sliding.slidingCapacityResultant.toFixed(3)):'Ara yüzü seçilmedi.'})
       if(sliding){
-        if(!sliding.evaluable)missing.push('Deprem + YASS altında kayma için cu')
-        else if(!sliding.slidingSafeResultant)failed.push('Kayma')
+        if(!sliding.evaluable){
+          if(seismicDesign&&sp.groundwaterDepth==null)missing.push('Temel kayma kontrolü için YASS derinliği')
+          if(seismicDesign&&sp.groundwaterDepth!=null&&sp.groundwaterDepth<=fp.footingDepth&&!(finite(sp.undrainedCohesion)&&sp.undrainedCohesion>0))missing.push('YASS altındaki deprem kayma kontrolü için cu')
+          if(sliding.slidingMode==='drained-interface'&&fp.foundationTanDelta==null)missing.push('Drenajlı kayma kontrolü için tanδ')
+          if(sliding.contactArea<=0)missing.push('Kayma kontrolü için pozitif basınçlı temas alanı')
+          if(!sliding.warnings.length)missing.push('Kayma kontrolü için gerekli geoteknik veriler')
+        }else if(!sliding.slidingSafeResultant)failed.push('Kayma')
         warnings.push(...sliding.warnings)
       }
     }catch(e){
@@ -130,9 +138,11 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       liquefaction=liquefactionProfile(input.liquefaction)
       const bad=liquefaction.rows.some(r=>r.conclusion==='SIVILAŞMA RİSKİ VAR')
       const incomplete=liquefaction.rows.some(r=>r.status==='VERİ EKSİK'||r.liquefactionCheck==='not-evaluable')
+      const postLiquefactionRequired=liquefaction.rows.some(r=>r.postLiquefactionEvaluation==='required')
       trace.push({check:'Sıvılaşma',status:bad?'UYGUN DEĞİL':incomplete?'VERİ EKSİK':'UYGUN',source:'TBDY 2018 16.6 + Ek 16B',details:String(liquefaction.rows.length)+' SPT noktası'})
       if(bad)failed.push('Sıvılaşma')
       if(incomplete)missing.push('Sıvılaşma için eksik saha/laboratuvar verisi')
+      if(postLiquefactionRequired)missing.push('FS<1.10 olan noktalar için TBDY 16.6.7–16.6.10 kapsamındaki sıvılaşma sonrası taşıma gücü, oturma ve yanal yayılma değerlendirmesi')
       warnings.push(...liquefaction.warnings)
     }catch(e){
       missing.push(e instanceof Error?e.message:'Sıvılaşma hesabı doğrulanamadı')
@@ -144,7 +154,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   const m=[...new Set(missing)],f=[...new Set(failed)]
   const status:FinalStatus=f.length?'UYGUN DEĞİL':m.length?'VERİ EKSİK':'UYGUN'
   return{
-    status,evaluable:status!=='VERİ EKSİK',
+    status,evaluable:m.length===0,
     project:{dts:p.seismic.dts,bks:p.seismic.bks,sds:p.seismic.sds,soilGroup,vs30:p.geophysical.vs30,zfSiteSpecificRequired},
     actions,failedChecks:f,missingData:m,warnings:[...new Set(warnings)],trace,bearing,sliding,settlement,liquefaction
   }

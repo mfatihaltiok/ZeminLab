@@ -2,14 +2,19 @@ import assert from 'node:assert/strict'
 import { calculateSpt } from '../src/core/engineering/spt/spt-engine.ts'
 import { calculateSurfaceFoundation } from '../src/core/engineering/surface-foundation.ts'
 import { liquefactionProfile } from '../src/core/engineering/liquefaction/liquefaction-profile.ts'
-import { foundationChecks } from '../src/core/engineering/calculation-engine.ts'
+import { foundationChecks, jetGrout as legacyJetGrout } from '../src/core/engineering/calculation-engine.ts'
 import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-settlement-engine.ts'
-import { stage2Settlement } from '../src/core/engineering/stage2-engine.ts'
+import { stage2BearingCapacity, stage2Settlement } from '../src/core/engineering/stage2-engine.ts'
+import { bearingCapacity as classicalBearingCapacity } from '../src/core/engineering/calculation-engine.ts'
+import { stressSpread21, layerSettlement, schmertmannSettlement, jetGroutAdvanced } from '../src/core/engineering/advanced-geotech.ts'
+import { jetGroutAxialCapacity, verifyJetGroutQC, virtualRaftSettlement } from '../src/core/engineering/jet-grout-advanced.ts'
+import { calculateSubgradeReaction } from '../src/core/engineering/subgrade-reaction.ts'
 import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
 import { captureSptStressSnapshot, deriveSptValues } from '../src/core/engineering/field-calculations.ts'
 import { toEngineeringSI } from '../src/core/units/engineering-input-adapter.ts'
+import { sptCorrection } from '../src/core/calculations/engineering.ts'
 import { normalizeEngineeringRenderModel } from '../src/renderer/src/components/engineering-render-model.ts'
 
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
@@ -18,17 +23,19 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 
 {
   const result=stage2Settlement({B:2,L:2,q:100,qNet:100,method:'2:1',layers:[
-    {thickness:1,sigmaV0:100,deltaSigma:0,Es:10000},
-    {thickness:1,sigmaV0:120,deltaSigma:0,Es:10000}
+    {thickness:1,sigmaV0:100,deltaSigma:0,Es:10000,nu:0.3},
+    {thickness:1,sigmaV0:120,deltaSigma:0,Es:10000,nu:0.3}
   ]})
   approx(result.value.layerResults[0].deltaSigma,64)
   approx(result.value.layerResults[1].deltaSigma,400/(3.5*3.5))
+  assert.throws(()=>stage2Settlement({B:2,L:2,q:100,method:'2:1',layers:[{thickness:1,sigmaV0:100,deltaSigma:0,Es:10000,nu:0.3}]}),/qNet açıkça girilmelidir/)
   assert.throws(()=>stage2Settlement({B:2,L:2,q:100,method:'elastic',layers:[
     {thickness:1,sigmaV0:100,deltaSigma:10,Es:10000,nu:0.5}
   ]}))
   assert.throws(()=>stage2Settlement({B:2,L:2,q:100,method:'elastic',layers:[
     {thickness:-1,sigmaV0:100,deltaSigma:10,Es:10000}
   ]}))
+  assert.throws(()=>stage2Settlement({B:2,L:2,Df:0,qNet:100,method:'consolidation',layers:[{thickness:1,sigmaV0:100,deltaSigma:50,Cc:0.2,e0:0.7,sigmaPc:150}]}),/Cr açıkça girilmelidir/)
 }
 
 
@@ -53,7 +60,12 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
-  const s=calculateSpt({nField:20,energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10,effectiveStress:100,fineContent:30})
+  const s=calculateSpt({nField:20,energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10,effectiveStress:100,fineContent:30,soilCode:'SP'})
+  assert.throws(()=>calculateSpt({nField:10,hammerType:'measured',sampler:'standard',rodLengthM:5}),/Ölçülmüş enerji oranı/)
+  assert.throws(()=>calculateSpt({nField:10,energyRatio:60,effectiveStress:-1,rodLengthM:5}),/efektif düşey gerilme/)
+  assert.throws(()=>calculateSpt({nField:10,energyRatio:90,ce:1,hammerType:'automatic',rodLengthM:5}),/ER ile CE/)
+  assert.throws(()=>calculateSpt({nField:10,cb:1,boreholeDiameterMm:150,rodLengthM:5}),/CB katsayısı/)
+  assert.throws(()=>calculateSpt({nField:10,cs:1,sampler:'without-liner',rodLengthM:5}),/CS=1.10/)
   approx(s.ce,1)
   approx(s.cb,1)
   approx(s.cs,1)
@@ -76,7 +88,8 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     sampler:'without-liner',
     samplerCorrection:1.20,
     rodLengthM:5,
-    effectiveStress:100
+    effectiveStress:100,
+    soilCode:'SP'
   })
   approx(corrected.n60,21.42,1e-12)
   approx(corrected.cn,0.978,1e-12)
@@ -85,7 +98,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
 }
 
 {
-  const global=calculateSpt({nField:20,ce:.90,cb:1.05,cs:1.20,rodLengthM:8,effectiveStress:100})
+  const global=calculateSpt({nField:20,ce:.90,cb:1.05,cs:1.20,rodLengthM:8,effectiveStress:100,soilCode:'SP'})
   approx(global.cr,.95,1e-12)
   approx(global.n60,20*.90*1.05*1.20*.95,1e-12)
   approx(global.n1_60,global.n60*.978,1e-12)
@@ -120,10 +133,23 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.throws(() => calculateSpt({nField:10,cs:1.05,effectiveStress:100,rodLengthM:5}), /CS için yalnız/)
   assert.throws(() => calculateSpt({nField:10,cs:1.2,sampler:'standard',effectiveStress:100,rodLengthM:5}), /Standart numune alıcı/)
   assert.throws(() => calculateSpt({nField:10,energyRatio:40,hammerType:'measured',effectiveStress:100,rodLengthM:5}), /ER %45–%160/)
+  const compatNoFines=sptCorrection({depth:3,nField:10},100)
+  assert.equal(compatNoFines.N160f,undefined)
+  const compatUnknownSoil=sptCorrection({depth:3,nField:10,fines:20},25)
+  assert.equal(compatUnknownSoil.N160f,undefined)
+  const clayCN=sptCorrection({depth:3,nField:10,soil:'CL',fines:20},25)
+  const sandCN=sptCorrection({depth:3,nField:10,soil:'SP',fines:20},25)
+  assert.equal(clayCN.CN,1)
+  assert.ok(sandCN.CN>1)
   const noStress=calculateSpt({nField:10,fineContent:20,rodLengthM:5})
   assert.equal(noStress.n1_60f,undefined)
   assert.equal(noStress.hasAssumptions,true)
   assert.ok(noStress.warnings.some(w=>w.includes('σ′v0 verilmedi')))
+  const unknownSoil=calculateSpt({nField:10,effectiveStress:25,fineContent:20,rodLengthM:5})
+  assert.equal(unknownSoil.n1_60f,undefined)
+  assert.equal(unknownSoil.hasAssumptions,true)
+  const noClassDilatancy=calculateSpt({nField:30,effectiveStress:25,fineContent:20,rodLengthM:5,applyDilatancy:true})
+  assert.equal(noClassDilatancy.dilatancyApplied,false)
 
 }
 
@@ -326,6 +352,21 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   })
   approx(terzaghi.sc,1.15)
   approx(terzaghi.sg,.9)
+  approx(terzaghi.Ngamma,1.5*(terzaghi.Nq-1)*Math.tan(Math.PI/6),1e-10)
+  const edgePressure=calculateSurfaceFoundation({B:2,L:4,Df:1,gamma1:18,gamma2:19,c:0,phi:0,verticalLoad:1000,momentX:100,momentY:40,resistanceFactor:1.4,method:'TBDY-2018',groundwaterDepth:10})
+  assert.equal(edgePressure.finalDesignEligible,true)
+  assert.equal(edgePressure.adequate,false)
+  assert.ok(edgePressure.qMax>1.25*edgePressure.qk)
+  assert.throws(()=>calculateSurfaceFoundation({B:2,L:4,Df:1,gamma1:18,c:0,phi:30,verticalLoad:1000,resistanceFactor:1.2,method:'TBDY-2018',groundwaterDepth:10}),/γRv=1.40/)
+  const gappedProfile=calculateSurfaceFoundation({B:2,L:2,Df:0,gamma1:18,c:10,phi:30,verticalLoad:1000,resistanceFactor:1.4,method:'TBDY-2018',groundwaterDepth:10,layers:[{topDepth:0,bottomDepth:1,gamma:18,cohesion:10,phi:30},{topDepth:2,bottomDepth:4,gamma:18,cohesion:10,phi:30}]})
+  assert.equal(gappedProfile.finalDesignEligible,false)
+  assert.ok(gappedProfile.warnings.some(w=>w.includes('sürekli değil')))
+  const classicalOnly=calculateSurfaceFoundation({B:2,L:4,Df:1,gamma1:18,gamma2:19,c:10,phi:30,verticalLoad:1000,method:'Terzaghi',groundwaterDepth:10})
+  assert.equal(classicalOnly.finalDesignEligible,false)
+  assert.equal(classicalOnly.qt,0)
+  assert.equal(classicalOnly.allowableClassical,undefined)
+  const classicalWithFs=calculateSurfaceFoundation({B:2,L:4,Df:1,gamma1:18,gamma2:19,c:10,phi:30,verticalLoad:1000,method:'Terzaghi',safetyFactor:3,groundwaterDepth:10})
+  approx(classicalWithFs.qt,classicalWithFs.qk/3,1e-10)
 }
 
 
@@ -353,6 +394,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(layered.representativeC,20)
   assert.ok(layered.representativePhi>20&&layered.representativePhi<30)
   assert.equal(layered.finalDesignEligible,false)
+  assert.equal(layered.adequate,false)
   assert.equal(layered.layeredScreeningOnly,true)
   assert.ok(layered.warnings.some(w=>w.includes('nihai tasarım')||w.includes('screening')))
 }
@@ -404,6 +446,17 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(seismicCu.slidingCapacityResultant,4*100/1.1)
   assert.equal(seismicCu.slidingMode,'undrained-cu')
   assert.equal(seismicCu.evaluable,true)
+  const missingTanDelta=foundationChecks({B:2,L:2,N:1000,Vx:100,Vy:0,Mx:0,My:0,groundwaterDepth:10,foundationDepth:1,seismic:true,interfaceType:'cast-in-place-soil'})
+  assert.equal(missingTanDelta.slidingTanDelta,0)
+  assert.equal(missingTanDelta.evaluable,false)
+  assert.equal(missingTanDelta.slidingCapacityResultant,0)
+  const missingGroundwater=foundationChecks({B:2,L:2,N:1000,Vx:500,Vy:0,Mx:0,My:0,seismic:true,interfaceType:'cast-in-place-soil'})
+  assert.equal(missingGroundwater.evaluable,false)
+  assert.equal(missingGroundwater.slidingCapacityResultant,0)
+  const missingInterface=foundationChecks({B:2,L:2,N:1000,Vx:500,Vy:0,Mx:0,My:0,deltaTan:0.6,groundwaterDepth:10,foundationDepth:1,seismic:true})
+  assert.equal(missingInterface.evaluable,false)
+  assert.equal(missingInterface.slidingTanDelta,0)
+  assert.throws(()=>foundationChecks({B:2,L:2,N:1000,Vx:100,Vy:0,Mx:0,My:0,deltaTan:0.7,interfaceType:'precast-soil'}),/üst sınırını aşamaz/)
 }
 
 
@@ -420,6 +473,9 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(result.rows[0].beta,1.1543167672515497,1e-12)
   assert.ok(result.rows[0].FS !== undefined)
   assert.equal(result.rows[0].conclusion,'SIVILAŞMA RİSKİ VAR')
+  assert.equal(result.rows[0].postLiquefactionTrigger,'FS<1.10')
+  assert.equal(result.rows[0].postLiquefactionEvaluation,'required')
+  assert.ok(result.warnings.some(w=>w.includes('16.6.10')))
 }
 
 {
@@ -432,6 +488,12 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(clayLiquefaction.rows[0].cn,1,1e-12)
   approx(clayLiquefaction.rows[0].n1_60,clayLiquefaction.rows[0].n60,1e-12)
   assert.ok(clayLiquefaction.rows[0].trace.some(x=>x.symbol==='CN'&&x.note==='Zemin sınıfı CIM'))
+  const unknownSoilLiquefaction=liquefactionProfile({
+    Mw:7.5,Sds:1,gwt:2,soilGroup:'ZE',dts:'1',continuousOrThickLens:true,foundationDepth:2,
+    layers:[{top:0,bottom:10,gamma:18,gammaSat:19,soil:'UNKNOWN',finesContent:30,plasticityIndex:5}],
+    spt:[{depth:5,nField:10,fineContent:30,plasticityIndex:5,waterContent:20,soil:'UNKNOWN',energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10,stressSnapshot:{sigmaV0:93,porePressureU0:29.43,effectiveStressV0:63.57,groundwaterDepth:2,capturedAt:new Date(0).toISOString()}}]
+  })
+  assert.equal(unknownSoilLiquefaction.rows[0].status,'VERİ EKSİK')
 }
 
 {
@@ -455,6 +517,14 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   const result=calculateIdealizedSettlement({profile,method:'2to1-layer',B:2,L:2,Df:0,qGross:100,groundwaterDepth:50})
   assert.equal(result.netFoundationPressure,100)
   assert.ok(result.layers[0].deltaSigma>0)
+  const esOnlyProfile={...profile,layers:profile.layers.map(layer=>({...layer,elasticModulus:20000,constrainedModulus:undefined,oedometricModulus:undefined}))}
+  const schmertmannEs=calculateIdealizedSettlement({profile:esOnlyProfile,method:'schmertmann',B:2,L:2,Df:0,qGross:100,groundwaterDepth:50,schmertmannC1:1,schmertmannC2:1})
+  assert.equal(schmertmannEs.ready,true)
+  const noM=calculateIdealizedSettlement({profile:esOnlyProfile,method:'2to1-layer',B:2,L:2,Df:0,qGross:100,groundwaterDepth:50})
+  assert.equal(noM.ready,false)
+  const noWater=calculateIdealizedSettlement({profile,method:'2to1-layer',B:2,L:2,Df:0,qGross:100})
+  assert.equal(noWater.ready,false)
+  assert.ok(noWater.warnings.some(w=>w.includes('YASS')))
 }
 
 
@@ -565,6 +635,15 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   // Kompozit taşıma gücü: qcomp = ρ·qcol + (1-ρ)·qsoil
   const expectedQ = expectedAr * 2000 + (1 - expectedAr) * 100
   approx(result.compositeCapacity, expectedQ, 1e-6)
+  const withFS=jetGroutAdvanced({columnDiameter:0.6,spacing:1.5,qSoil:100,qColumn:2000,FS:3,load:0,foundationArea:4})
+  approx(withFS.allowableCapacity!,withFS.compositeCapacity/3,1e-12)
+  assert.equal(withFS.capacityFS,undefined)
+  const withDemand=jetGroutAdvanced({columnDiameter:0.6,spacing:1.5,qSoil:100,qColumn:2000,FS:3,load:500,foundationArea:2})
+  assert.equal(withDemand.designAdequate,false)
+  assert.ok((withDemand.designUtilization??0)>1)
+  assert.throws(()=>virtualRaftSettlement({load:100,area:4,treatedThickness:3,untreatedModulus:10000,treatedModulus:50000} as any),/Poisson oranı/)
+  const legacy=legacyJetGrout({columnDiameter:0.6,spacing:1.5,qultSoil:100,qultColumn:2000,improvementFactor:1.2,FS:3,columnStrength:2500})
+  approx(legacy.value.allowable,legacy.value.composite/3,1e-12)
   
   // Kompozit modül: Ecomp = ρ·Ecol + (1-ρ)·Esoil
   const expectedE = expectedAr * 50000 + (1 - expectedAr) * 5000
@@ -599,10 +678,10 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
 
 {
   // Jet Grout tam tasarım hesabı
-  const design = calculateJetGroutDesign({
+  const designInput = {
     columnDiameter: 0.6,
     spacing: 1.5,
-    layout: 'square',
+    layout: 'square' as const,
     soilUnitWeight: 18,
     soilCohesion: 10,
     soilFrictionAngle: 25,
@@ -615,9 +694,18 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
     foundationLength: 10,
     foundationDepth: 1.5,
     verticalLoad: 5000,
+    momentX:1000,
     safetyFactorBearing: 3,
     safetyFactorSliding: 1.5
-  })
+  }
+  const design=calculateJetGroutDesign(designInput)
+  assert.ok(design.warnings.some(w=>w.includes('YASS derinliği girilmedi')))
+  assert.throws(()=>calculateJetGroutDesign({...designInput,groundwaterDepth:0}),/γsat>γw/)
+  const withGwt=calculateJetGroutDesign({...designInput,groundwaterDepth:0,saturatedUnitWeight:20})
+  assert.ok(withGwt.compositeBearingCapacity>0)
+  const withoutNu=calculateJetGroutDesign({...designInput,soilNu:undefined})
+  assert.equal(withoutNu.untreatedSettlement,undefined)
+  assert.ok(withoutNu.warnings.some(w=>w.includes('Poisson oranı')))
   
   // Kompozit parametreler hesaplanmalı
   assert.ok(design.areaReplacementRatio > 0)
@@ -625,7 +713,8 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.ok(design.compositeEs! > 0)
   
   // Taşıma gücü kontrolü
-  assert.ok(design.appliedStress > 0)
+  assert.ok(design.appliedStress > 50)
+  assert.ok(design.effectiveLength < 10)
   assert.ok(design.bearingCapacityUtilization >= 0)
   assert.equal(typeof design.bearingCapacitySafe, 'boolean')
   
@@ -635,13 +724,11 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.ok(design.settlementReduction! > 0)
   assert.ok(design.settlementReduction! < 100)
   
-  // Eksenel kapasite
-  assert.ok(design.axialCapacity!.shaftCapacity > 0)
-  assert.ok(design.axialCapacity!.tipCapacity > 0)
-  assert.ok(design.axialCapacity!.totalCapacity > 0)
-  assert.ok(design.axialCapacity!.designCapacity > 0)
-  assert.ok(design.axialCapacity!.groupEfficiency > 0)
-  assert.ok(design.axialCapacity!.groupEfficiency <= 1)
+  // Eksik efektif gerilme profiliyle eksenel/grup kapasitesi üretilmez.
+  assert.equal(design.axialCapacity, undefined)
+  assert.equal(design.screeningOnly, true)
+  assert.equal(design.designEligible, false)
+  assert.ok(design.warnings.some(w => w.includes('efektif gerilmeler')))
   
   // Kolon sayısı
   assert.ok(design.numberOfColumns! > 0)
@@ -742,6 +829,85 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.ok(result.warnings.length > 0)
   
   console.log('✓ Jet Grout mühendislik hesabı (tam paket)')
+}
+
+{
+  const dry=classicalBearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:30,FS:3,method:'Meyerhof',surcharge:18,gammaBearing:18}).value
+  const wet=classicalBearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:30,FS:3,method:'Meyerhof',surcharge:18,gammaBearing:9.19}).value
+  assert.ok(wet.ultimate<dry.ultimate)
+  assert.throws(()=>classicalBearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:NaN,FS:3,method:'Meyerhof'}))
+  const base=stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:30,method:'Meyerhof'})
+  assert.equal(base.value.allowableGross,undefined)
+  assert.ok(base.warnings.some(w=>w.includes('FS varsayılmadı')))
+  const extra=stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:30,method:'Meyerhof',surcharge:50})
+  assert.ok(extra.value.characteristic>base.value.characteristic)
+  const submerged=stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,gammaSat:19,waterTableDepth:0,c:10,phi:30,method:'Meyerhof'})
+  assert.ok(submerged.value.characteristic<base.value.characteristic)
+  assert.throws(()=>stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,waterTableDepth:0,c:10,phi:30,method:'Meyerhof'}))
+}
+
+{
+  assert.throws(()=>calculateSurfaceFoundation({
+    B:NaN,L:2,Df:0,gamma1:18,c:0,phi:30,verticalLoad:100,
+    method:'TBDY-2018'
+  }))
+  assert.throws(()=>calculateSurfaceFoundation({
+    B:2,L:2,Df:0,gamma1:18,c:0,phi:30,verticalLoad:100,
+    resistanceFactor:1.2,method:'TBDY-2018'
+  }),/γRv=1.40/)
+  assert.throws(()=>calculateSurfaceFoundation({
+    B:2,L:2,Df:0,gamma1:18,c:0,phi:30,verticalLoad:100,
+    method:'TBDY-2018',layers:[
+      {topDepth:0,bottomDepth:3,gamma:18,cohesion:0,phi:30},
+      {topDepth:2,bottomDepth:4,gamma:18,cohesion:0,phi:30}
+    ]
+  }),/çakışan/)
+}
+
+{
+  approx(stressSpread21({q:100,B:2,L:2,z:1}).deltaSigma,100*4/9,1e-12)
+  assert.throws(()=>stressSpread21({q:-1,B:2,L:2,z:1}))
+  assert.throws(()=>layerSettlement([{thickness:-1,sigma0:100,deltaSigma:10,Es:10000}]))
+  assert.throws(()=>schmertmannSettlement(100,[{thickness:1,Es:0,Iz:0.5}],1,1))
+  const noM=layerSettlement([{thickness:1,sigma0:100,deltaSigma:10,Es:10000}])
+  approx(noM.total,0)
+  assert.ok(noM.warnings.some(w=>w.includes('Es Young modülüdür')))
+  const withM=layerSettlement([{thickness:1,sigma0:100,deltaSigma:10,M:10000}])
+  approx(withM.total,0.001)
+  assert.throws(()=>layerSettlement([{thickness:1,sigma0:100,deltaSigma:10,Cc:0.2,Es:10000}]),/Cc ve e0 birlikte/)
+  assert.throws(()=>jetGroutAdvanced({columnDiameter:0.6,spacing:1.5,qSoil:-1,qColumn:1000}))
+  const qcPass=verifyJetGroutQC({requiredUcs:2000,measuredUcs:2500,requiredDiameter:0.6,measuredDiameter:0.65,requiredCoreSamples:3,measuredCoreSamples:3,continuityVerified:true,constructionLogsVerified:true,testReportReviewed:true})
+  assert.equal(qcPass.status,'pass')
+  const qcFail=verifyJetGroutQC({requiredUcs:2000,measuredUcs:1500,requiredDiameter:0.6,measuredDiameter:0.55,requiredCoreSamples:3,measuredCoreSamples:2,continuityVerified:false,constructionLogsVerified:false,testReportReviewed:false})
+  assert.equal(qcFail.status,'fail')
+  const qcMissing=verifyJetGroutQC({requiredUcs:2000,measuredUcs:2500})
+  assert.equal(qcMissing.status,'not-evaluable')
+  const ks=calculateSubgradeReaction({B:2,L:4,Es:20000,nu:0.3,method:'elastic',unitSystem:'kN-m'})
+  assert.ok(Number.isFinite(ks.ks)&&ks.ks>0)
+  assert.equal(calculateSubgradeReaction({B:2,Es:10000,nu:0.3}).method,'elastic')
+  const ksTon=calculateSubgradeReaction({B:2,L:4,Es:20000/9.80665,nu:0.3,method:'elastic',unitSystem:'ton-m'})
+  approx(ksTon.ks,ks.ks/9.80665,1e-8)
+  const plateClay=calculateSubgradeReaction({B:0.3048,L:0.3048,Kv1:10000,soilType:'cohesive',method:'erol-plate',unitSystem:'kN-m'})
+  const plateSand=calculateSubgradeReaction({B:0.3048,L:0.3048,Kv1:10000,soilType:'cohesionless',method:'erol-plate',unitSystem:'kN-m'})
+  approx(plateClay.ks,10000,1e-8)
+  approx(plateSand.ks,10000,1e-8)
+}
+
+{
+  const axial=jetGroutAxialCapacity({
+    diameter:0.6,columnStrength:2500,numberOfColumns:1,resistanceFactor:1.4,layers:[{
+      thickness:3,gamma:18,cohesion:10,frictionAngle:30,
+      effectiveStressAtTop:20,effectiveStressAtBottom:74,interfaceAlpha:0.8,interfaceDelta:25
+    }]
+  })
+  assert.ok(axial.designCapacity>0)
+  const axialClay=jetGroutAxialCapacity({diameter:0.6,columnStrength:100000,numberOfColumns:1,resistanceFactor:1.4,layers:[{thickness:1,gamma:18,cohesion:100,frictionAngle:0,effectiveStressAtTop:10,effectiveStressAtBottom:20,interfaceAlpha:1,interfaceDelta:0}]})
+  approx(axialClay.tipCharacteristic,(100*5.14+20)*Math.PI*0.6**2/4,1e-8)
+  assert.throws(()=>jetGroutAxialCapacity({
+    diameter:0.6,columnStrength:2500,numberOfColumns:1,resistanceFactor:1.4,layers:[{
+      thickness:3,gamma:18,cohesion:10,frictionAngle:30
+    }]
+  }),/efektif gerilmeler/)
 }
 
 console.log('\n═══════════════════════════════════════════════════════════════════════════════')
