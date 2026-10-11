@@ -361,6 +361,10 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.ok(gappedProfile.warnings.some(w=>w.includes('sürekli değil')))
   const classicalOnly=calculateSurfaceFoundation({B:2,L:4,Df:1,gamma1:18,gamma2:19,c:10,phi:30,verticalLoad:1000,method:'Terzaghi',groundwaterDepth:10})
   assert.equal(classicalOnly.finalDesignEligible,false)
+  assert.equal(classicalOnly.qt,0)
+  assert.equal(classicalOnly.allowableClassical,undefined)
+  const classicalWithFs=calculateSurfaceFoundation({B:2,L:4,Df:1,gamma1:18,gamma2:19,c:10,phi:30,verticalLoad:1000,method:'Terzaghi',safetyFactor:3,groundwaterDepth:10})
+  approx(classicalWithFs.qt,classicalWithFs.qk/3,1e-10)
 }
 
 
