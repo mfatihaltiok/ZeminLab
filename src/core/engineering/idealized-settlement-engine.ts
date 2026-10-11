@@ -231,6 +231,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   }
   if(results.some(x=>x.status==='VERİ EKSİK'))warnings.push('Bir veya daha fazla tabakada gerekli oturma parametresi eksik; eksik katkılar sıfır kabul edilmez ve sonuç hazırlıksız işaretlenir.')
   if(method==='schmertmann'&&input.timeYears==null)warnings.push('Schmertmann C2=1 alındı; zaman bilgisi girilmediği için creep düzeltmesi yapılmadı.')
+  if(input.timeYears==null&&layers.some(layer=>finite(layer.secondaryCompressionIndex)&&layer.secondaryCompressionIndex!>0))warnings.push('Cα girilmiş ancak hesap süresi t girilmemiş; ikincil oturma hesaplanmadı.')
   if(method==='janbu')warnings.push('Janbu yöntemi M0–M1 gerilme-bağımlı parametreleri veri modeline eklenene kadar hesaplanmaz; sonuç VERİ EKSİK olarak tutulur.')
   if(method==='burland-burbidge')warnings.push('Burland-Burbidge bağıntısı özellikle kum/granüler zemin için ampirik bir yöntemdir; kohezyonlu tabakalarda ayrı konsolidasyon hesabı yapılır.')
   if(finite(input.timeYears)&&input.timeYears!>0&&input.secondaryStartTimeYears==null&&results.some(x=>x.secondarySettlement>0))warnings.push('İkincil oturma için başlangıç zamanı girilmedi; t1=1 yıl referansı kullanıldı. Proje verisi varsa secondaryStartTimeYears girilmelidir.')
