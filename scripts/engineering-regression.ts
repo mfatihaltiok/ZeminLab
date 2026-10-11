@@ -4,7 +4,11 @@ import { calculateSurfaceFoundation } from '../src/core/engineering/surface-foun
 import { liquefactionProfile } from '../src/core/engineering/liquefaction/liquefaction-profile.ts'
 import { foundationChecks } from '../src/core/engineering/calculation-engine.ts'
 import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-settlement-engine.ts'
-import { stage2Settlement } from '../src/core/engineering/stage2-engine.ts'
+import { stage2BearingCapacity, stage2Settlement } from '../src/core/engineering/stage2-engine.ts'
+import { bearingCapacity as classicalBearingCapacity } from '../src/core/engineering/calculation-engine.ts'
+import { stressSpread21, layerSettlement, schmertmannSettlement, jetGroutAdvanced } from '../src/core/engineering/advanced-geotech.ts'
+import { jetGroutAxialCapacity } from '../src/core/engineering/jet-grout-advanced.ts'
+import { calculateSubgradeReaction } from '../src/core/engineering/subgrade-reaction.ts'
 import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
@@ -635,13 +639,11 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.ok(design.settlementReduction! > 0)
   assert.ok(design.settlementReduction! < 100)
   
-  // Eksenel kapasite
-  assert.ok(design.axialCapacity!.shaftCapacity > 0)
-  assert.ok(design.axialCapacity!.tipCapacity > 0)
-  assert.ok(design.axialCapacity!.totalCapacity > 0)
-  assert.ok(design.axialCapacity!.designCapacity > 0)
-  assert.ok(design.axialCapacity!.groupEfficiency > 0)
-  assert.ok(design.axialCapacity!.groupEfficiency <= 1)
+  // Eksik efektif gerilme profiliyle eksenel/grup kapasitesi üretilmez.
+  assert.equal(design.axialCapacity, undefined)
+  assert.equal(design.screeningOnly, true)
+  assert.equal(design.designEligible, false)
+  assert.ok(design.warnings.some(w => w.includes('efektif gerilmeler')))
   
   // Kolon sayısı
   assert.ok(design.numberOfColumns! > 0)
@@ -742,6 +744,62 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.ok(result.warnings.length > 0)
   
   console.log('✓ Jet Grout mühendislik hesabı (tam paket)')
+}
+
+{
+  const dry=classicalBearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:30,FS:3,method:'Meyerhof',surcharge:18,gammaBearing:18}).value
+  const wet=classicalBearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:30,FS:3,method:'Meyerhof',surcharge:18,gammaBearing:9.19}).value
+  assert.ok(wet.ultimate<dry.ultimate)
+  assert.throws(()=>classicalBearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:NaN,FS:3,method:'Meyerhof'}))
+  const base=stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:30,method:'Meyerhof'})
+  const extra=stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,c:10,phi:30,method:'Meyerhof',surcharge:50})
+  assert.ok(extra.value.characteristic>base.value.characteristic)
+  const submerged=stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,gammaSat:19,waterTableDepth:0,c:10,phi:30,method:'Meyerhof'})
+  assert.ok(submerged.value.characteristic<base.value.characteristic)
+  assert.throws(()=>stage2BearingCapacity({B:2,L:2,Df:1,gamma:18,waterTableDepth:0,c:10,phi:30,method:'Meyerhof'}))
+}
+
+{
+  assert.throws(()=>calculateSurfaceFoundation({
+    B:NaN,L:2,Df:0,gamma1:18,c:0,phi:30,verticalLoad:100,
+    method:'TBDY-2018'
+  }))
+  assert.throws(()=>calculateSurfaceFoundation({
+    B:2,L:2,Df:0,gamma1:18,c:0,phi:30,verticalLoad:100,
+    resistanceFactor:1.2,method:'TBDY-2018'
+  }),/γRv=1.40/)
+  assert.throws(()=>calculateSurfaceFoundation({
+    B:2,L:2,Df:0,gamma1:18,c:0,phi:30,verticalLoad:100,
+    method:'TBDY-2018',layers:[
+      {topDepth:0,bottomDepth:3,gamma:18,cohesion:0,phi:30},
+      {topDepth:2,bottomDepth:4,gamma:18,cohesion:0,phi:30}
+    ]
+  }),/çakışan/)
+}
+
+{
+  approx(stressSpread21({q:100,B:2,L:2,z:1}).deltaSigma,100*4/9,1e-12)
+  assert.throws(()=>stressSpread21({q:-1,B:2,L:2,z:1}))
+  assert.throws(()=>layerSettlement([{thickness:-1,sigma0:100,deltaSigma:10,Es:10000}]))
+  assert.throws(()=>schmertmannSettlement(100,[{thickness:1,Es:0,Iz:0.5}]))
+  assert.throws(()=>jetGroutAdvanced({columnDiameter:0.6,spacing:1.5,qSoil:-1,qColumn:1000}))
+  const ks=calculateSubgradeReaction({B:2,L:4,Es:20000,nu:0.3,method:'elastic',unitSystem:'kN-m'})
+  assert.ok(Number.isFinite(ks.ks)&&ks.ks>0)
+}
+
+{
+  const axial=jetGroutAxialCapacity({
+    diameter:0.6,columnStrength:2500,numberOfColumns:1,layers:[{
+      thickness:3,gamma:18,cohesion:10,frictionAngle:30,
+      effectiveStressAtTop:20,effectiveStressAtBottom:74,interfaceAlpha:0.8,interfaceDelta:25
+    }]
+  })
+  assert.ok(axial.designCapacity>0)
+  assert.throws(()=>jetGroutAxialCapacity({
+    diameter:0.6,columnStrength:2500,layers:[{
+      thickness:3,gamma:18,cohesion:10,frictionAngle:30
+    }]
+  }),/efektif gerilmeler/)
 }
 
 console.log('\n═══════════════════════════════════════════════════════════════════════════════')
