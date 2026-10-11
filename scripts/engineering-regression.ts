@@ -28,6 +28,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   ]})
   approx(result.value.layerResults[0].deltaSigma,64)
   approx(result.value.layerResults[1].deltaSigma,400/(3.5*3.5))
+  assert.throws(()=>stage2Settlement({B:2,L:2,q:100,method:'2:1',layers:[{thickness:1,sigmaV0:100,deltaSigma:0,Es:10000,nu:0.3}]}),/qNet açıkça girilmelidir/)
   assert.throws(()=>stage2Settlement({B:2,L:2,q:100,method:'elastic',layers:[
     {thickness:1,sigmaV0:100,deltaSigma:10,Es:10000,nu:0.5}
   ]}))
