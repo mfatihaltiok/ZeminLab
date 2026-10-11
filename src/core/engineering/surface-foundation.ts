@@ -199,7 +199,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=gammaW))throw new Error('YASS tanımlandıysa γsat, γw=9.80665 kN/m³ değerinden büyük olmalıdır.')
   if((i.groundSlope??0)<0||(i.groundSlope??0)>=90||(i.baseSlope??0)<0||(i.baseSlope??0)>=90)throw new Error('Arazi ve temel tabanı eğimleri 0°≤β<90° aralığında olmalıdır.')
   if(i.additionalSurcharge!=null&&i.additionalSurcharge<0)throw new Error('Ek sürşarj negatif olamaz.')
-  if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük negatif olamaz.')
+  if(i.c<0||i.verticalLoad<=0)throw new Error('c negatif olamaz; taşıma gücü hesabı için düşey yük pozitif olmalıdır.')
   if(!finite(i.phi)||i.phi<0||i.phi>50)throw new Error('φ 0° ile 50° arasında olmalıdır.')
   for(const [name,value] of [['ek sürşarj',i.additionalSurcharge],['yatay yük',i.horizontalLoad],['Mx',i.momentX],['My',i.momentY],['arazi eğimi',i.groundSlope],['temel tabanı eğimi',i.baseSlope],['YASS derinliği',i.groundwaterDepth],['Cu',i.undrainedCu],['direnç katsayısı',i.resistanceFactor],['güvenlik katsayısı',i.safetyFactor]] as const){if(value!==undefined&&!finite(value))throw new Error(name+' sonlu bir sayı olmalıdır.')}
   if(i.horizontalLoad!=null&&i.horizontalLoad<0)throw new Error('Yatay yük büyüklüğü negatif girilemez; yön ayrı temsil edilmelidir.')
