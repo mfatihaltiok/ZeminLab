@@ -91,6 +91,8 @@ export interface JetGroutDesignResult {
   
   // Taşıma gücü kontrolü
   appliedStress: number             // kPa
+  effectiveWidth: number
+  effectiveLength: number
   bearingCapacityUtilization: number // %
   bearingCapacitySafe: boolean
   screeningOnly: true
@@ -169,9 +171,12 @@ export function calculateJetGroutDesign(params: JetGroutDesignParameters): JetGr
   }
   if (params.soilEs != null && params.soilEs <= 0 || params.columnEs != null && params.columnEs <= 0 || params.columnLength != null && params.columnLength <= 0 || params.horizontalLoad != null && params.horizontalLoad < 0 || params.soilNu != null && (params.soilNu <= -1 || params.soilNu >= 0.5)) throw new Error('Jet Grout elastisite, uzunluk, yatay yük veya Poisson girdisi geçersiz.')
 
-  const foundationArea = params.foundationWidth! * params.foundationLength!
+  const ex=(params.momentY??0)/params.verticalLoad,ey=(params.momentX??0)/params.verticalLoad
+  const effectiveWidth=params.foundationWidth!-2*Math.abs(ex),effectiveLength=params.foundationLength!-2*Math.abs(ey)
+  if(effectiveWidth<=0||effectiveLength<=0)throw new Error('Jet Grout ön kontrolünde momentler nedeniyle pozitif basınçlı etkin temel alanı kalmıyor.')
+  const foundationArea = effectiveWidth * effectiveLength
   const soilCapacity = bearingCapacity({
-    B: params.foundationWidth!, L: params.foundationLength!, Df: params.foundationDepth!,
+    B: effectiveWidth, L: effectiveLength, Df: params.foundationDepth!,
     gamma: params.soilUnitWeight, c: params.soilCohesion, phi: params.soilFrictionAngle,
     FS: params.safetyFactorBearing, method: 'Meyerhof'
   })
@@ -195,10 +200,12 @@ export function calculateJetGroutDesign(params: JetGroutDesignParameters): JetGr
   const bearingCapacitySafe = bearingCapacityUtilization <= 100 / params.safetyFactorBearing
   warnings.push('Bu API girdisinde YASS parametresi bulunmadığından yeraltı suyu düzeltmesi yapılmamıştır.')
   if (bearingCapacityUtilization > 80) warnings.push('Ön tarama kullanım oranı %80 üzerindedir; geometri ve iyileştirme tasarımı yeniden değerlendirilmelidir.')
+  if((params.momentX??0)!==0||(params.momentY??0)!==0)warnings.push('Momentler etkin temel boyutlarına B′=B−2|ey| ve L′=L−2|ex| yaklaşımıyla yansıtıldı; bu sonuç hâlâ ön taramadır.')
+  if(params.columnUnitWeight!=null)warnings.push('Kolon birim hacim ağırlığı bu kompozit kapasite ön modelinde kullanılmaz; kendi ağırlık etkisi ayrıca modellenmelidir.')
   let untreatedSettlement: number | undefined
   let treatedSettlement: number | undefined
   let settlementReduction: number | undefined
-  if (params.soilEs && params.columnEs && params.columnLength) {
+  if (params.soilEs && params.columnEs && params.columnLength && params.soilNu!=null) {
     const virtualRaft = virtualRaftSettlement({
       load: params.verticalLoad, area: foundationArea, treatedThickness: params.columnLength,
       untreatedModulus: params.soilEs, treatedModulus: compositeResult.compositeModulus ?? params.columnEs,
@@ -208,6 +215,7 @@ export function calculateJetGroutDesign(params: JetGroutDesignParameters): JetGr
     treatedSettlement = virtualRaft.treatedSettlement
     settlementReduction = virtualRaft.reductionPercent
     warnings.push('Oturma azaltma sonucu eşdeğer tabaka/sanal radye taramasıdır; katman bazlı oturma analizinin yerine geçmez.')
+  }else if(params.soilEs&&params.columnEs&&params.columnLength&&params.soilNu==null){warnings.push('Sanal radye oturması hesaplanmadı: Poisson oranı ν açıkça girilmelidir.')
   }
   let slidingResistance: number | undefined
   let slidingDemand: number | undefined
@@ -236,7 +244,7 @@ export function calculateJetGroutDesign(params: JetGroutDesignParameters): JetGr
     columnLoadShare: compositeResult.columnLoadShare,
     soilLoadShare: compositeResult.soilLoadShare,
     stressConcentrationFactor: compositeResult.areaReplacementRatio > 0 ? compositeResult.columnLoadShare / compositeResult.areaReplacementRatio : 0,
-    appliedStress, bearingCapacityUtilization, bearingCapacitySafe,
+    appliedStress,effectiveWidth,effectiveLength,bearingCapacityUtilization,bearingCapacitySafe,
     screeningOnly: true, designEligible: false,
     untreatedSettlement, treatedSettlement, settlementReduction,
     slidingResistance, slidingDemand, slidingSafetyFactor, slidingSafe,
