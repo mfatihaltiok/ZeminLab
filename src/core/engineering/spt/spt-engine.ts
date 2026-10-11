@@ -158,7 +158,8 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const stressAssumption=applyOverburden&&!normalizedForOverburden
   if(fines!==undefined&&(!Number.isFinite(fines)||fines<0||fines>100))throw new Error('İnce dane oranı 0–100% arasında olmalıdır.')
   if(stressAssumption&&soilClassKnown)warnings.push('σ′v0 verilmediği için CN uygulanmadı; normalize edilmiş (N1)60 ve (N1)60f üretilmedi.')
-  const dilatancyApplied=Boolean(input.applyDilatancy&&fines<35&&finitePositive(sigma)&&n1_60>15)
+  const dilatancyApplied=Boolean(input.applyDilatancy&&normalizedForOverburden&&input.fineContent!=null&&fines<35&&finitePositive(sigma)&&n1_60>15)
+  if(input.applyDilatancy&&!dilatancyApplied)warnings.push('Dilatansi düzeltmesi uygulanmadı; geçerli normalize edilmiş (N1)60, ince dane içeriği, efektif gerilme ve eşik koşulları gereklidir.')
   const n1_60_dilatancy=dilatancyApplied?15+.5*(n1_60-15):undefined
   const trace:SptTraceStep[]=[
     {symbol:'N',title:'Ham SPT',formula:'N=N₂+N₃',value:input.nField,note:'Sahada ölçülen 30 cm penetrasyon vuruş sayısı.'},
