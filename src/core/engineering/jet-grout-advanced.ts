@@ -169,8 +169,8 @@ export function verifyJetGroutQC(i: JetGroutQCInput): JetGroutQCResult {
   ].filter((x):x is string=>Boolean(x))
   const warnings=['Kabul kriterleri proje şartnamesi/zemin iyileştirme tasarımına göre tanımlanmalıdır; bu kontrol evrensel bir TBDY kabul eşiği oluşturmaz.']
   if(missing.length)warnings.push('Kalite kontrolü tamamlanamadı; eksik: '+missing.join(', ')+'.')
-  if(checks.some(x=>!x.passed)&&missing.length===0)warnings.push('En az bir saha kalite kontrol ölçütü proje kabul kriterini sağlamıyor.')
-  return {status:missing.length?'not-evaluable':checks.every(x=>x.passed)?'pass':'fail',checks,warnings}
+  if(checks.some(x=>!x.passed))warnings.push('En az bir saha kalite kontrol ölçütü proje kabul kriterini sağlamıyor.')
+  return {status:checks.some(x=>!x.passed)?'fail':missing.length?'not-evaluable':'pass',checks,warnings}
 }
 
 export interface JetGroutEngineeringInput extends JetGroutAdvancedInput {
