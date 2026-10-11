@@ -87,13 +87,15 @@ function buildBearingSection(p: ReturnType<typeof useProjectInfo>, profile?: Ide
         { label: 'Karakteristik Taşıma Gücü (qk)', value: fmt(result.value.qk), unit: 'kPa' },
         { label: 'Tasarım Taşıma Gücü (qt)', value: fmt(result.value.qt), unit: 'kPa' },
         { label: 'Uygulanan Basınç (q₀)', value: fmt(result.value.qo), unit: 'kPa' },
+        { label: 'Maksimum taban basıncı (qmax)', value: fmt(result.qMax), unit: 'kPa', status: !designEligible?'warning':result.qMax<=1.25*result.qk?'ok':'fail' },
+        { label: 'Kenar basıncı sınırı (1.25·qk)', value: fmt(1.25*result.qk), unit: 'kPa' },
         { label: 'Kullanım Oranı (η)', value: fmt(result.value.utilization * 100, 1), unit: '%', status: designEligible ? (result.value.utilization <= 1 ? 'ok' : 'fail') : 'warning' },
         { label: 'Tasarım durumu', value: designEligible ? (result.value.adequate ? 'UYGUN' : 'UYGUN DEĞİL') : 'ÖN DEĞERLENDİRME — NİHAİ TASARIM DEĞİL', unit: '', status: designEligible ? (result.value.adequate ? 'ok' : 'fail') : 'warning' }
       ],
       notes: designWarnings
     }
-  } catch {
-    return null
+  } catch(error) {
+    return {id:'1',title:'Yüzeysel Temel Taşıma Gücü',subtitle:'TBDY 2018 Denklem 16.8',method:'Hesap doğrulaması',source:'TBDY 2018 Bölüm 16.8.3',inputs:[],steps:[],results:[{label:'Hesap durumu',value:'HESAPLANAMADI',unit:'',status:'warning'}],notes:[error instanceof Error?error.message:'Taşıma gücü hesabı doğrulanamadı.']}
   }
 }
 
@@ -154,8 +156,8 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
       ],
       notes: result.warnings
     }
-  } catch {
-    return null
+  } catch(error) {
+    return {id:'2',title:'Temel Kayma ve Stabilite Kontrolü',subtitle:'TBDY 2018 Madde 16.8.4',method:'Hesap doğrulaması',source:'TBDY 2018 Bölüm 16.7–16.8',inputs:[],steps:[],results:[{label:'Hesap durumu',value:'HESAPLANAMADI',unit:'',status:'warning'}],notes:[error instanceof Error?error.message:'Temel kayma hesabı doğrulanamadı.']}
   }
 }
 
@@ -413,14 +415,16 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
         { label: 'Alan Değiştirme Oranı', value: fmt(result.areaReplacementRatio * 100, 1), unit: '%' },
         { label: 'Kompozit Taşıma Gücü', value: fmt(result.compositeCapacity), unit: 'kPa' },
         { label: 'Kompozit Modül', value: result.compositeModulus ? fmt(result.compositeModulus) : '—', unit: result.compositeModulus ? 'kPa' : '' },
+        { label: 'Karakteristik kapasite / talep', value: result.capacityFS==null?'—':fmt(result.capacityFS), unit: '—' },
+        { label: 'İzin verilebilir kompozit kapasite', value: result.allowableCapacity==null?'FS girilmedi':fmt(result.allowableCapacity), unit: result.allowableCapacity==null?'':'kPa' },
         { label: 'Kolon Yük Paylaşımı', value: fmt(result.columnLoadShare * 100, 1), unit: '%' },
         { label: 'Zemin Yük Paylaşımı', value: fmt(result.soilLoadShare * 100, 1), unit: '%' },
         { label: 'Saha kalite kontrolü', value: result.qcVerification.status==='pass'?'UYGUN':result.qcVerification.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK', unit: '', status: result.qcVerification.status==='pass'?'ok':result.qcVerification.status==='fail'?'fail':'warning' }
       ],
-      notes: [...result.warnings, 'Kompozit parametreler ön tasarım/screening niteliğindedir. Nihai tasarım için saha deneyleri ve kalite kontrol gereklidir.']
+      notes: [...result.warnings, result.sourceNote, 'Kompozit parametreler ön tasarım/screening niteliğindedir. Nihai tasarım için saha deneyleri ve kalite kontrol gereklidir.']
     }
-  } catch {
-    return null
+  } catch(error) {
+    return {id:'4',title:'Jet Grout Zemin İyileştirme',subtitle:'Kompozit zemin ön değerlendirmesi',method:'Hesap doğrulaması',source:'Erol & Çekinmez Bayram (2018)',inputs:[],steps:[],results:[{label:'Hesap durumu',value:'HESAPLANAMADI',unit:'',status:'warning'}],notes:[error instanceof Error?error.message:'Jet Grout hesabı doğrulanamadı.']}
   }
 }
 
