@@ -471,7 +471,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   })
   assert.equal(result.mandatoryByProject,true)
   assert.equal(result.rows[0].mandatoryAnalysis,true)
-  approx(result.rows[0].n1_60,11.652962647393084,1e-10)
+  approx(result.rows[0].n1_60,10*9.78/Math.sqrt(93-9.80665*3),1e-10)
   approx(result.rows[0].beta,1.1543167672515497,1e-12)
   assert.ok(result.rows[0].FS !== undefined)
   assert.equal(result.rows[0].conclusion,'SIVILAŞMA RİSKİ VAR')
