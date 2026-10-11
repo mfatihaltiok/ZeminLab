@@ -131,14 +131,14 @@ export function foundationChecks(i:FoundationCheckInput){
   const interfaceType=i.interfaceType??'cast-in-place-soil'
   if(interfaceProvided&&!Object.prototype.hasOwnProperty.call(interfaceLimits,interfaceType))throw new Error('Temel-zemin arayüzü geçersiz.')
   const tanLimit=interfaceProvided?interfaceLimits[interfaceType]:0
-  const rawTan=interfaceProvided?(i.deltaTan??tanLimit):0
+  const rawTan=interfaceProvided?(i.deltaTan??0):0
   if(rawTan<0||!Number.isFinite(rawTan))throw new Error('tanδ sıfır veya pozitif ve sonlu olmalıdır.')
   if(interfaceProvided&&rawTan>tanLimit+1e-9)throw new Error('Girilen tanδ, TBDY Tablo 16.3 seçilen arayüz üst sınırını aşamaz.')
   const deltaTan=rawTan
   const warnings:string[]=[]
   if(!interfaceProvided)warnings.push('Temel-zemin arayüzü seçilmedi; arayüz dayanımı kredilendirilmedi ve nihai kontrol veri eksik olarak işaretlendi.')
   if(!interfaceProvided&&i.deltaTan!=null)warnings.push('tanδ değeri arayüz sınıfı olmadan kullanılmadı.')
-  if(i.deltaTan==null&&interfaceProvided)warnings.push('tanδ girilmedi; seçilen arayüz için TBDY Tablo 16.3 üst sınırı kullanıldı. Proje özelinde deney/veri varsa doğrudan girilmelidir.')
+  if(i.deltaTan==null&&interfaceProvided)warnings.push('tanδ girilmedi; arayüz üst sınırı varsayılmadı ve sürtünme direnci kredilendirilmedi. Nihai drenajlı kayma kontrolü için proje/deney verisi girilmelidir.')
   const submerged=i.groundwaterDepth!=null&&i.foundationDepth!=null&&i.groundwaterDepth<=i.foundationDepth
   const seismic=Boolean(i.seismic)
   const groundwaterKnown=i.groundwaterDepth!=null&&i.foundationDepth!=null
@@ -174,9 +174,9 @@ export function foundationChecks(i:FoundationCheckInput){
   if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
   if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; kayma için sürtünme direncinde yalnızca gerçek basınçlı temas alanı esas alınmalıdır.')
   if(contactArea<=0)warnings.push('Temas alanı sıfırdır; sürtünme direnci ve temel temas kontrolleri geçersizdir.')
-  const requiredData=slidingMode==='data-missing'||!interfaceProvided||contactArea<=0||(i.usePassiveResistance&&rpk<=0)
+  const requiredData=slidingMode==='data-missing'||!interfaceProvided||(slidingMode==='drained-interface'&&i.deltaTan==null)||contactArea<=0||(i.usePassiveResistance&&rpk<=0)
   return{
-    ex,ey,qAvg,qMax,qMin,contactArea,effectiveWidth,effectiveLength,
+    ex,ey,qAvg,qMax,qMin,contactArea,effectiveWidth,effectiveLength,frictionResistanceDesign:rth,totalSlidingResistanceDesign:designResistance,
     horizontalResultant:vh,slidingFS:vh>0?designResistance/vh:Infinity,
     slidingCapacityX:designResistance,slidingCapacityY:designResistance,slidingCapacityResultant:designResistance,
     slidingUtilizationX:utilizationX,slidingUtilizationY:utilizationY,slidingUtilizationResultant:utilizationResultant,
