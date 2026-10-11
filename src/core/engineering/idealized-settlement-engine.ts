@@ -133,7 +133,11 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   const layers=[...profile.layers].sort((a,b)=>a.topDepth-b.topDepth)
   const gwt=finite(input.groundwaterDepth)?input.groundwaterDepth!:-1
   if(profile.status!=='SABİTLENDİ')warnings.push('İdealize Zemin Profili SABİTLENDİ durumunda değil.')
-  if(B<=0||L<=0||Df<0||qGross<=0)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSecondary:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,'Temel B, L, Df ve yük girdileri geçerli olmalıdır.'],source:'ZeminLab idealize zemin profili oturma motoru'}
+  const invalidInput=![B,L,Df,qGross].every(finite)||B<=0||L<=0||Df<0||qGross<=0||input.groundwaterDepth!=null&&(!finite(input.groundwaterDepth)||input.groundwaterDepth<0)||input.timeYears!=null&&(!finite(input.timeYears)||input.timeYears<0)||input.secondaryStartTimeYears!=null&&(!finite(input.secondaryStartTimeYears)||input.secondaryStartTimeYears<=0)
+  const invalidLayer=layers.some(layer=>!finite(layer.topDepth)||!finite(layer.bottomDepth)||layer.topDepth<0||layer.bottomDepth<=layer.topDepth||!finite(layer.gamma)||layer.gamma<=0||layer.gammaSat!=null&&(!finite(layer.gammaSat)||layer.gammaSat<=0)||layer.poissonRatio!=null&&(!finite(layer.poissonRatio)||layer.poissonRatio<=-1||layer.poissonRatio>=0.5)||layer.initialVoidRatio!=null&&(!finite(layer.initialVoidRatio)||layer.initialVoidRatio<=-1))
+  let overlaps=false
+  for(let k=1;k<layers.length;k++)if(layers[k].topDepth<layers[k-1].bottomDepth-1e-9)overlaps=true
+  if(invalidInput||invalidLayer||overlaps)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSecondary:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,invalidInput?'Temel, yük, YASS veya zaman girdileri geçersiz.':invalidLayer?'Zemin profilinde derinlik, γ, γsat, ν veya e0 parametreleri geçersiz.':'Zemin profili çakışan tabakalar içeriyor.'],source:'ZeminLab idealize zemin profili oturma motoru'}
   const baseStress=effectiveStressAtDepth(layers,Df,gwt)
   const ratio=L/Math.max(B,1e-9)
   const influenceDepth=method==='burland-burbidge'?1.4*Math.pow(B/.3,.75)*.3:method==='schmertmann'?(ratio>=10?4*B:2*B):method==='boussinesq'?boussinesqInfluenceDepth(B,L,.10):method==='janbu'?Math.max(B,1):2*B
@@ -149,8 +153,9 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   }
   if(coverageCursor<coverageLimit-1e-9)coverageOk=false
   if(!coverageOk)warnings.push('Temel altındaki oturma etki derinliğinde profil sürekliliği veya γ verisi eksik; eksik tabaka sıfır gerilme ile geçiştirilmez.')
-  const qNet=Math.max(0,qGross-baseStress.effective)
-  if(qNet<=0)warnings.push('Temel seviyesinde net ilave basınç sıfır/negatif; oturma hesabı yük artışı açısından sınırlıdır.')
+  const rawQNet=qGross-baseStress.effective
+  const qNet=Math.max(0,rawQNet)
+  if(qNet<=0)warnings.push('Temel seviyesinde net ilave basınç sıfır/negatif; yükleme oturması hesabı geçerli değildir.')
   let totalImmediate=0,totalConsolidation=0,totalSecondary=0
   const results:SettlementLayerResult[]=[]
   for(const layer of layers){
@@ -175,8 +180,8 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     }else if(method==='elasticity'){
       methodName='Elastik tabaka gerinimi'
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
-      if(finite(M)&&M>0)immediate=deltaSigma*thickness*(1-(finite(layer.poissonRatio)?layer.poissonRatio!:0.3)**2)/M*1000
-      else{status='VERİ EKSİK';note='Constrained/oedometric modül gerekir.'}
+      if(finite(M)&&M>0&&finite(layer.poissonRatio)&&layer.poissonRatio>-1&&layer.poissonRatio<0.5)immediate=deltaSigma*thickness*(1-layer.poissonRatio**2)/M*1000
+      else{status='VERİ EKSİK';note='Constrained/oedometric modül ve geçerli Poisson oranı gerekir.'}
       if(cohesive){const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective);if(r.ok){consolidation=r.value;if(r.crAssumed)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): Geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.')}else status='VERİ EKSİK'}
     }else if(method==='boussinesq'){
       methodName='Boussinesq alan integrasyonu + elastik tabaka'
@@ -186,7 +191,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     }else if(method==='2to1-layer'){
       methodName='2:1 gerilme yayılımı + elastik tabaka'
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
-      if(finite(M)&&M>0)immediate=deltaSigma*thickness*(1-(finite(layer.poissonRatio)?layer.poissonRatio!:0.3)**2)/M*1000;else{status='VERİ EKSİK';note='Constrained/oedometric modül gerekir.'}
+      if(finite(M)&&M>0&&finite(layer.poissonRatio)&&layer.poissonRatio>-1&&layer.poissonRatio<0.5)immediate=deltaSigma*thickness*(1-layer.poissonRatio**2)/M*1000;else{status='VERİ EKSİK';note='Constrained/oedometric modül ve geçerli Poisson oranı gerekir.'}
     }else if(method==='janbu'){
       methodName='Janbu — M0/M1 verisi gerekli'
       status='VERİ EKSİK'
@@ -203,10 +208,11 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       else{status='VERİ EKSİK';note='Schmertmann için E modülü gerekir.'}
     }
     if(finite(layer.secondaryCompressionIndex)&&layer.secondaryCompressionIndex!>=0&&finite(input.timeYears)&&input.timeYears!>0){
-      const start=finite(input.secondaryStartTimeYears)&&input.secondaryStartTimeYears!>0?input.secondaryStartTimeYears!:1
+      const start=input.secondaryStartTimeYears??1
       if(input.timeYears!>start){
-        const e0=finite(layer.initialVoidRatio)&&layer.initialVoidRatio!>-1?layer.initialVoidRatio!:0
-        secondary=Math.max(0,thickness*layer.secondaryCompressionIndex!*Math.log10(input.timeYears!/start)/(1+e0)*1000)
+        const e0=layer.initialVoidRatio
+        if(finite(e0)&&e0>-1)secondary=Math.max(0,thickness*layer.secondaryCompressionIndex!*Math.log10(input.timeYears!/start)/(1+e0)*1000)
+        else{status='VERİ EKSİK';note='İkincil oturma için başlangıç boşluk oranı e0 gerekir.'}
       }
     }
     totalImmediate+=immediate
@@ -219,5 +225,5 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   if(method==='janbu')warnings.push('Janbu yöntemi M0–M1 gerilme-bağımlı parametreleri veri modeline eklenene kadar hesaplanmaz; sonuç VERİ EKSİK olarak tutulur.')
   if(method==='burland-burbidge')warnings.push('Burland-Burbidge bağıntısı özellikle kum/granüler zemin için ampirik bir yöntemdir; kohezyonlu tabakalarda ayrı konsolidasyon hesabı yapılır.')
   if(finite(input.timeYears)&&input.timeYears!>0&&input.secondaryStartTimeYears==null&&results.some(x=>x.secondarySettlement>0))warnings.push('İkincil oturma için başlangıç zamanı girilmedi; t1=1 yıl referansı kullanıldı. Proje verisi varsa secondaryStartTimeYears girilmelidir.')
-  return{method,layers:results,totalImmediate,totalConsolidation,totalSecondary,totalSettlement:totalImmediate+totalConsolidation+totalSecondary,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,ready:results.length>0&&coverageOk&&!results.some(x=>x.status==='VERİ EKSİK'),warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978), Boussinesq alan integrasyonu, 2:1 gerilme yayılımı. Janbu M0–M1 verisi yoksa sonuç üretilmez.'}
+  return{method,layers:results,totalImmediate,totalConsolidation,totalSecondary,totalSettlement:totalImmediate+totalConsolidation+totalSecondary,influenceDepth,netFoundationPressure:qNet,foundationEffectiveStress:baseStress.effective,ready:results.length>0&&coverageOk&&qNet>0&&!results.some(x=>x.status==='VERİ EKSİK'),warnings,source:'Burland & Burbidge (1985), Schmertmann et al. (1978), Boussinesq alan integrasyonu, 2:1 gerilme yayılımı. Janbu M0–M1 verisi yoksa sonuç üretilmez.'}
 }
