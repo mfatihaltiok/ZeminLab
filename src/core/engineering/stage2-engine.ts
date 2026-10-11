@@ -29,7 +29,7 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
   if(i.gammaSat!=null&&(!Number.isFinite(i.gammaSat)||i.gammaSat<=9.80665))throw new Error('γsat, su birim hacim ağırlığından büyük ve sonlu olmalıdır.')
   if(i.layers?.some(x=>!Number.isFinite(x.thickness)||x.thickness<=0||!Number.isFinite(x.c)||x.c<0||!Number.isFinite(x.phi)||x.phi<0||x.phi>50||!Number.isFinite(x.gamma)||x.gamma<=0||(x.gammaSat!=null&&(!Number.isFinite(x.gammaSat)||x.gammaSat<=9.80665))))throw new Error('Taşıma gücü tabaka parametreleri geçersiz.')
   let layerTop=i.Df
-  const mappedLayers=i.layers?.map(x=>{const layer={topDepth:layerTop,bottomDepth:layerTop+x.thickness,gamma:x.gamma,gammaSat:x.gammaSat??x.gamma,cohesion:x.c,phi:x.phi};layerTop+=x.thickness;return layer})
+  const mappedLayers=i.layers?.map(x=>{const layer={topDepth:layerTop,bottomDepth:layerTop+x.thickness,gamma:x.gamma,gammaSat:x.gammaSat??i.gammaSat,cohesion:x.c,phi:x.phi};layerTop+=x.thickness;return layer})
   if(design==='tbdy-2018'){
     const r=calculateSurfaceFoundation({
       B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma,gamma2:i.gammaSat??i.gamma,c:i.c,phi:i.phi,
