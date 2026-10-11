@@ -242,9 +242,9 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   const sandyRecord={id:'SPT-SAND',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'Sa',source:'manual' as const,confirmed:false}
   const sandyDerived=deriveSptValues(sandyBorehole,sandyRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
   approx(sandyDerived.verticalStress!,96,1e-12)
-  approx(sandyDerived.porePressure!,29.43,1e-12)
-  approx(sandyDerived.effectiveStress!,66.57,1e-12)
-  approx(sandyDerived.cn,9.78/Math.sqrt(66.57),1e-12)
+  approx(sandyDerived.porePressure!,9.80665*3,1e-12)
+  approx(sandyDerived.effectiveStress!,96-9.80665*3,1e-12)
+  approx(sandyDerived.cn,9.78/Math.sqrt(96-9.80665*3),1e-12)
   approx(sandyDerived.n60,17,1e-12)
   approx(sandyDerived.n1_60,17*sandyDerived.cn,1e-12)
   assert.equal(sandyDerived.hasAssumptions,true)
@@ -315,7 +315,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   }
   const clayRecord={id:'SPT-CLAY-2',depth:5,testType:'SPT' as const,n1:5,n2:10,n3:10,rodLengthM:5,soilCode:'CIM',source:'manual' as const,confirmed:false}
   const clayDerived=deriveSptValues(clayBorehole,clayRecord,[],'kN-m',{unitWeight:18,saturatedUnitWeight:19,groundwaterDepth:2})
-  approx(clayDerived.effectiveStress!,63.57,1e-12)
+  approx(clayDerived.effectiveStress!,93-9.80665*3,1e-12)
   approx(clayDerived.cn,1,1e-12)
   approx(clayDerived.n1_60,clayDerived.n60,1e-12)
 }
