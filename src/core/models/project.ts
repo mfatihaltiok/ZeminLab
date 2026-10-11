@@ -13,6 +13,7 @@ export interface JetGroutProjectParameters{
   layout?:'square'|'triangular'
   qSoil?:number
   qColumn?:number
+  safetyFactor?:number
   cSoil?:number
   cColumn?:number
   EsSoil?:number
