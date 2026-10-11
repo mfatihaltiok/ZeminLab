@@ -299,6 +299,7 @@ function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile: I
         { label: 'Temel Uzunluğu (L)', value: fmt(L), unit: 'm' },
         { label: 'Temel Derinliği (Df)', value: fmt(Df), unit: 'm' },
         { label: 'Brüt temel basıncı (q)', value: fmt(qGross), unit: 'kPa' },
+        { label: 'YASS sondajı', value: profileBorehole?.name ?? 'Proje girdisi', unit: '' },
         { label: 'Yeraltı suyu derinliği', value: fmt(profileBorehole?.groundwaterDepth??p.soilParameters.groundwaterDepth), unit: 'm' },
         { label: 'Hesap yöntemi', value: settlementMethod, unit: '' },
         { label: 'Hesap süresi t', value: fmt(profile.settlementTimeYears), unit: 'yıl' },
