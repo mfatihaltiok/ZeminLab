@@ -1,41 +1,34 @@
-# FALUZMN
+# ZeminLab
 
-FALUZMN is a Windows-first geotechnical engineering desktop application built with Electron, React and TypeScript.
+ZeminLab, Electron, React ve TypeScript ile geliştirilen masaüstü geoteknik mühendisliği uygulamasıdır.
 
-## v1.0
+## Mühendislik kapsamı
 
-v1.0 adds the professional output/integration layer:
+- Sondaj, zemin tabakaları, SPT ve laboratuvar parametreleri
+- TBDY 2018 kapsamında temel taşıma gücü ve ilgili temel kontrolleri
+- Oturma ve sıvılaşma değerlendirmeleri
+- Jet Grout zemin iyileştirmesi için ön değerlendirme ve doğrulama akışları
+- Hesap izleri, uyarılar ve raporlama altyapısı
 
-- A4 PDF report export infrastructure
-- Erol 2014 and Erol 2018 local source-pack indexing
-- PaddleOCR PP-OCRv5 + Docling document-intelligence installation and offline runner
-- OCR provider settings with encrypted API-key storage
-- Electron internet/connectivity health check
-- Excel export utility
-- DXF soil-profile export utility
-- neutral SAP2000 interchange and OpenSees Tcl export adapters
+**Mühendislik notu:** Bir hesabın yazılım tarafından üretilebilmesi, tek başına yönetmelik uygunluğu veya nihai tasarım onayı anlamına gelmez. Her yöntem için girdiler, birimler, varsayımlar, geçerlilik sınırları ve tasarım kapsamı ayrıca doğrulanmalıdır. Tabakalı zemin ve iyileştirme hesapları, ilgili motor açıkça nihai tasarıma uygun olduğunu belirtmediği sürece ön değerlendirme olarak ele alınmalıdır.
 
-### Belge istihbaratı\n\nFALUZMN uses two deterministic local layers: **PaddleOCR PP-OCRv5** for text recognition and **Docling 2.128.0** for document layout and table structure. Values are not inferred from fixed page coordinates. Ambiguous/conflicting candidates are rejected and the user must review OCR candidates before import. The runtime is CPU-first and prepared for offline operation. Docling's layout and TableFormer artifacts are prefetched into the application package.\n\nPaddleOCR itself can run locally, so the application does **not** require an API key for offline OCR. A remote OCR endpoint/API-key field may still be present for deployments that use a hosted OCR service. The key is stored encrypted through Electron's `safeStorage` when the operating system supports it.
+## Belge işleme durumu
 
-### v1.0 setup
+OCR, görsel tarama ve belge-istihbaratı özellikleri uygulamanın kapsamından çıkarılmıştır. Bu README, kaldırılmış OCR sağlayıcılarını, OCR kurulum adımlarını veya API anahtarı ayarlarını uygulamanın güncel özellikleri olarak tanımlamaz.
 
-From PowerShell:
-
-```powershell
-.\tools\setup_stage3.ps1
-```
-
-This creates a project-local Python runtime, installs PaddleOCR document parsing dependencies, downloads the two publisher source PDFs into the local source-pack, and indexes figure-bearing pages. The source PDFs themselves are not committed to GitHub.
-
-### Development
+## Geliştirme
 
 ```bash
 npm install
 npm run dev
 ```
 
-### Build Windows setup
+## Doğrulama
 
 ```bash
-npm run build:win
+npm run typecheck
+npm run test:engineering
+npm run build
 ```
+
+Bu komutların başarılı çalışması gerekir; sonuçlar CI veya yerel çalışma çıktılarıyla doğrulanmadan testlerin geçtiği varsayılmamalıdır.
