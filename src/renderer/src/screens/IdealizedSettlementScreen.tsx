@@ -5,7 +5,7 @@ import type { IdealizedSoilProfile } from '../../core/models/idealized-soil-prof
 import type { BoreholeRecord } from '../../core/models/field-data'
 import { forceToBase, forceFromBase, stressFromBase, stressToBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
 import type { SubgradeReactionMethod, SubgradeSoilType } from '../../core/engineering/subgrade-reaction'
-import { useProjectInfo } from '../../core/state/project-store'
+import { updateProjectInfo, useProjectInfo } from '../../core/state/project-store'
 import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
 import { CalculationTrace } from '../components/CalculationTrace'
 
@@ -57,7 +57,6 @@ export let latestIdealizedSettlementResult: ReturnType<typeof calculateIdealized
 
 export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile?: IdealizedSoilProfile; boreholes?: BoreholeRecord[] }) {
   const p = useProjectInfo()
-  const updateProjectInfo=useProjectInfo().updateProjectInfo
   const selectedMethod:IdealizedSettlementMethod=profile?.settlementMethod??'burland-burbidge'
   const changeMethod=(value:IdealizedSettlementMethod)=>{if(profile)updateProjectInfo({idealizedSoilProfile:{...profile,settlementMethod:value}})}
   const [ksMethod, setKsMethod] = useState<SubgradeReactionMethod>('erol-plate')
@@ -239,15 +238,15 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
               ) : <div className="inline-empty">Seçilen yatak katsayısı yöntemi için gerekli veriler girilmelidir.</div>}
             </Card>
             <Card title="HESAP YÖNTEMİ / KAYNAK">
-              <div className="inline-empty">Aktif oturma yöntemi: <b>{methodLabel[method]}</b>. Yatak katsayısı: <b>{ksMethodLabel[ksMethod]}</b>. Katman gerilmeleri orta nokta yaklaşımıyla raporlanır. Taşıma gücü, oturma ve yatak katsayısı sonuçları proje verileriyle birlikte değerlendirilmelidir.</div>
+              <div className="inline-empty">Aktif oturma yöntemi: <b>{methodLabel[selectedMethod]}</b>. Yatak katsayısı: <b>{ksMethodLabel[ksMethod]}</b>. Katman gerilmeleri orta nokta yaklaşımıyla raporlanır. Taşıma gücü, oturma ve yatak katsayısı sonuçları proje verileriyle birlikte değerlendirilmelidir.</div>
             </Card>
           </div>
 
           <CalculationTrace title="Oturma hesap zinciri" source={result.source} rows={[
             { symbol: 'σ′v0', title: 'Temel tabanındaki efektif gerilme', formula: 'ΣγH − u', value: result.foundationEffectiveStress, unit: 'kPa' },
             { symbol: 'qnet', title: 'Net temel gerilmesi', formula: 'max(0.1q, q − σ′v0)', value: result.netFoundationPressure, unit: 'kPa' },
-            { symbol: 'zI', title: 'Etki derinliği', formula: method === 'burland-burbidge' ? 'Burland-Burbidge bağıntısı' : method === 'boussinesq' ? 'Δσv/q = 0.10 kriteri; Boussinesq alan integrasyonu' : 'Profil/gerilme yayılımı sınırı', value: result.influenceDepth, unit: 'm' },
-            { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: method === 'burland-burbidge' ? 'Σ[fS·fL·Ic·qnet·B^0.7]' : method === 'elasticity' ? 'Σ[Δσ′·H/M]' : method === '2to1-layer' ? 'Σ[Δσ₂:₁·H/M]' : method === 'boussinesq' ? 'Σ[ΔσBoussinesq·H/E]' : method === 'janbu' ? 'Σ[Δσ′·H/M]' : 'Σ[C1·C2·q·Iz/Es·Δz]', value: result.totalImmediate, unit: 'mm' },
+            { symbol: 'zI', title: 'Etki derinliği', formula: selectedMethod === 'burland-burbidge' ? 'Burland-Burbidge bağıntısı' : selectedMethod === 'boussinesq' ? 'Δσv/q = 0.10 kriteri; Boussinesq alan integrasyonu' : 'Profil/gerilme yayılımı sınırı', value: result.influenceDepth, unit: 'm' },
+            { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: selectedMethod === 'burland-burbidge' ? 'Σ[fS·fL·Ic·qnet·B^0.7]' : selectedMethod === 'elasticity' ? 'Σ[Δσ′·H/M]' : selectedMethod === '2to1-layer' ? 'Σ[Δσ₂:₁·H/M]' : selectedMethod === 'boussinesq' ? 'Σ[ΔσBoussinesq·H/E]' : selectedMethod === 'janbu' ? 'Σ[Δσ′·H/M]' : 'Σ[C1·C2·q·Iz/Es·Δz]', value: result.totalImmediate, unit: 'mm' },
             { symbol: 's꜀', title: 'Toplam konsolidasyon', formula: 'Σ[Cc/(1+e₀)·H·log10(σ′vf/σ′v0)]', value: result.totalConsolidation, unit: 'mm' },
             { symbol: 'sₜ', title: 'Toplam oturma', formula: 'sₜ = sᵢ + s꜀', value: result.totalSettlement, unit: 'mm' },
             ...(ks ? [{ symbol: 'ks', title: 'Winkler yatak katsayısı', formula: ks.formula, value: ks.ks, unit: 'kN/m³' }] : [])

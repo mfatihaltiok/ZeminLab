@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import { jetGroutEngineering, type JetGroutEngineeringResult } from '../../../core/engineering/jet-grout-advanced'
+import { jetGroutEngineering, verifyJetGroutQC, type JetGroutEngineeringResult } from '../../../core/engineering/jet-grout-advanced'
 import { Card, Field, Frame, Metric, Source } from '../workspace/WorkspaceShell'
 import { updateProjectInfo, useProjectInfo } from '../../../core/state/project-store'
-import { forceToBase, stressToBase, projectUnits } from '../../../core/units/project-units'
+import { forceToBase, momentToBase, stressToBase, projectUnits } from '../../../core/units/project-units'
 import { CalculationTrace } from '../components/CalculationTrace'
 
 export let latestJetGroutResult:JetGroutEngineeringResult|undefined
@@ -11,11 +11,14 @@ const num=(value:string)=>{if(value.trim()==='')return undefined;const n=Number(
 
 export function JetGroutEngineeringScreen(){
   const p=useProjectInfo(),f=p.foundationParameters,j=p.jetGrout,units=projectUnits(p.unitSystem)
-  const projectArea=Math.max(0,f.footingWidth*f.footingLength)
   const projectLoad=forceToBase(f.structuralWeight,p.unitSystem)
+  const ex=projectLoad>0?momentToBase(f.momentY,p.unitSystem)/projectLoad:0,ey=projectLoad>0?momentToBase(f.momentX,p.unitSystem)/projectLoad:0
+  const effectiveWidth=f.footingWidth-2*Math.abs(ex),effectiveLength=f.footingLength-2*Math.abs(ey)
+  const projectArea=effectiveWidth>0&&effectiveLength>0?effectiveWidth*effectiveLength:0
+  const eccentricityInvalid=projectLoad>0&&f.footingWidth>0&&f.footingLength>0&&projectArea<=0
   const projectH=Math.hypot(forceToBase(f.vtX,p.unitSystem),forceToBase(f.vtY,p.unitSystem))
   const set=(key:keyof typeof j,value:number|undefined|string|boolean)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
-  const d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=j.qSoil?.toString()??'',column=j.qColumn?.toString()??''
+  const d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=j.qSoil?.toString()??'',column=j.qColumn?.toString()??'',fs=j.safetyFactor?.toString()??''
   const soilEs=j.EsSoil?.toString()??'',columnEs=j.EsColumn?.toString()??'',soilC=j.cSoil?.toString()??'',columnC=j.cColumn?.toString()??''
   const thickness=j.foundationThickness?.toString()??'',nu=j.soilPoissonRatio?.toString()??'',c=j.interfaceCohesion?.toString()??'',angle=j.interfaceFrictionAngle?.toString()??''
   const qcRequiredUcs=j.qcRequiredUcs?.toString()??'',qcMeasuredUcs=j.qcMeasuredUcs?.toString()??''
@@ -24,16 +27,17 @@ export function JetGroutEngineeringScreen(){
   const layout=j.layout??'square'
   const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)&&projectLoad>0&&projectArea>0
   const qcResult=useMemo(()=>verifyJetGroutQC({requiredUcs:num(qcRequiredUcs)==null?undefined:stressToBase(num(qcRequiredUcs)!,p.unitSystem),measuredUcs:num(qcMeasuredUcs)==null?undefined:stressToBase(num(qcMeasuredUcs)!,p.unitSystem),requiredDiameter:num(qcRequiredDiameter),measuredDiameter:num(qcMeasuredDiameter),requiredCoreSamples:num(qcRequiredCoreSamples),measuredCoreSamples:num(qcMeasuredCoreSamples),continuityVerified:j.qcContinuityVerified,constructionLogsVerified:j.qcConstructionLogsVerified,testReportReviewed:j.qcTestReportReviewed}),[p.unitSystem,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed])
-  const r=useMemo(()=>{
-    if(!ready)return undefined
-    return jetGroutEngineering({
-      columnDiameter:Number(d),spacing:Number(spacing),layout,qSoil:stressToBase(Number(soil),p.unitSystem),qColumn:stressToBase(Number(column),p.unitSystem),
-      cSoil:Number(soilC)>0?stressToBase(Number(soilC),p.unitSystem):undefined,cColumn:Number(columnC)>0?stressToBase(Number(columnC),p.unitSystem):undefined,
+  const computation=useMemo(()=>{
+    if(eccentricityInvalid)return {result:undefined,error:'Momentler nedeniyle pozitif basınçlı etkin temel alanı kalmıyor; temel geometrisi/yükler yeniden kontrol edilmelidir.'}
+    if(!ready)return {result:undefined,error:undefined}
+    try{return {result:jetGroutEngineering({
+      columnDiameter:Number(d),spacing:Number(spacing),layout,qSoil:stressToBase(Number(soil),p.unitSystem),qColumn:stressToBase(Number(column),p.unitSystem),FS:num(fs),
+      cSoil:soilC!==''&&Number.isFinite(Number(soilC))&&Number(soilC)>=0?stressToBase(Number(soilC),p.unitSystem):undefined,cColumn:columnC!==''&&Number.isFinite(Number(columnC))&&Number(columnC)>=0?stressToBase(Number(columnC),p.unitSystem):undefined,
       EsSoil:Number(soilEs)>0?stressToBase(Number(soilEs),p.unitSystem):undefined,EsColumn:Number(columnEs)>0?stressToBase(Number(columnEs),p.unitSystem):undefined,
       load:projectLoad>0?projectLoad:undefined,foundationArea:projectArea>0?projectArea:undefined,
       foundationThickness:Number(thickness)>0?Number(thickness):undefined,
       soilPoissonRatio:nu!==''&&Number.isFinite(Number(nu))&&Number(nu)>-1&&Number(nu)<0.5?Number(nu):undefined,
-      cohesion:Number(c)>0?stressToBase(Number(c),p.unitSystem):undefined,
+      cohesion:c!==''&&Number.isFinite(Number(c))&&Number(c)>=0?stressToBase(Number(c),p.unitSystem):undefined,
       frictionAngle:angle!==''&&Number.isFinite(Number(angle))&&Number(angle)>=0&&Number(angle)<=50?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH,
       qc:{
         requiredUcs:num(qcRequiredUcs)==null?undefined:stressToBase(num(qcRequiredUcs)!,p.unitSystem),
@@ -42,18 +46,20 @@ export function JetGroutEngineeringScreen(){
         requiredCoreSamples:num(qcRequiredCoreSamples),measuredCoreSamples:num(qcMeasuredCoreSamples),
         continuityVerified:j.qcContinuityVerified,constructionLogsVerified:j.qcConstructionLogsVerified,testReportReviewed:j.qcTestReportReviewed
       }
-    })
-  },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed,projectLoad,projectArea,projectH])
+    }),error:undefined}}catch(error){return {result:undefined,error:error instanceof Error?error.message:'Jet Grout hesabı doğrulanamadı'}}
+  },[ready,eccentricityInvalid,d,spacing,soil,column,fs,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,p.unitSystem,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed,projectLoad,projectArea,projectH])
+  const r=computation.result,calculationError=computation.error
   latestJetGroutResult=r
 
   return <Frame screen="jet-grout">
-    <Source>Erol &amp; Çekinmez Bayram (2018) kompozit yaklaşımı kullanılır. Priebe yalnızca taş kolon/vibro-replacement referansıdır. TBDY 2018 geoteknik kontrolleri ayrı motorlardan yürütülür.</Source>
+    <Source>Erol &amp; Çekinmez Bayram (2018) kompozit ön kontrolü. FS girilmeden izin verilebilir kapasite üretilmez; qSoil/qColumn girdileri kaynak hesabında YASS düzeltmeli olmalıdır. Momentler etkin temel alanına yansıtılır. Priebe yalnızca taş kolon/vibro-replacement referansıdır; nihai TBDY kontrolü ayrı yürütülür.</Source>
     <Card title="JET GROUT GİRDİLERİ"><div className="form-grid">
       <Field label="Kolon çapı d (m)" value={d} onChange={v=>set('columnDiameter',num(v))}/>
       <Field label="Aks aralığı s (m)" value={spacing} onChange={v=>set('spacing',num(v))}/>
       <label>Yerleşim<select value={layout} onChange={e=>set('layout',e.target.value as 'square'|'triangular')}><option value="square">Kare</option><option value="triangular">Üçgen</option></select></label>
       <Field label={"Zemin qult ("+units.stress+")"} value={soil} onChange={v=>set('qSoil',num(v))}/>
       <Field label={"Kolon qult ("+units.stress+")"} value={column} onChange={v=>set('qColumn',num(v))}/>
+      <Field label="FS (kompozit ön kontrol; boş bırakılırsa izin verilebilir kapasite üretilmez)" value={fs} onChange={v=>set('safetyFactor',num(v))}/>
       <Field label={"Zemin c′ ("+units.stress+")"} value={soilC} onChange={v=>set('cSoil',num(v))}/>
       <Field label={"Kolon c′ ("+units.stress+")"} value={columnC} onChange={v=>set('cColumn',num(v))}/>
       <Field label={"Zemin E ("+units.stress+")"} value={soilEs} onChange={v=>set('EsSoil',num(v))}/>
@@ -78,12 +84,16 @@ export function JetGroutEngineeringScreen(){
       <Metric label="H" value={projectH.toFixed(2)} unit="kN"/>
     </div></Card>
 
-    {!r?<Card title="HESAP BEKLENİYOR"><div className="inline-empty">Kolon çapı, aks aralığı, zemin kapasitesi ve kolon kapasitesi girilmeden sonuç üretilmez.</div></Card>:
+    {!r?<Card title={calculationError?'GİRDİLERİ KONTROL ET':'HESAP BEKLENİYOR'}><div className="inline-empty">{calculationError??'Kolon çapı, aks aralığı, zemin kapasitesi ve kolon kapasitesi girilmeden sonuç üretilmez.'}</div></Card>:
       <><div className="metric-strip">
         <Metric label="Alan oranı" value={(r.areaReplacementRatio*100).toFixed(2)} unit="%"/>
         <Metric label="Kompozit kapasite" value={r.compositeCapacity.toFixed(2)} unit="kPa"/>
         <Metric label="Ecomp" value={r.compositeModulus?.toFixed(1)??'—'} unit="kPa"/>
         <Metric label="Kolon yük payı" value={(r.columnLoadShare*100).toFixed(1)} unit="%"/>
+        <Metric label="Karakteristik kapasite / talep" value={r.capacityFS?.toFixed(2)??'—'} unit="—"/>
+        <Metric label="İzin verilebilir kapasite" value={r.allowableCapacity?.toFixed(2)??'—'} unit={r.allowableCapacity==null?'':'kPa'}/>
+        <Metric label="Tasarım kullanım oranı" value={r.designUtilization==null?'—':(r.designUtilization*100).toFixed(1)} unit={r.designUtilization==null?'':'%'} />
+        <Metric label="Ön kontrol" value={r.designAdequate==null?'FS GİRİLMEDİ':r.designAdequate?'YETERLİ':'YETERSİZ'}/>
         <Metric label="β" value={r.stressConcentrationFactor.toFixed(2)}/>
       </div>
       <Card title="TASARIM DURUMU"><div className="inline-empty">Sonuçlar ön tasarım ve temel/oturma yeniden değerlendirme akışında kullanılır; nihai mühendislik kararı proje verileriyle ayrıca doğrulanır.</div>{r.warnings.map((w,i)=><div className="inline-empty" key={i}>{w}</div>)}</Card><Card title="KOMPOZİT BİRİM HÜCRE"><CalculationTrace title="Hesap zinciri" source={r.source} rows={[

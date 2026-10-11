@@ -1,4 +1,4 @@
-import { calculateSpt, fineContentCorrection } from '../engineering/spt/spt-engine'
+import { calculateSpt } from '../engineering/spt/spt-engine'
 import { bearingCapacity as bearingEngine, foundationChecks as foundationEngine, jetGrout as jetGroutEngine, liquefaction as liquefactionEngine, settlement as settlementEngine, stressAtDepth as stressEngine, type BearingMethod, type CalculationResult } from '../engineering/calculation-engine'
 import { stage2BearingCapacity, stage2Settlement, type Stage2BearingInput, type Stage2SettlementInput, type Stage2BearingMethod } from '../engineering/stage2-engine'
 import { liquefactionProfile as liquefactionProfileEngine, type LiquefactionProfileInput, type LiquefactionProfileResult } from '../engineering/liquefaction/liquefaction-profile'
@@ -10,7 +10,7 @@ import { calculateSubgradeReaction, type SubgradeReactionInput } from '../engine
 
 export type { BearingMethod, LayerSettlementInput, SchmertmannLayer, LiquefactionProfileInput, LiquefactionProfileResult, Stage2BearingInput, Stage2SettlementInput, Stage2BearingMethod, SurfaceFoundationInput, SurfaceFoundationMethod, SubgradeReactionInput, JetGroutDesignParameters, JetGroutDesignResult, JetGroutEngineeringInput, JetGroutEngineeringResult, JetGroutAxialInput }
 export type SoilLayerInput={top:number;bottom:number;soil?:string;gamma:number;gammaSat:number;cohesion?:number;phi?:number;fines?:number;cu?:number;PI?:number}
-export type SptInput={depth:number;nField:number;energyRatio?:number;boreholeDiameter?:number;sampler?:'standard'|'without-liner';samplerCorrection?:number;rodLengthM?:number;hammerType?:'donut'|'safety'|'automatic'|'measured';fines?:number}
+export type SptInput={depth:number;nField:number;energyRatio?:number;boreholeDiameter?:number;sampler?:'standard'|'without-liner';samplerCorrection?:number;rodLengthM?:number;hammerType?:'donut'|'safety'|'automatic'|'measured';fines?:number;soil?:string;claySoil?:boolean}
 
 export function classifySoilISO14688(ll?:number,pi?:number){
   if(ll==null||pi==null||!Number.isFinite(ll)||!Number.isFinite(pi)||ll<=0)return null
@@ -19,9 +19,8 @@ export function classifySoilISO14688(ll?:number,pi?:number){
 }
 export function stressAtDepth(depth:number,layers:Pick<SoilLayerInput,'top'|'bottom'|'gamma'|'gammaSat'>[],gwt:number){return stressEngine(depth,layers,gwt)}
 export function sptCorrection(x:SptInput,sigmaVPrime:number){
-  const r=calculateSpt({nField:x.nField,energyRatio:x.energyRatio,hammerType:x.hammerType,boreholeDiameterMm:x.boreholeDiameter,sampler:x.sampler==='without-liner'?'without-liner':'standard',samplerCorrection:x.samplerCorrection,rodLengthM:x.rodLengthM,effectiveStress:sigmaVPrime,fineContent:x.fines,applyOverburden:true,applyDilatancy:false})
-  const fines=Math.max(0,x.fines??0),{alpha,beta}=fineContentCorrection(fines)
-  return{CE:r.ce,CB:r.cb,CS:r.cs,CR:r.cr,CN:r.cn,N60:r.n60,N160:r.n1_60,N160f:alpha+beta*r.n1_60,alpha,beta,sigmaVPrime}
+  const r=calculateSpt({nField:x.nField,energyRatio:x.energyRatio,hammerType:x.hammerType,boreholeDiameterMm:x.boreholeDiameter,sampler:x.sampler==='without-liner'?'without-liner':'standard',samplerCorrection:x.samplerCorrection,rodLengthM:x.rodLengthM,effectiveStress:sigmaVPrime,fineContent:x.fines,soilCode:x.soil,claySoil:x.claySoil,claySoilSource:x.claySoil!=null?'explicit classification':x.soil!=null?'soil code':'classification not supplied',applyOverburden:true,applyDilatancy:false})
+  return{CE:r.ce,CB:r.cb,CS:r.cs,CR:r.cr,CN:r.cn,N60:r.n60,N160:r.n1_60,N160f:r.n1_60f,alpha:r.alpha,beta:r.beta,sigmaVPrime}
 }
 
 /** Authoritative classical bearing result. Inputs are SI base units (kPa, kN, m). */
@@ -42,7 +41,7 @@ export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number
 export function stressSpread2to1(i:{q:number;B:number;L:number;z:number}){return stressSpread21(i)}
 export function subgradeReaction(i:SubgradeReactionInput){return calculateSubgradeReaction(i)}
 export function layerSettlement(layers:LayerSettlementInput[]){return layerSettlementEngine(layers)}
-export function schmertmann(q:number,layers:SchmertmannLayer[],C1=1,C2=1){return schmertmannSettlement(q,layers,C1,C2)}
+export function schmertmann(q:number,layers:SchmertmannLayer[],C1:number,C2:number){return schmertmannSettlement(q,layers,C1,C2)}
 export function jetGroutAdvanced(i:Parameters<typeof jetGroutAdvancedEngine>[0]){return jetGroutAdvancedEngine(i)}
 export function jetGroutFullDesign(i:JetGroutDesignParameters):JetGroutDesignResult{return calculateJetGroutDesign(i)}
 export function jetGroutNumberOfColumns(foundationWidth:number,foundationLength:number,spacing:number,layout:'square'|'triangular'='square'):number{return calculateNumberOfColumns(foundationWidth,foundationLength,spacing,layout)}

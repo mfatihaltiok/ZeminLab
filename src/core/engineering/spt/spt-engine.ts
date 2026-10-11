@@ -16,6 +16,7 @@ export interface SptEngineInput{
   effectiveStress?:number
   fineContent?:number
   claySoil?:boolean
+  soilCode?:string
   claySoilSource?:string
   applyOverburden?:boolean
   applyDilatancy?:boolean
@@ -23,7 +24,7 @@ export interface SptEngineInput{
 export interface SptTraceStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string}
 export interface SptEngineResult{
   nField:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number
-  n1_60_dilatancy?:number;alpha?:number;beta?:number;n1_60f?:number;dilatancyApplied:boolean;hasAssumptions:boolean;trace:SptTraceStep[];warnings:string[]
+  n1_60_dilatancy?:number;alpha?:number;beta?:number;n1_60f?:number;dilatancyApplied:boolean;overburdenCorrectionApplied:boolean;hasAssumptions:boolean;trace:SptTraceStep[];warnings:string[]
 }
 
 function finitePositive(value:number|undefined){return value!==undefined&&Number.isFinite(value)&&value>0}
@@ -127,18 +128,27 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const n60=input.nField*ce*cb*cs*cr
   const sigma=input.effectiveStress
   const applyOverburden=input.applyOverburden??true
-  const claySoil=input.claySoil===true
+  const clayCode=(input.soilCode??'').trim().toUpperCase().replace(/[\s_]/g,'')
+  const inferredClay=['CL','CH','CLAY','KIL','KİL','CVL','CEH','SACL','GRCL','ANCL'].includes(clayCode)||clayCode.startsWith('CI')
+  const knownNonClay=/^(SP|SW|SM|SC|GP|GW|GM|GC|ML|MH|OL|OH|PT)([-/].*)?$/.test(clayCode)||['SAND','SANDY','KUM','KUMU','KUMLU','SILT','SILTY','SILTLI','GRAVEL','GRAVELLY','CAKIL','ÇAKIL'].includes(clayCode)
+  const soilClassKnown=input.claySoil!=null||inferredClay||knownNonClay
+  const claySoil=input.claySoil??inferredClay
   let cn=1
   if(applyOverburden){
-    if(claySoil){
+    if(!soilClassKnown){
+      warnings.push('Zemin sınıflandırması girilmediği için CN uygulanmadı; N1,60f üretilmez.')
+      assumptions.push('CN: zemin sınıflandırması eksik.')
+    }else if(claySoil){
       cn=1
     }else if(finitePositive(sigma)){
       cn=Math.min(1.70,9.78/Math.sqrt(sigma!))
     }else{
       warnings.push('Etkin düşey gerilme verilmediği için CN uygulanmadı; (N1)60 yalnız N60 olarak raporlanır.')
     }
+  }else{
+    warnings.push('CN düzeltmesi kapalı; N1,60f hesaplanmadı.')
   }
-  const normalizedForOverburden=!applyOverburden||claySoil||finitePositive(sigma)
+  const normalizedForOverburden=applyOverburden&&soilClassKnown&&(claySoil||finitePositive(sigma))
   const n1_60=n60*cn
   const fines=input.fineContent
   const fc=fines!==undefined&&Number.isFinite(fines)&&fines>=0&&fines<=100?fineContentCorrection(fines):undefined
@@ -147,8 +157,9 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
   const n1_60f=normalizedForOverburden&&fc?alpha!+beta!*n1_60:undefined
   const stressAssumption=applyOverburden&&!normalizedForOverburden
   if(fines!==undefined&&(!Number.isFinite(fines)||fines<0||fines>100))throw new Error('İnce dane oranı 0–100% arasında olmalıdır.')
-  if(stressAssumption)warnings.push('σ′v0 verilmediği için CN uygulanmadı; normalize edilmiş (N1)60 ve (N1)60f üretilmedi.')
-  const dilatancyApplied=Boolean(input.applyDilatancy&&fines<35&&finitePositive(sigma)&&n1_60>15)
+  if(stressAssumption&&soilClassKnown)warnings.push('σ′v0 verilmediği için CN uygulanmadı; normalize edilmiş (N1)60 ve (N1)60f üretilmedi.')
+  const dilatancyApplied=Boolean(input.applyDilatancy&&normalizedForOverburden&&input.fineContent!=null&&fines<35&&finitePositive(sigma)&&n1_60>15)
+  if(input.applyDilatancy&&!dilatancyApplied)warnings.push('Dilatansi düzeltmesi uygulanmadı; geçerli normalize edilmiş (N1)60, ince dane içeriği, efektif gerilme ve eşik koşulları gereklidir.')
   const n1_60_dilatancy=dilatancyApplied?15+.5*(n1_60-15):undefined
   const trace:SptTraceStep[]=[
     {symbol:'N',title:'Ham SPT',formula:'N=N₂+N₃',value:input.nField,note:'Sahada ölçülen 30 cm penetrasyon vuruş sayısı.'},
@@ -157,7 +168,7 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
     {symbol:'CS',title:'Numune alıcı düzeltmesi',formula:'CS=f(sampler) veya proje katsayısı',value:cs,note:csResolved.source},
     {symbol:'CR',title:'Tij boyu düzeltmesi',formula:input.rodLengthM!==undefined?'CR=f(L) · TBDY 16B.1':'CR=tij boyu verilmedi',value:cr,note:crResolved.source},
     {symbol:'N60',title:'Standartlaştırılmış SPT',formula:'N60=N·CE·CB·CS·CR',value:n60},
-    {symbol:'CN',title:'Örtü basıncı düzeltmesi',formula:claySoil?'CN=1.00 (killi/kohezyonlu zemin)':'CN=min(1.70,9.78/√σ′v0)',value:cn,note:claySoil?(input.claySoilSource??'Killi zemin'):finitePositive(sigma)?'σ′v0='+sigma!.toFixed(2)+' kPa':'Uygulanmadı'},
+    {symbol:'CN',title:'Örtü basıncı düzeltmesi',formula:!soilClassKnown?'Zemin sınıflandırması eksik; CN uygulanmadı':claySoil?'CN=1.00 (killi/kohezyonlu zemin)':'CN=min(1.70,9.78/√σ′v0)',value:cn,note:!soilClassKnown?'Zemin sınıflandırması girilmelidir.':claySoil?(input.claySoilSource??'Killi zemin'):finitePositive(sigma)?'σ′v0='+sigma!.toFixed(2)+' kPa':'Uygulanmadı'},
     {symbol:'(N1)60',title:'Normalize SPT',formula:'(N1)60=CN·N60',value:n1_60}
   ]
   if(normalizedForOverburden&&fc){
@@ -169,5 +180,5 @@ export function calculateSpt(input:SptEngineInput):SptEngineResult{
     trace.push({symbol:'(N1)60,d',title:'Dilatansi düzeltmesi',formula:'15+0.5[(N1)60−15]',value:n1_60_dilatancy,note:'Yalnız yöntem açıkça gerektiriyorsa kullanılmalıdır.'})
   }
   warnings.push(...assumptions)
-  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,alpha,beta,n1_60f,dilatancyApplied,hasAssumptions:ceResolved.assumption||assumptions.length>0||stressAssumption,trace,warnings}
+  return{nField:input.nField,ce,cb,cs,cr,cn,n60,n1_60,n1_60_dilatancy,alpha,beta,n1_60f,dilatancyApplied,overburdenCorrectionApplied:normalizedForOverburden,hasAssumptions:ceResolved.assumption||assumptions.length>0||stressAssumption,trace,warnings}
 }

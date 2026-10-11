@@ -57,7 +57,8 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
   }
   if(i.waterTableDepth==null)warnings.push('YASS girilmedi; klasik sonuç kuru zemin kabulüyle ön değerlendirmedir.')
   if(i.layers?.length)warnings.push('Klasik yöntem katmanlı zemin parametrelerini hesapta kullanmaz; katmanlı nihai değerlendirme için TBDY yüzeysel temel motoru ve zemin profili analizi gerekir.')
-  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,gammaBearing,surcharge,c:i.c,phi:i.phi,FS:i.FS??3,method:i.method})
+  const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,gammaBearing,surcharge,c:i.c,phi:i.phi,FS:i.FS,method:i.method})
+  warnings.push(...(r.warnings??[]))
   if(H>0)warnings.push('Klasik taşıma gücü API yatay yük ve kayma güvenliğini değerlendirmez; temel kayma kontrolü ayrı yapılmalıdır.')
   if((i.momentX??0)!==0||(i.momentY??0)!==0)warnings.push('Klasik taşıma gücü API merkezi düşey yük varsayar; momentli temas için TBDY motoru kullanılmalıdır.')
   return{
@@ -76,7 +77,9 @@ export interface Stage2SettlementInput{
 export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
   const B=i.B,L=i.L??i.B,q=i.q,qNet=i.qNet??q,method=i.method??'elastic'
   const warnings:string[]=[]
-  if(![B,L,q,qNet].every(Number.isFinite)||B<=0||L<=0||q<0||qNet<0)throw new Error('Oturma hesabında B/L pozitif, q/qNet sıfır veya pozitif ve tüm girdiler sonlu olmalıdır.')
+  if(![B,L,q,qNet].every(Number.isFinite)||B<=0||L<=0||q<0||qNet<0||qNet>q+1e-9)throw new Error('Oturma hesabında B/L pozitif, q≥qNet≥0 ve tüm girdiler sonlu olmalıdır.')
+  if((method==='2:1'||method==='schmertmann')&&i.qNet==null)throw new Error('2:1 ve Schmertmann yöntemleri için net temel basıncı qNet açıkça girilmelidir; qNet=q varsayılmaz.')
+  if(i.timeYears!=null&&(!Number.isFinite(i.timeYears)||i.timeYears<0))throw new Error('Oturma hesabı zamanı negatif olmayan sonlu bir değer olmalıdır.')
   if(!Array.isArray(i.layers)||!i.layers.length)throw new Error('Oturma hesabı için en az bir zemin tabakası gereklidir.')
   if(!['elastic','2:1','janbu','schmertmann','consolidation'].includes(method))throw new Error('Desteklenmeyen oturma yöntemi.')
   if(method==='schmertmann'&&(!Number.isFinite(i.schmertmannC1)||i.schmertmannC1!<=0||!Number.isFinite(i.schmertmannC2)||i.schmertmannC2!<=0))throw new Error('Schmertmann yöntemi için C1 ve C2 sonlu değerlerle girilmelidir.')
@@ -95,6 +98,7 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
     if(method==='consolidation'&&layer.mv==null&&((layer.Cc==null)!==(layer.e0==null)))throw new Error('Oturma tabakası '+(index+1)+': Cc ve e0 birlikte girilmelidir.')
   }
   const C1=i.schmertmannC1,C2=i.schmertmannC2
+  if(i.timeYears!=null)warnings.push('Stage2 uyumluluk hesabında timeYears oturma miktarına uygulanmaz; Schmertmann C2 açık girilmeli, konsolidasyon hızı için Cv ve drenaj yolu içeren ayrı zaman analizi gerekir.')
   const results:any[]=[]
   let cumulativeDepth=0
   for(const [index,layer] of i.layers.entries()){
@@ -120,7 +124,7 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
           if(layer.sigmaPc==null)warnings.push('Katman '+(index+1)+': σpc girilmedi; normal konsolide davranış (σpc=σ′v0) varsayıldı.')
           if(!Number.isFinite(pc)||pc<=0||pc<sigma0||!Number.isFinite(Cr)||Cr<0)throw new Error('Oturma tabakası '+(index+1)+': sigmaPc ve Cr geçersiz.')
           if(pc>sigma0&&layer.Cr==null)throw new Error('Oturma tabakası '+(index+1)+': aşırı konsolide davranış için Cr açıkça girilmelidir; Cc yerine varsayılamaz.')
-          s=sigma1<=pc?H*Cr/(1+layer.e0)*Math.log10(sigma1/sigma0):H*Cr/(1+layer.e0)*Math.log10(pc/sigma0)+H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/pc),type='oedometer
+          s=sigma1<=pc?H*Cr/(1+layer.e0)*Math.log10(sigma1/sigma0):H*Cr/(1+layer.e0)*Math.log10(pc/sigma0)+H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/pc),type='oedometer'
         }else warnings.push('Katman '+(index+1)+': mv veya Cc/e0 eksik.')
       }
     }
@@ -130,6 +134,7 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
   const immediate=results.filter(x=>x.type!=='oedometer').reduce((a,x)=>a+x.settlement,0)
   const consolidation=results.filter(x=>x.type==='oedometer').reduce((a,x)=>a+x.settlement,0)
   if(method==='elastic'||method==='2:1')warnings.push('Elastik tabaka sonucu sadeleştirilmiş katman integrasyonudur; tam elastik yarı-uzay çözümü veya diferansiyel oturma analizinin yerine geçmez.')
+  if(method==='consolidation')warnings.push('Bu sonuç birincil konsolidasyon oturmasıdır; zaman-bağımlı konsolidasyon derecesi Cv ve drenaj yolu verilmediğinden hesaplanmaz.')
   return{value:{immediate,consolidation,total:immediate+consolidation,layerResults:results,C1,C2},method,source:'Stage2 uyumluluk katmanı; sadeleştirilmiş tabaka integrasyonu. Nihai tasarımda idealize profil motoru ve uygun kaynak yöntemi kullanılmalıdır.',warnings,steps:[
     {symbol:'Δσ',title:'Katman gerilme artışı',formula:method==='2:1'?'qBL/[(B+z)(L+z)]':'girilen katman Δσ',unit:'kPa'},
     {symbol:'si',title:'Ani oturma',formula:'Katman integrasyonu',value:immediate,unit:'m'},

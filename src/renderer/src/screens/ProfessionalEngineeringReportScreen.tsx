@@ -53,8 +53,9 @@ function buildBearingSection(p: ReturnType<typeof useProjectInfo>, profile?: Ide
       }))
     })
 
-    const designEligible = result.finalDesignEligible && !(p.geophysical.soilGroup === 'ZF' && !p.geophysical.siteSpecificResponseAnalysisCompleted)
-    const designWarnings = [...result.warnings, ...(p.geophysical.soilGroup === 'ZF' && !p.geophysical.siteSpecificResponseAnalysisCompleted ? ['ZF zemin grubu için TBDY 16.5.1.3 sahaya özel zemin davranış analizi tamamlanmadan nihai tasarım uygunluğu verilemez.'] : [])]
+    const lockedProfileAvailable=Boolean(profile&&profile.status==='SABİTLENDİ'&&profile.layers.length>0)
+    const designEligible = result.finalDesignEligible && lockedProfileAvailable && !(p.geophysical.soilGroup === 'ZF' && !p.geophysical.siteSpecificResponseAnalysisCompleted)
+    const designWarnings = [...result.warnings, ...(!lockedProfileAvailable?['Nihai tasarım raporu için kilitli ve katmanları tanımlı idealize zemin profili gereklidir.']:[]), ...(p.geophysical.soilGroup === 'ZF' && !p.geophysical.siteSpecificResponseAnalysisCompleted ? ['ZF zemin grubu için TBDY 16.5.1.3 sahaya özel zemin davranış analizi tamamlanmadan nihai tasarım uygunluğu verilemez.'] : [])]
     const steps: ReportCalculationStep[] = result.steps.map((s, i) => ({
       index: i + 1,
       symbol: s.symbol,
@@ -86,13 +87,15 @@ function buildBearingSection(p: ReturnType<typeof useProjectInfo>, profile?: Ide
         { label: 'Karakteristik Taşıma Gücü (qk)', value: fmt(result.value.qk), unit: 'kPa' },
         { label: 'Tasarım Taşıma Gücü (qt)', value: fmt(result.value.qt), unit: 'kPa' },
         { label: 'Uygulanan Basınç (q₀)', value: fmt(result.value.qo), unit: 'kPa' },
-        { label: 'Kullanım Oranı (η)', value: fmt(result.value.utilization * 100, 1), unit: '%', status: designEligible ? (result.value.utilization <= 1 ? 'ok' : 'fail') : 'warning' },
+        { label: 'Maksimum taban basıncı (qmax)', value: fmt(result.qMax), unit: 'kPa', status: result.qMax>1.25*result.qk?'fail':!designEligible?'warning':'ok' },
+        { label: 'Kenar basıncı sınırı (1.25·qk)', value: fmt(1.25*result.qk), unit: 'kPa' },
+        { label: 'Kullanım Oranı (η)', value: fmt(result.value.utilization * 100, 1), unit: '%', status: result.value.utilization>1?'fail':!designEligible?'warning':'ok' },
         { label: 'Tasarım durumu', value: designEligible ? (result.value.adequate ? 'UYGUN' : 'UYGUN DEĞİL') : 'ÖN DEĞERLENDİRME — NİHAİ TASARIM DEĞİL', unit: '', status: designEligible ? (result.value.adequate ? 'ok' : 'fail') : 'warning' }
       ],
       notes: designWarnings
     }
-  } catch {
-    return null
+  } catch(error) {
+    return {id:'1',title:'Yüzeysel Temel Taşıma Gücü',subtitle:'TBDY 2018 Denklem 16.8',method:'Hesap doğrulaması',source:'TBDY 2018 Bölüm 16.8.3',inputs:[],steps:[],results:[{label:'Hesap durumu',value:'HESAPLANAMADI',unit:'',status:'warning'}],notes:[error instanceof Error?error.message:'Taşıma gücü hesabı doğrulanamadı.']}
   }
 }
 
@@ -111,6 +114,7 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
   try {
     const result = foundationChecks({
       B, L, N, Vx, Vy, Mx, My,
+      deltaTan: f.foundationTanDelta,
       cu: soil.undrainedCohesion == null ? undefined : stressToBase(soil.undrainedCohesion, p.unitSystem),
       groundwaterDepth: soil.groundwaterDepth,
       foundationDepth: f.footingDepth,
@@ -125,8 +129,10 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
       { index: 2, symbol: 'ey', title: 'y yönünde eksantrisite', formula: 'ey = Mx / N', value: result.ey, unit: 'm' },
       { index: 3, symbol: 'B\'', title: 'Etkin genişlik', formula: 'B\' = B - 2|ex|', value: B - 2 * Math.abs(result.ex), unit: 'm' },
       { index: 4, symbol: 'L\'', title: 'Etkin uzunluk', formula: 'L\' = L - 2|ey|', value: L - 2 * Math.abs(result.ey), unit: 'm' },
-      { index: 5, symbol: 'Rth', title: 'Sürtünme direnci', formula: 'Rth = N·tanδ / γRh', value: result.slidingCapacityResultant, unit: 'kN' },
-      { index: 6, symbol: 'Vh', title: 'Yatay yük sonucu', formula: 'Vh = √(Vx² + Vy²)', value: result.horizontalResultant, unit: 'kN' }
+      { index: 5, symbol: 'Rth', title: 'Sürtünme direnci', formula: result.slidingMode==='undrained-cu'?'Rth = Ac·Cu / γRh':'Rth = N·tanδ / γRh', value: result.frictionResistanceDesign, unit: 'kN' },
+      { index: 6, symbol: '0.3Rpt', title: 'Pasif direnç katkısı', formula: '0.30·Rpt', value: 0.30*result.passiveResistanceDesign, unit: 'kN' },
+      { index: 7, symbol: 'Rdesign', title: 'Toplam tasarım kayma direnci', formula: 'Rth + 0.30·Rpt', value: result.slidingCapacityResultant, unit: 'kN' },
+      { index: 8, symbol: 'Vh', title: 'Yatay yük sonucu', formula: 'Vh = √(Vx² + Vy²)', value: result.horizontalResultant, unit: 'kN' }
     ]
 
     return {
@@ -150,8 +156,8 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
       ],
       notes: result.warnings
     }
-  } catch {
-    return null
+  } catch(error) {
+    return {id:'2',title:'Temel Kayma ve Stabilite Kontrolü',subtitle:'TBDY 2018 Madde 16.8.4',method:'Hesap doğrulaması',source:'TBDY 2018 Bölüm 16.7–16.8',inputs:[],steps:[],results:[{label:'Hesap durumu',value:'HESAPLANAMADI',unit:'',status:'warning'}],notes:[error instanceof Error?error.message:'Temel kayma hesabı doğrulanamadı.']}
   }
 }
 
@@ -363,20 +369,26 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
     return {id:'4',title:'Jet Grout Zemin İyileştirme ve Saha Kalite Kontrolü',subtitle:'Kompozit tasarım girdileri ve saha doğrulaması',method:'Ön değerlendirme / proje kabul kriterleri',source:'Erol & Çekinmez Bayram (2018); proje kalite kontrol şartnamesi',inputs:[{label:'Kolon çapı',value:fmt(j.columnDiameter),unit:'m'},{label:'Kolon aralığı',value:fmt(j.spacing),unit:'m'}],steps:[],results:[{label:'Kompozit hesap',value:'GİRDİ EKSİK',unit:'',status:'warning'},{label:'Saha kalite kontrolü',value:qc.status==='pass'?'UYGUN':qc.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK',unit:'',status:qc.status==='pass'?'ok':qc.status==='fail'?'fail':'warning'}],notes:qc.warnings}
   }
   try {
+    const N=forceToBase(p.foundationParameters.structuralWeight,p.unitSystem)
+    const ex=N>0?momentToBase(p.foundationParameters.momentY,p.unitSystem)/N:0,ey=N>0?momentToBase(p.foundationParameters.momentX,p.unitSystem)/N:0
+    const effectiveWidth=p.foundationParameters.footingWidth-2*Math.abs(ex),effectiveLength=p.foundationParameters.footingLength-2*Math.abs(ey)
+    if(N<=0||effectiveWidth<=0||effectiveLength<=0)throw new Error('Jet Grout ön kontrolü için pozitif yük ve momentleri içeren etkin temel alanı gereklidir.')
+    const effectiveArea=effectiveWidth*effectiveLength
     const result = jetGroutEngineering({
       columnDiameter: j.columnDiameter,
       spacing: j.spacing,
       layout: j.layout ?? 'square',
       qSoil: stressToBase(j.qSoil, p.unitSystem),
       qColumn: stressToBase(j.qColumn, p.unitSystem),
+      FS:j.safetyFactor,
       cSoil: j.cSoil == null ? undefined : stressToBase(j.cSoil, p.unitSystem),
       cColumn: j.cColumn == null ? undefined : stressToBase(j.cColumn, p.unitSystem),
       EsSoil: j.EsSoil == null ? undefined : stressToBase(j.EsSoil, p.unitSystem),
       EsColumn: j.EsColumn == null ? undefined : stressToBase(j.EsColumn, p.unitSystem),
-      load:forceToBase(p.foundationParameters.structuralWeight,p.unitSystem),
-      foundationArea:p.foundationParameters.footingWidth*p.foundationParameters.footingLength,
+      load:N,
+      foundationArea:effectiveArea,
       foundationThickness:j.foundationThickness,soilPoissonRatio:j.soilPoissonRatio,
-      verticalLoad:forceToBase(p.foundationParameters.structuralWeight,p.unitSystem),
+      verticalLoad:N,
       horizontalLoad:Math.hypot(forceToBase(p.foundationParameters.vtX,p.unitSystem),forceToBase(p.foundationParameters.vtY,p.unitSystem)),
       cohesion:j.interfaceCohesion==null?undefined:stressToBase(j.interfaceCohesion,p.unitSystem),frictionAngle:j.interfaceFrictionAngle,
       qc:qcInput
@@ -409,18 +421,22 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
         { label: 'Alan Değiştirme Oranı', value: fmt(result.areaReplacementRatio * 100, 1), unit: '%' },
         { label: 'Kompozit Taşıma Gücü', value: fmt(result.compositeCapacity), unit: 'kPa' },
         { label: 'Kompozit Modül', value: result.compositeModulus ? fmt(result.compositeModulus) : '—', unit: result.compositeModulus ? 'kPa' : '' },
+        { label: 'Karakteristik kapasite / talep', value: result.capacityFS==null?'—':fmt(result.capacityFS), unit: '—' },
+        { label: 'İzin verilebilir kompozit kapasite', value: result.allowableCapacity==null?'FS girilmedi':fmt(result.allowableCapacity), unit: result.allowableCapacity==null?'':'kPa' },
+        { label: 'Tasarım kullanım oranı', value: result.designUtilization==null?'FS girilmedi':fmt(result.designUtilization*100,1), unit: result.designUtilization==null?'':'%', status: result.designAdequate==null?'warning':result.designAdequate?'ok':'fail' },
+        { label: 'Kompozit ön kontrol', value: result.designAdequate==null?'VERİ EKSİK':result.designAdequate?'YETERLİ':'YETERSİZ', unit: '', status: result.designAdequate==null?'warning':result.designAdequate?'ok':'fail' },
         { label: 'Kolon Yük Paylaşımı', value: fmt(result.columnLoadShare * 100, 1), unit: '%' },
         { label: 'Zemin Yük Paylaşımı', value: fmt(result.soilLoadShare * 100, 1), unit: '%' },
         { label: 'Saha kalite kontrolü', value: result.qcVerification.status==='pass'?'UYGUN':result.qcVerification.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK', unit: '', status: result.qcVerification.status==='pass'?'ok':result.qcVerification.status==='fail'?'fail':'warning' }
       ],
-      notes: [...result.warnings, 'Kompozit parametreler ön tasarım/screening niteliğindedir. Nihai tasarım için saha deneyleri ve kalite kontrol gereklidir.']
+      notes: [...result.warnings, `Moment etkisi B′=${fmt(effectiveWidth)} m, L′=${fmt(effectiveLength)} m etkin alanı ile hesaba katıldı.`, result.sourceNote, 'Kompozit parametreler ön tasarım/screening niteliğindedir. Nihai tasarım için saha deneyleri ve kalite kontrol gereklidir.']
     }
-  } catch {
-    return null
+  } catch(error) {
+    return {id:'4',title:'Jet Grout Zemin İyileştirme',subtitle:'Kompozit zemin ön değerlendirmesi',method:'Hesap doğrulaması',source:'Erol & Çekinmez Bayram (2018)',inputs:[],steps:[],results:[{label:'Hesap durumu',value:'HESAPLANAMADI',unit:'',status:'warning'}],notes:[error instanceof Error?error.message:'Jet Grout hesabı doğrulanamadı.']}
   }
 }
 
-export function ProfessionalEngineeringReport({ profile }: Props) {
+export function ProfessionalEngineeringReport({ profile, boreholes, labs }: Props) {
   const p = useProjectInfo()
 
   const sections = useMemo(() => {

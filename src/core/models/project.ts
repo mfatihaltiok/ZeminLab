@@ -13,6 +13,7 @@ export interface JetGroutProjectParameters{
   layout?:'square'|'triangular'
   qSoil?:number
   qColumn?:number
+  safetyFactor?:number
   cSoil?:number
   cColumn?:number
   EsSoil?:number
@@ -69,6 +70,7 @@ export interface FoundationParameters{
   passiveResistanceCharacteristic:number
   usePassiveResistance:boolean
   foundationInterface?:FoundationInterface
+  foundationTanDelta?:number
 }
 
 export interface ProjectInfo{
