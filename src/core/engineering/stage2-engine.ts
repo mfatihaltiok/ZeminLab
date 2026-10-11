@@ -25,7 +25,7 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
   if(i.FS!=null&&(!Number.isFinite(i.FS)||i.FS<=0))throw new Error('Güvenlik katsayısı pozitif olmalıdır.')
   if(i.waterTableDepth!=null&&(!Number.isFinite(i.waterTableDepth)||i.waterTableDepth<0))throw new Error('YASS derinliği negatif olmayan sonlu bir değer olmalıdır.')
   if(i.surcharge!=null&&(!Number.isFinite(i.surcharge)||i.surcharge<0))throw new Error('Ek sürşarj negatif olmayan sonlu bir değer olmalıdır.')
-  if(i.waterTableDepth!=null&&i.gammaSat==null)throw new Error('YASS tanımlandığında γsat girilmelidir.')
+  if(i.waterTableDepth!=null&&i.waterTableDepth<=i.Df+i.B&&i.gammaSat==null)throw new Error('YASS temel etki bölgesindeyse γsat girilmelidir.')
   if(i.gammaSat!=null&&(!Number.isFinite(i.gammaSat)||i.gammaSat<=9.80665))throw new Error('γsat, su birim hacim ağırlığından büyük ve sonlu olmalıdır.')
   if(i.layers?.some(x=>!Number.isFinite(x.thickness)||x.thickness<=0||!Number.isFinite(x.c)||x.c<0||!Number.isFinite(x.phi)||x.phi<0||x.phi>50||!Number.isFinite(x.gamma)||x.gamma<=0||(x.gammaSat!=null&&(!Number.isFinite(x.gammaSat)||x.gammaSat<=9.80665))))throw new Error('Taşıma gücü tabaka parametreleri geçersiz.')
   let layerTop=i.Df
@@ -46,11 +46,14 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
   let surcharge=i.surcharge??0,gammaBearing=i.gamma
   if(i.waterTableDepth==null){surcharge+=i.gamma*i.Df}
   else{
-    const gammaSub=i.gammaSat!-9.80665,gwt=i.waterTableDepth
-    surcharge+=gwt<i.Df?i.gamma*gwt+gammaSub*(i.Df-gwt):i.gamma*i.Df
-    if(gwt<=i.Df)gammaBearing=gammaSub
-    else if(gwt<=i.Df+i.B)gammaBearing=gammaSub+((gwt-i.Df)/i.B)*(i.gamma-gammaSub)
-    if(gwt<=i.Df+i.B)warnings.push('Klasik hesapta YASS etkisi sürşarj ve Nγ terimi için efektif birim hacim ağırlıkla dikkate alındı.')
+    const gwt=i.waterTableDepth
+    if(gwt<=i.Df+i.B){
+      const gammaSub=i.gammaSat!-9.80665
+      surcharge+=gwt<i.Df?i.gamma*gwt+gammaSub*(i.Df-gwt):i.gamma*i.Df
+      if(gwt<=i.Df)gammaBearing=gammaSub
+      else gammaBearing=gammaSub+((gwt-i.Df)/i.B)*(i.gamma-gammaSub)
+      warnings.push('Klasik hesapta YASS etkisi sürşarj ve Nγ terimi için efektif birim hacim ağırlıkla dikkate alındı.')
+    }else surcharge+=i.gamma*i.Df
   }
   if(i.waterTableDepth==null)warnings.push('YASS girilmedi; klasik sonuç kuru zemin kabulüyle ön değerlendirmedir.')
   if(i.layers?.length)warnings.push('Klasik yöntem katmanlı zemin parametrelerini hesapta kullanmaz; katmanlı nihai değerlendirme için TBDY yüzeysel temel motoru ve zemin profili analizi gerekir.')
