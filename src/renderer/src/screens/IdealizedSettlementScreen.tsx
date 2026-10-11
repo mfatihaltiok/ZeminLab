@@ -95,7 +95,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       return subgradeReaction({ ...common, q: qGross, settlement: result.totalSettlement / 1000 })
     }
     if (ksMethod === 'elastic') {
-      const Es = surfaceLayer?.constrainedModulus ?? surfaceLayer?.oedometricModulus
+      const Es = surfaceLayer?.elasticModulus
       if (!Es || Es <= 0) return undefined
       if (surfaceLayer?.poissonRatio == null) return undefined
       return subgradeReaction({ ...common, Es: stressToBase(Es, profile?.unitSystem ?? p.unitSystem), nu: surfaceLayer.poissonRatio })
