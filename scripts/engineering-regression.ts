@@ -807,14 +807,14 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
 
 {
   const axial=jetGroutAxialCapacity({
-    diameter:0.6,columnStrength:2500,numberOfColumns:1,layers:[{
+    diameter:0.6,columnStrength:2500,numberOfColumns:1,resistanceFactor:1.4,layers:[{
       thickness:3,gamma:18,cohesion:10,frictionAngle:30,
       effectiveStressAtTop:20,effectiveStressAtBottom:74,interfaceAlpha:0.8,interfaceDelta:25
     }]
   })
   assert.ok(axial.designCapacity>0)
   assert.throws(()=>jetGroutAxialCapacity({
-    diameter:0.6,columnStrength:2500,layers:[{
+    diameter:0.6,columnStrength:2500,numberOfColumns:1,resistanceFactor:1.4,layers:[{
       thickness:3,gamma:18,cohesion:10,frictionAngle:30
     }]
   }),/efektif gerilmeler/)
