@@ -202,14 +202,14 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       note='Gerilme-bağımlı Janbu hesabı için M0 ve M1 parametreleri veri modelinde bulunmadığından elastik M ile Janbu sonucu üretilmez.'
     }else{
       methodName='Schmertmann et al. (1978)'
-      const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
+      const Es=layer.elasticModulus
       const sigmaPeak=effectiveStressAtDepth(layers,Df+Math.min(influenceDepth/2,B),gwt).effective
       const Iz=schmertmannIz(zMid,B,L,qNet,sigmaPeak)
       const C1=qNet>0?Math.max(.5,1-.5*baseStress.effective/qNet):1
       const C2=finite(input.timeYears)&&input.timeYears!>=.1?1+.2*Math.log10(input.timeYears!/.1):1
       const C3=ratio>=10?1:Math.max(.73,1.03-.03*ratio)
-      if(finite(M)&&M>0)immediate=C1*C2*C3*qNet*Iz*thickness/M*1000
-      else{status='VERİ EKSİK';note='Schmertmann için E modülü gerekir.'}
+      if(finite(Es)&&Es>0)immediate=C1*C2*C3*qNet*Iz*thickness/Es*1000
+      else{status='VERİ EKSİK';note='Schmertmann için bağımsız Young modülü Es gerekir; M/Moed yerine kullanılamaz.'}
     }
     if(finite(layer.secondaryCompressionIndex)&&layer.secondaryCompressionIndex!>=0&&finite(input.timeYears)&&input.timeYears!>0){
       const start=input.secondaryStartTimeYears??1
@@ -222,7 +222,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
     totalImmediate+=immediate
     totalConsolidation+=consolidation
     totalSecondary+=secondary
-    results.push({layerId:layer.id,order:layer.order,soilName:layer.soilName,soilCode:layer.soilCode,topDepth:top,bottomDepth:bottom,thickness,midDepth,sigmaV0:midStress.total,porePressure:midStress.porePressure,sigmaV0Effective:midStress.effective,deltaSigma,sigmaVFinal:midStress.total+deltaSigma,sigmaVFinalEffective:finalEffective,representativeN60:layer.representativeN60,representativeN1_60:layer.representativeN1_60,Es:layer.constrainedModulus??layer.oedometricModulus,poissonRatio:layer.poissonRatio,immediateSettlement:immediate,consolidationSettlement:consolidation,secondarySettlement:secondary,totalSettlement:immediate+consolidation+secondary,method:methodName,status,note})
+    results.push({layerId:layer.id,order:layer.order,soilName:layer.soilName,soilCode:layer.soilCode,topDepth:top,bottomDepth:bottom,thickness,midDepth,sigmaV0:midStress.total,porePressure:midStress.porePressure,sigmaV0Effective:midStress.effective,deltaSigma,sigmaVFinal:midStress.total+deltaSigma,sigmaVFinalEffective:finalEffective,representativeN60:layer.representativeN60,representativeN1_60:layer.representativeN1_60,Es:layer.elasticModulus,poissonRatio:layer.poissonRatio,immediateSettlement:immediate,consolidationSettlement:consolidation,secondarySettlement:secondary,totalSettlement:immediate+consolidation+secondary,method:methodName,status,note})
   }
   if(results.some(x=>x.status==='VERİ EKSİK'))warnings.push('Bir veya daha fazla tabakada gerekli oturma parametresi eksik; eksik katkılar sıfır kabul edilmez ve sonuç hazırlıksız işaretlenir.')
   if(method==='schmertmann'&&input.timeYears==null)warnings.push('Schmertmann C2=1 alındı; zaman bilgisi girilmediği için creep düzeltmesi yapılmadı.')
