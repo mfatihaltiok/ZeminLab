@@ -73,7 +73,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       const resolvedInterface=input.foundationInterface ?? fp.foundationInterface
       const si:FoundationCheckInput={
         B:fp.footingWidth,L:fp.footingLength,N,Vx,Vy,Mx,My,
-        deltaTan:undefined,cu:sp.undrainedCohesion,
+        deltaTan:fp.foundationTanDelta,cu:sp.undrainedCohesion,
         groundwaterDepth:sp.groundwaterDepth,foundationDepth:fp.footingDepth,
         passiveResistanceCharacteristic:fp.passiveResistanceCharacteristic,
         usePassiveResistance:fp.usePassiveResistance,
