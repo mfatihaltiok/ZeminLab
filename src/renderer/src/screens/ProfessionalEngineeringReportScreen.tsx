@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { useProjectInfo } from '../../../core/state/project-store'
 import { forceToBase, stressToBase, unitWeightToBase, momentToBase } from '../../../core/units/project-units'
-import { bearingCapacity, tbdyBearingCapacity, foundationChecks, liquefactionProfile, jetGroutAdvanced, subgradeReaction } from '../../../core/calculations/engineering'
+import { bearingCapacity, tbdyBearingCapacity, foundationChecks, jetGroutAdvanced, subgradeReaction } from '../../../core/calculations/engineering'
+import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { calculateIdealizedSettlement } from '../../../core/engineering/idealized-settlement-engine'
 import { EngineeringReportProfessional, type ReportSection, type ReportCalculationStep } from '../components/EngineeringReportProfessional'
 import { TechnicalSection, type TechnicalSectionLayer, type TechnicalSectionMarker } from '../components/TechnicalSection'
@@ -152,6 +153,116 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
   }
 }
 
+
+function buildLiquefactionSection(
+  p: ReturnType<typeof useProjectInfo>,
+  boreholes: BoreholeRecord[],
+  labs: LaboratoryRecord[]
+): ReportSection {
+  const b = boreholes[0]
+  const sds = p.seismic.sds
+  const spt = b ? b.spt.filter(x => x.testType === 'SPT' && Number.isFinite(x.n2) && Number.isFinite(x.n3)).sort((a, z) => a.depth - z.depth) : []
+  const gammaSatComplete = Boolean(b && b.lithology.length > 0 && b.lithology.every(l =>
+    unitWeightToBase(l.saturatedUnitWeight ?? p.soilParameters.saturatedUnitWeight ?? 0, p.unitSystem) > 9.80665
+  ))
+  const missing = [
+    !b ? 'sondaj' : undefined,
+    b && b.groundwaterDepth == null ? 'YASS' : undefined,
+    sds == null ? 'SDS' : undefined,
+    p.seismic.magnitude == null ? 'Mw' : undefined,
+    spt.length === 0 ? 'SPT' : undefined,
+    !gammaSatComplete ? 'γsat' : undefined
+  ].filter((x): x is string => Boolean(x))
+  if (missing.length) {
+    return {
+      id: '5', title: 'Sıvılaşma ve Sıvılaşma Sonrası Etkiler',
+      subtitle: 'TBDY 2018 Bölüm 16.6 ve Ek 16B',
+      method: 'SPT tabanlı tetiklenme kontrolü',
+      source: 'TBDY 2018 16.6.1–16.6.10 ve Ek 16B',
+      inputs: [
+        { label: 'Sondaj', value: b?.name ?? '—', unit: '' },
+        { label: 'DTS / Zemin Grubu', value: (p.seismic.dts ?? '—') + ' / ' + (p.geophysical.soilGroup ?? '—'), unit: '' },
+        { label: 'Eksik girdiler', value: missing.join(', '), unit: '' }
+      ],
+      steps: [],
+      results: [{ label: 'Hesap durumu', value: 'VERİ EKSİK — NİHAİ SONUÇ ÜRETİLMEDİ', unit: '', status: 'warning' }],
+      notes: ['Sıvılaşma hesabı için YASS, SDS, Mw, γsat ve SPT verileri gerekir. Test-zamanı σv0/u0/σ′v0 snapshotı olmayan satırlar nihai tetiklenme sonucu olarak kabul edilmez.']
+    }
+  }
+
+  try {
+    const rows: LiquefactionSptRecord[] = spt.map(record => {
+      const lab = labs.filter(x => x.boreholeId === b!.id)
+        .filter(x => record.depth >= x.depth && record.depth <= (x.depthTo ?? x.depth + 0.5))
+        .sort((x, y) => Math.abs(x.depth - record.depth) - Math.abs(y.depth - record.depth))[0]
+      const layer = b!.lithology.find(x => record.depth >= x.from && record.depth < x.to)
+      return {
+        depth: record.depth, depthTo: record.depthTo, nField: record.n2! + record.n3!,
+        soil: record.soilCode ?? layer?.code,
+        fineContent: lab?.finesContent ?? lab?.sieve200Passing ?? layer?.finesContent,
+        plasticityIndex: lab?.plasticityIndex ?? (lab?.liquidLimit != null && lab?.plasticLimit != null ? lab.liquidLimit - lab.plasticLimit : undefined) ?? layer?.plasticityIndex,
+        clayContent: lab?.hydrometer002, waterContent: lab?.waterContent,
+        rodLengthM: record.rodLengthM, stressSnapshot: record.testStressSnapshot
+      }
+    })
+    const result = liquefactionProfile({
+      Mw: p.seismic.magnitude!, Sds: sds!, gwt: b.groundwaterDepth!,
+      layers: b.lithology.map(l => ({
+        top: l.from, bottom: l.to,
+        gamma: unitWeightToBase(l.unitWeight ?? p.soilParameters.unitWeight, p.unitSystem),
+        gammaSat: unitWeightToBase(l.saturatedUnitWeight ?? p.soilParameters.saturatedUnitWeight ?? 0, p.unitSystem),
+        soil: l.code, finesContent: l.finesContent, plasticityIndex: l.plasticityIndex
+      })),
+      spt: rows, sptCorrection: p.sptCorrections, dts: p.seismic.dts,
+      soilGroup: p.geophysical.soilGroup,
+      continuousOrThickLens: p.soilParameters.liquefactionContinuousOrThickLens,
+      foundationDepth: p.foundationParameters.footingDepth
+    })
+    const evaluated = result.rows.filter(row => Number.isFinite(row.FS))
+    const minimumFS = evaluated.length ? Math.min(...evaluated.map(row => row.FS!)) : undefined
+    const postRequired = result.rows.filter(row => row.postLiquefactionEvaluation === 'required').length
+    const postReview = result.rows.some(row => row.postLiquefactionEvaluation === 'review')
+    const postNotEvaluable = result.rows.some(row => row.postLiquefactionEvaluation === 'not-evaluable')
+    const postStatus = postRequired > 0 ? 'GEREKLİ' : postReview ? 'ETKİLERİ İNCELE' : postNotEvaluable ? 'VERİ EKSİK' : 'KAPSAM DIŞI'
+    const firstTrace = result.rows[0]?.trace ?? []
+    return {
+      id: '5', title: 'Sıvılaşma ve Sıvılaşma Sonrası Etkiler',
+      subtitle: 'TBDY 2018 Bölüm 16.6 ve Ek 16B',
+      method: result.method, source: result.source,
+      inputs: [
+        { label: 'Sondaj', value: b.name, unit: '' },
+        { label: 'DTS / Zemin Grubu', value: (p.seismic.dts ?? '—') + ' / ' + (p.geophysical.soilGroup ?? '—'), unit: '' },
+        { label: 'SDS / Mw', value: fmt(sds) + ' / ' + fmt(p.seismic.magnitude), unit: '' },
+        { label: 'YASS', value: fmt(b.groundwaterDepth), unit: 'm' },
+        { label: 'SPT satırı', value: String(result.rows.length), unit: '' }
+      ],
+      steps: firstTrace.slice(0, 12).map((step, i) => ({
+        index: i + 1, symbol: step.symbol, title: step.title, formula: step.formula,
+        value: step.value ?? '—', unit: step.unit ?? '', note: step.note
+      })),
+      results: [
+        { label: 'En düşük hesaplanan FS', value: fmt(minimumFS, 3), unit: '', status: minimumFS == null ? 'warning' : minimumFS < 1.10 ? 'fail' : 'ok' },
+        { label: 'FS<1.10 satırı', value: String(postRequired), unit: 'adet', status: postRequired > 0 ? 'fail' : 'ok' },
+        { label: 'Sıvılaşma sonrası inceleme', value: postStatus, unit: '', status: postRequired > 0 || postNotEvaluable ? 'warning' : 'ok' },
+        { label: 'Veri durumu', value: result.rows.some(row => row.liquefactionCheck === 'not-evaluable') ? 'KISMEN / VERİ EKSİK' : 'SATIRLAR DEĞERLENDİRİLDİ', unit: '', status: result.rows.some(row => row.liquefactionCheck === 'not-evaluable') ? 'warning' : 'ok' }
+      ],
+      notes: [
+        ...result.warnings,
+        'Bu bölüm tetiklenme güvenliğini hesaplar; sıvılaşma sonrası kalıcı oturma, yanal yayılma ve artık dayanım hesabı üretmez. FS<1.10 durumunda TBDY 16.6.7, 16.6.9 ve 16.6.10 için proje özelinde ek değerlendirme gerekir.'
+      ]
+    }
+  } catch (error) {
+    return {
+      id: '5', title: 'Sıvılaşma ve Sıvılaşma Sonrası Etkiler',
+      subtitle: 'Hesap üretilemedi', method: 'TBDY 2018 Bölüm 16.6 + Ek 16B',
+      source: 'ZeminLab sıvılaşma motoru',
+      inputs: [{ label: 'Sondaj', value: b.name, unit: '' }],
+      steps: [], results: [{ label: 'Hesap durumu', value: 'VERİ EKSİK / GEÇERSİZ', unit: '', status: 'warning' }],
+      notes: [error instanceof Error ? error.message : 'Sıvılaşma girdileri doğrulanamadı.']
+    }
+  }
+}
+
 function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile?: IdealizedSoilProfile): ReportSection | null {
   const f = p.foundationParameters
   const B = f.footingWidth, L = f.footingLength, Df = f.footingDepth
@@ -271,12 +382,15 @@ export function ProfessionalEngineeringReport({ profile }: Props) {
     
     const settlement = buildSettlementSection(p, profile)
     if (settlement) result.push(settlement)
-    
+
+    const liquefaction = buildLiquefactionSection(p, boreholes, labs)
+    result.push(liquefaction)
+
     const jetGrout = buildJetGroutSection(p)
     if (jetGrout) result.push(jetGrout)
     
     return result
-  }, [p, profile])
+  }, [p, profile, boreholes, labs])
 
   const reportData = {
     projectName: p.title,
