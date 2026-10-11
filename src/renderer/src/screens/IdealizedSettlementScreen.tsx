@@ -88,7 +88,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
 
   latestIdealizedSettlementResult = result
 
-  const surfaceLayer = profile?.layers.find(x => x.bottomDepth > f.footingDepth)
+  const surfaceLayer = profile?.layers.find(x => x.topDepth <= f.footingDepth && x.bottomDepth > f.footingDepth)
   const ks = useMemo(() => {
     if (f.footingWidth <= 0 || f.footingLength <= 0) return undefined
     const common = { B: f.footingWidth, L: f.footingLength, method: ksMethod, unitSystem: 'kN-m' as const }
