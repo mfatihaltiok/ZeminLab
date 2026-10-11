@@ -354,6 +354,10 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.equal(edgePressure.finalDesignEligible,true)
   assert.equal(edgePressure.adequate,false)
   assert.ok(edgePressure.qMax>1.25*edgePressure.qk)
+  assert.throws(()=>calculateSurfaceFoundation({B:2,L:4,Df:1,gamma1:18,c:0,phi:30,verticalLoad:1000,resistanceFactor:1.2,method:'TBDY-2018',groundwaterDepth:10}),/γRv=1.40 sabittir/)
+  const gappedProfile=calculateSurfaceFoundation({B:2,L:2,Df:0,gamma1:18,c:10,phi:30,verticalLoad:1000,resistanceFactor:1.4,method:'TBDY-2018',groundwaterDepth:10,layers:[{topDepth:0,bottomDepth:1,gamma:18,cohesion:10,phi:30},{topDepth:2,bottomDepth:4,gamma:18,cohesion:10,phi:30}]})
+  assert.equal(gappedProfile.finalDesignEligible,false)
+  assert.ok(gappedProfile.warnings.some(w=>w.includes('sürekli değil')))
   const classicalOnly=calculateSurfaceFoundation({B:2,L:4,Df:1,gamma1:18,gamma2:19,c:10,phi:30,verticalLoad:1000,method:'Terzaghi',groundwaterDepth:10})
   assert.equal(classicalOnly.finalDesignEligible,false)
 }
