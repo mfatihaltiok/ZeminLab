@@ -79,32 +79,36 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
   let consolidation = 0
   const details: LayerSettlementResult['layers'] = []
   const warnings: string[] = []
-  for (const [index,l] of layers.entries()) {
-    const values=[l.thickness,l.sigma0,l.deltaSigma,l.Es,l.M,l.mv,l.Cc,l.e0,l.Cr,l.sigmaPc]
-    if(values.some(v=>v!==undefined&&!Number.isFinite(v)))throw new Error('Oturma katmanı '+(index+1)+': parametreler sonlu olmalıdır.')
-    if(l.thickness<=0||l.deltaSigma<0||l.Es!=null&&l.Es<=0||l.M!=null&&l.M<=0||l.mv!=null&&l.mv<0||l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<0||l.Cr!=null&&l.Cr<0||l.sigmaPc!=null&&l.sigmaPc<=0||l.sigma0!=null&&l.sigma0<=0)throw new Error('Oturma katmanı '+(index+1)+': fiziksel olmayan parametre.')
-    if((l.Cc!=null)!==(l.e0!=null))throw new Error('Oturma katmanı '+(index+1)+': Cc ve e0 birlikte girilmelidir.')
-    if(l.Cr!=null&&l.Cc==null)throw new Error('Oturma katmanı '+(index+1)+': Cr girildiyse Cc de gereklidir.')
-    if(l.Cc!=null&&l.sigma0==null)throw new Error('Oturma katmanı '+(index+1)+': Cc/e0 konsolidasyonu için σ′v0 gereklidir.')
-    if(l.sigmaPc!=null&&l.sigma0!=null&&l.sigmaPc<l.sigma0)throw new Error('Oturma katmanı '+(index+1)+': σpc, başlangıç efektif gerilmesinden küçük olamaz.')
+  if (!Array.isArray(layers) || layers.length === 0) throw new Error('Oturma hesabı için en az bir zemin tabakası gereklidir.')
+  for (const l of layers) {
+    if (!Number.isFinite(l.thickness) || l.thickness <= 0) throw new Error('Oturma tabakası kalınlığı pozitif ve sonlu olmalıdır.')
+    if (!Number.isFinite(l.deltaSigma) || l.deltaSigma < 0) throw new Error('Oturma tabakasındaki gerilme artışı negatif olmayan ve sonlu olmalıdır.')
+    if (!Number.isFinite(l.sigma0) || l.sigma0 < 0) throw new Error('Başlangıç efektif gerilmesi negatif olmayan ve sonlu olmalıdır.')
+    if (l.Es != null && (!Number.isFinite(l.Es) || l.Es <= 0)) throw new Error('Es pozitif ve sonlu olmalıdır.')
+    if (l.mv != null && (!Number.isFinite(l.mv) || l.mv < 0)) throw new Error('mv negatif olmayan ve sonlu olmalıdır.')
+    if (l.Cc != null && (!Number.isFinite(l.Cc) || l.Cc < 0)) throw new Error('Cc negatif olmayan ve sonlu olmalıdır.')
+    if (l.Cr != null && (!Number.isFinite(l.Cr) || l.Cr < 0)) throw new Error('Cr negatif olmayan ve sonlu olmalıdır.')
+    if (l.e0 != null && (!Number.isFinite(l.e0) || l.e0 <= -1)) throw new Error('Başlangıç boşluk oranı e0 > -1 olmalıdır.')
+    if (l.sigmaPc != null && (!Number.isFinite(l.sigmaPc) || l.sigmaPc <= 0)) throw new Error('Ön konsolidasyon gerilmesi σ′p pozitif ve sonlu olmalıdır.')
+    if ((l.Cc != null) !== (l.e0 != null)) throw new Error('Ödometre hesabı için Cc ve e0 birlikte girilmelidir.')
+    if (l.deltaSigma === 0) {
+      details.push({ settlement: 0, type: 'elastic' })
+      continue
+    }
     const H = l.thickness
     const ds = l.deltaSigma
     let s = 0
-    let type: 'elastic' | 'constrained-modulus' | 'oedometer' | 'not-evaluable' = 'not-evaluable'
-    if (H <= 0 || ds <= 0) {
-      details.push({ settlement: 0, type:'elastic' })
-      continue
-    }
-    if (l.mv != null && l.mv >= 0) {
+    let type: 'elastic' | 'oedometer' = 'elastic'
+    if (l.mv != null) {
       s = H * l.mv * ds
       consolidation += s
       type = 'oedometer'
-    } else if (l.Cc != null && l.e0 != null && l.sigma0 > 0 && l.Cc >= 0 && l.e0 >= 0) {
+    } else if (l.Cc != null && l.e0 != null) {
+      if (l.sigma0 <= 0) throw new Error('Cc/e0 ile konsolidasyon hesabı için başlangıç efektif gerilmesi pozitif olmalıdır.')
       const sigma1 = l.sigma0 + ds
       const spc = l.sigmaPc ?? l.sigma0
-      if(l.sigmaPc==null)warnings.push('Katman '+(index+1)+': σpc girilmedi; normal konsolide davranış varsayıldı.')
-      if(spc>l.sigma0&&l.Cr==null)throw new Error('Aşırı konsolide katmanda σpc>σ′v0 olduğunda Cr açıkça girilmelidir; Cc yerine varsayılamaz.')
-      const Cr = l.Cr ?? l.Cc
+      if (spc > l.sigma0 && l.Cr == null) throw new Error('Aşırı konsolide tabakada yeniden sıkışma için Cr girilmelidir; Cc yerine varsayılan olarak kullanılamaz.')
+      const Cr = l.Cr ?? 0
       if (spc > l.sigma0 && sigma1 > l.sigma0) {
         const sigmaA = Math.min(sigma1, spc)
         const sigmaB = Math.max(sigma1, spc)
@@ -117,20 +121,17 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
       }
       consolidation += s
       type = 'oedometer'
-    } else if (l.M != null && l.M > 0) {
-      s = H * ds / l.M
+    } else if (l.Es != null) {
+      s = H * ds / l.Es
       immediate += s
-      type = 'constrained-modulus'
     } else {
-      if(l.Es!=null)warnings.push('Katman '+(index+1)+': Es Young modülüdür; 1B katman sıkışması için M (kısıtlı/ödometre modülü) gerekir. Es yerine sessizce kullanılmadı.')
-      else warnings.push('Katman '+(index+1)+': pozitif M veya mv ya da eksiksiz Cc/e0/σ′v0 parametreleri yok; katman oturması hesaplanmadı.')
+      throw new Error('Her tabaka için Es, mv veya birlikte Cc/e0 parametreleri gereklidir.')
     }
-    details.push({ settlement: Math.max(0, s), type })
+    details.push({ settlement: s, type })
   }
   return { immediate, consolidation, total: immediate + consolidation, layers: details, warnings }
 }
 
-export interface SchmertmannLayer { thickness: number; Es: number; Iz: number }
 export function schmertmannSettlement(q: number, layers: SchmertmannLayer[], C1: number, C2: number) {
   if(![q,C1,C2].every(Number.isFinite)||q<0||C1<=0||C2<=0)throw new Error('Schmertmann hesabında q≥0 ve C1/C2>0 sonlu olmalıdır.')
   for(const [index,l] of layers.entries())if(![l.thickness,l.Es,l.Iz].every(Number.isFinite)||l.thickness<=0||l.Es<=0||l.Iz<0)throw new Error('Schmertmann katmanı '+(index+1)+': kalınlık/Es pozitif, Iz negatif olmayan sonlu değer olmalıdır.')
