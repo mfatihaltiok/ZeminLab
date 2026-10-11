@@ -3,7 +3,7 @@ import { calculateIdealizedSettlement, type IdealizedSettlementMethod } from '..
 import { subgradeReaction } from '../../core/calculations/engineering'
 import type { IdealizedSoilProfile } from '../../core/models/idealized-soil-profile'
 import type { BoreholeRecord } from '../../core/models/field-data'
-import { forceToBase, forceFromBase, stressFromBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
+import { forceToBase, forceFromBase, stressFromBase, stressToBase, PROJECT_UNIT_LABELS } from '../../core/units/project-units'
 import type { SubgradeReactionMethod, SubgradeSoilType } from '../../core/engineering/subgrade-reaction'
 import { useProjectInfo } from '../../core/state/project-store'
 import { Card, Frame, Metric, Source, Table } from '../workspace/WorkspaceShell'
@@ -57,44 +57,50 @@ export let latestIdealizedSettlementResult: ReturnType<typeof calculateIdealized
 
 export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile?: IdealizedSoilProfile; boreholes?: BoreholeRecord[] }) {
   const p = useProjectInfo()
-  const [method, setMethod] = useState<IdealizedSettlementMethod>('burland-burbidge')
+  const updateProjectInfo=useProjectInfo().updateProjectInfo
+  const selectedMethod:IdealizedSettlementMethod=profile?.settlementMethod??'burland-burbidge'
+  const changeMethod=(value:IdealizedSettlementMethod)=>{if(profile)updateProjectInfo({idealizedSoilProfile:{...profile,settlementMethod:value}})}
   const [ksMethod, setKsMethod] = useState<SubgradeReactionMethod>('erol-plate')
   const [kv1Input, setKv1Input] = useState('')
   const [ksSoilType, setKsSoilType] = useState<SubgradeSoilType>('cohesive')
-  const [selected, setSelected] = useState(boreholes[0]?.id ?? '')
-  const b = boreholes.find(x => x.id === selected) ?? boreholes[0]
+  const [selected, setSelected] = useState(profile?.settlementGroundwaterBoreholeId ?? profile?.sourceBoreholeIds[0] ?? boreholes[0]?.id ?? '')
+  const eligibleBoreholes=profile?.sourceBoreholeIds.length?boreholes.filter(x=>profile.sourceBoreholeIds.includes(x.id)):boreholes
+  const b=eligibleBoreholes.find(x=>x.id===selected)??eligibleBoreholes[0]??boreholes[0]
   const f = p.foundationParameters
-  const qGross = finite(f.verticalLoad) && finite(f.footingWidth) && finite(f.footingLength)
-    ? forceToBase(f.verticalLoad, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
+  const qGross = finite(f.structuralWeight) && finite(f.footingWidth) && finite(f.footingLength)
+    ? forceToBase(f.structuralWeight, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
     : 0
+  const setTime=(key:'settlementTimeYears'|'secondaryStartTimeYears',raw:string)=>{if(!profile)return;const value=raw.trim()===''?undefined:Number(raw);if(value!==undefined&&(!Number.isFinite(value)||value<0||(key==='secondaryStartTimeYears'&&value===0)))return;updateProjectInfo({idealizedSoilProfile:{...profile,[key]:value}})}
 
   const result = useMemo(() => {
     if (!profile || profile.status !== 'SABİTLENDİ') return undefined
     return calculateIdealizedSettlement({
       profile,
-      method,
+      method:selectedMethod,
       B: f.footingWidth,
       L: f.footingLength,
       Df: f.footingDepth,
       qGross,
-      groundwaterDepth: b?.groundwaterDepth,
+      groundwaterDepth: b?.groundwaterDepth ?? p.soilParameters.groundwaterDepth,
+      timeYears:profile.settlementTimeYears,secondaryStartTimeYears:profile.secondaryStartTimeYears
     })
-  }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth])
+  }, [profile, selectedMethod, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth, p.soilParameters.groundwaterDepth,profile?.settlementTimeYears,profile?.secondaryStartTimeYears])
 
   latestIdealizedSettlementResult = result
 
-  const surfaceLayer = profile?.layers.find(x => x.bottomDepth > f.footingDepth)
+  const surfaceLayer = profile?.layers.find(x => x.topDepth <= f.footingDepth && x.bottomDepth > f.footingDepth)
   const ks = useMemo(() => {
     if (f.footingWidth <= 0 || f.footingLength <= 0) return undefined
     const common = { B: f.footingWidth, L: f.footingLength, method: ksMethod, unitSystem: 'kN-m' as const }
     if (ksMethod === 'q/s') {
-      if (!result || result.totalSettlement <= 0 || qGross <= 0) return undefined
+      if (!result || !result.ready || result.totalSettlement <= 0 || qGross <= 0) return undefined
       return subgradeReaction({ ...common, q: qGross, settlement: result.totalSettlement / 1000 })
     }
     if (ksMethod === 'elastic') {
-      const Es = surfaceLayer?.constrainedModulus ?? surfaceLayer?.oedometricModulus
+      const Es = surfaceLayer?.elasticModulus
       if (!Es || Es <= 0) return undefined
-      return subgradeReaction({ ...common, Es, nu: surfaceLayer?.poissonRatio ?? 0.30 })
+      if (surfaceLayer?.poissonRatio == null) return undefined
+      return subgradeReaction({ ...common, Es: stressToBase(Es, profile?.unitSystem ?? p.unitSystem), nu: surfaceLayer.poissonRatio })
     }
     const kv1Project = Number(kv1Input)
     if (!Number.isFinite(kv1Project) || kv1Project <= 0) return undefined
@@ -116,7 +122,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
     elasticity: 'Elastisite teorisi',
     '2to1-layer': '2:1 + tabaka',
     boussinesq: 'Boussinesq alan integrasyonu',
-    janbu: 'Janbu M-integrasyonu',
+    janbu: 'Janbu M-integrasyonu (doğrulanmış katsayı yolu yok)',
     schmertmann: 'Schmertmann'
   }
 
@@ -127,19 +133,19 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       <Card title="OTURMA YÖNTEMİ">
         <div className="form-grid">
           <label>Hesap yöntemi
-            <select value={method} onChange={e => setMethod(e.target.value as IdealizedSettlementMethod)}>
+            <select value={selectedMethod} onChange={e => changeMethod(e.target.value as IdealizedSettlementMethod)} disabled={!profile}>
               <option value="burland-burbidge">Yöntem 1 · Burland &amp; Burbidge + kilde konsolidasyon</option>
               <option value="elasticity">Yöntem 2 · Elastisite teorisi + kilde konsolidasyon</option>
               <option value="2to1-layer">Yöntem 3 · 2:1 gerilme yayılımı + tabaka</option>
               <option value="boussinesq">Yöntem 4 · Boussinesq dikdörtgen alan integrasyonu</option>
-              <option value="janbu">Yöntem 5 · Janbu M-integrasyonu</option>
+              <option value="janbu" disabled>Yöntem 5 · Janbu M-integrasyonu (doğrulanmış katsayı yolu yok)</option>
               <option value="schmertmann">Yöntem 6 · Schmertmann gerinim integrasyonu</option>
             </select>
           </label>
           <label>Sondaj / YASS
-            <select value={b?.id ?? ''} onChange={e => setSelected(e.target.value)} disabled={!boreholes.length}>
+            <select value={b?.id ?? ''} onChange={e => {setSelected(e.target.value);if(profile)updateProjectInfo({idealizedSoilProfile:{...profile,settlementGroundwaterBoreholeId:e.target.value}})}} disabled={!eligibleBoreholes.length}>
               <option value="">Sondaj seç</option>
-              {boreholes.map(x => <option key={x.id} value={x.id}>{x.name} · YASS {x.groundwaterDepth ?? '—'} m</option>)}
+              {eligibleBoreholes.map(x => <option key={x.id} value={x.id}>{x.name} · YASS {x.groundwaterDepth ?? '—'} m</option>)}
             </select>
           </label>
           <Metric label="Profil durumu" value={profile?.status ?? 'YOK'} />
@@ -148,6 +154,8 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
           <Metric label="L" value={f.footingLength || '—'} unit="m" />
           <Metric label="Df" value={f.footingDepth || '—'} unit="m" />
           <Metric label="q" value={qGross ? stressFromBase(qGross, p.unitSystem) : '—'} unit={PROJECT_UNIT_LABELS.stress} />
+          <label>Hesap süresi t (yıl)<input type="number" min="0" step="0.1" value={profile?.settlementTimeYears??''} disabled={!profile} onChange={e=>setTime('settlementTimeYears',e.target.value)}/></label>
+          <label>İkincil oturma başlangıcı t₁ (yıl)<input type="number" min="0.01" step="0.1" value={profile?.secondaryStartTimeYears??''} disabled={!profile} onChange={e=>setTime('secondaryStartTimeYears',e.target.value)}/></label>
         </div>
       </Card>
 
@@ -205,7 +213,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
             <ProfileDiagram result={result} />
           </Card>
 
-          <Card title={`TABAKA BAZINDA OTURMA · ${methodLabel[method]}`}>
+          <Card title={`TABAKA BAZINDA OTURMA · ${methodLabel[selectedMethod]}`}>
             <div className="table-wrap">
               <table>
                 <thead><tr><th>#</th><th>Zemin</th><th>Üst</th><th>Alt</th><th>zorta</th><th>σ′v0</th><th>Δσ′</th><th>σ′vf</th><th>Ani</th><th>Kons.</th><th>Durum</th></tr></thead>
@@ -239,7 +247,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
             { symbol: 'σ′v0', title: 'Temel tabanındaki efektif gerilme', formula: 'ΣγH − u', value: result.foundationEffectiveStress, unit: 'kPa' },
             { symbol: 'qnet', title: 'Net temel gerilmesi', formula: 'max(0.1q, q − σ′v0)', value: result.netFoundationPressure, unit: 'kPa' },
             { symbol: 'zI', title: 'Etki derinliği', formula: method === 'burland-burbidge' ? 'Burland-Burbidge bağıntısı' : method === 'boussinesq' ? 'Δσv/q = 0.10 kriteri; Boussinesq alan integrasyonu' : 'Profil/gerilme yayılımı sınırı', value: result.influenceDepth, unit: 'm' },
-            { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: method === 'burland-burbidge' ? 'Σ[fS·fL·Ic·qnet·B^0.7]' : method === 'elasticity' ? 'Σ[(Δσ′/E)·H·(1−ν²)]' : method === '2to1-layer' ? 'Σ[Δσ₂:₁·H/E]' : method === 'boussinesq' ? 'Σ[ΔσBoussinesq·H/E]' : method === 'janbu' ? 'Σ[Δσ′·H/M]' : 'Σ[C1·C2·q·Iz/Es·Δz]', value: result.totalImmediate, unit: 'mm' },
+            { symbol: 'sᵢ', title: 'Toplam ani oturma', formula: method === 'burland-burbidge' ? 'Σ[fS·fL·Ic·qnet·B^0.7]' : method === 'elasticity' ? 'Σ[Δσ′·H/M]' : method === '2to1-layer' ? 'Σ[Δσ₂:₁·H/M]' : method === 'boussinesq' ? 'Σ[ΔσBoussinesq·H/E]' : method === 'janbu' ? 'Σ[Δσ′·H/M]' : 'Σ[C1·C2·q·Iz/Es·Δz]', value: result.totalImmediate, unit: 'mm' },
             { symbol: 's꜀', title: 'Toplam konsolidasyon', formula: 'Σ[Cc/(1+e₀)·H·log10(σ′vf/σ′v0)]', value: result.totalConsolidation, unit: 'mm' },
             { symbol: 'sₜ', title: 'Toplam oturma', formula: 'sₜ = sᵢ + s꜀', value: result.totalSettlement, unit: 'mm' },
             ...(ks ? [{ symbol: 'ks', title: 'Winkler yatak katsayısı', formula: ks.formula, value: ks.ks, unit: 'kN/m³' }] : [])

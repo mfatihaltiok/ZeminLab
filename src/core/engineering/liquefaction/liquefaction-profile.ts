@@ -22,6 +22,8 @@ export interface LiquefactionProfileRow{
   sigmaV:number;porePressure:number;sigmaVPrime:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number;alpha:number;beta:number;n1_60f:number
   crrM75?:number;CM?:number;tauResistance?:number;rd:number;tauEarthquake?:number;FS?:number
   saturated:boolean;potentiallyLiquefiable:boolean;mandatoryAnalysis:boolean;triggerRequired:boolean
+  postLiquefactionTrigger?:'FS<1.10'|'none'
+  postLiquefactionEvaluation:'required'|'review'|'not-required'|'not-evaluable'
   status:'ANALİZ GEREKLİ'|'ANALİZ GEREKMİYOR'|'TETİKLENME DEĞERLENDİRMESİ'|'VERİ EKSİK'
   conclusion:'SIVILAŞMA RİSKİ VAR'|'SIVILAŞMA RİSKİ YOK'|'DEĞERLENDİRİLMEDİ'|'VERİ EKSİK'
   liquefactionCheck:'evaluate'|'not-evaluable';trace:SptTraceStep[]
@@ -40,7 +42,7 @@ function stressAtDepth(depth:number,layers:LiquefactionSoilLayer[],gwt:number,ga
     gwt,
     gammaW
   )
-  return{sigmaV:r.sigmaV,porePressure:r.porePressure,sigmaVPrime:Math.max(.01,r.sigmaVPrime),covered:r.covered}
+  return{sigmaV:r.sigmaV,porePressure:r.porePressure,sigmaVPrime:r.sigmaVPrime,covered:r.covered}
 }
 function rdAtDepth(z:number){
   const d=Math.max(z,0)
@@ -63,6 +65,13 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
   if(!finite(input.gwt)||input.gwt<0)throw new Error('Sıvılaşma değerlendirmesi için geçerli YASS gerekir.')
   const gammaW=input.gammaW??9.81
   if(!finite(gammaW)||gammaW<=0)throw new Error('Su birim hacim ağırlığı pozitif olmalıdır.')
+  if(input.layers.some(l=>![l.top,l.bottom,l.gamma,l.gammaSat].every(finite)||l.top<0||l.bottom<=l.top||l.gamma<=0||l.gammaSat<=gammaW||l.finesContent!=null&&(!finite(l.finesContent)||l.finesContent<0||l.finesContent>100)||l.plasticityIndex!=null&&(!finite(l.plasticityIndex)||l.plasticityIndex<0)))throw new Error('Sıvılaşma zemin tabakalarının derinlik, γ, γsat, ince dane veya PI verileri geçersiz.')
+  const orderedLayers=[...input.layers].sort((a,b)=>a.top-b.top)
+  for(let k=1;k<orderedLayers.length;k++)if(orderedLayers[k].top<orderedLayers[k-1].bottom-1e-9)throw new Error('Sıvılaşma zemin profili çakışan tabakalar içeremez.')
+  if(input.spt.some(s=>!finite(s.depth)||s.depth<0||!Number.isInteger(s.nField)||s.nField<0||s.fineContent!=null&&(!finite(s.fineContent)||s.fineContent<0||s.fineContent>100)||s.plasticityIndex!=null&&(!finite(s.plasticityIndex)||s.plasticityIndex<0)||s.clayContent!=null&&(!finite(s.clayContent)||s.clayContent<0||s.clayContent>100)||s.waterContent!=null&&(!finite(s.waterContent)||s.waterContent<0)))throw new Error('SPT derinliği, ham N, FC, PI, kil oranı veya su muhtevası geçersiz.')
+  if(input.foundationDepth!=null&&(!finite(input.foundationDepth)||input.foundationDepth<0))throw new Error('Temel derinliği negatif olmayan sonlu değer olmalıdır.')
+  if(input.dts!=null&&!['1','1a','2','2a','3','3a','4','4a'].includes(input.dts))throw new Error('DTS değeri geçersiz.')
+  if(input.soilGroup!=null&&!['ZA','ZB','ZC','ZD','ZE','ZF'].includes(input.soilGroup))throw new Error('TBDY zemin grubu geçersiz.')
   const warnings:string[]=[]
   const scopeComplete=input.dts!==undefined&&input.soilGroup!==undefined&&input.continuousOrThickLens!==undefined
   const mandatoryByProject=scopeComplete&&mandatoryDts(input.dts)&&mandatorySoilGroup(input.soilGroup)&&input.continuousOrThickLens===true
@@ -71,7 +80,8 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
   const rows=input.spt.filter(x=>finite(x.depth)&&x.depth>=0).sort((a,b)=>a.depth-b.depth).map((record):LiquefactionProfileRow=>{
     const layer=input.layers.find(l=>record.depth>=l.top&&record.depth<l.bottom)
     const calculatedStress=stressAtDepth(record.depth,input.layers,input.gwt,gammaW)
-    const stress=record.stressSnapshot?{sigmaV:record.stressSnapshot.sigmaV0,porePressure:record.stressSnapshot.porePressureU0,sigmaVPrime:Math.max(.01,record.stressSnapshot.effectiveStressV0),covered:record.depth}:calculatedStress
+    if(record.stressSnapshot){const snap=record.stressSnapshot;if(![snap.sigmaV0,snap.porePressureU0,snap.effectiveStressV0,snap.groundwaterDepth].every(finite)||snap.sigmaV0<0||snap.porePressureU0<0||snap.groundwaterDepth<0||snap.effectiveStressV0<0||snap.effectiveStressV0>snap.sigmaV0+1e-6||Math.abs(snap.effectiveStressV0-(snap.sigmaV0-snap.porePressureU0))>Math.max(0.5,0.01*snap.sigmaV0)||!Number.isFinite(Date.parse(snap.capturedAt)))throw new Error('SPT test-zamanı gerilme snapshotı fiziksel olarak geçersiz veya tutarsız.');}
+    const stress=record.stressSnapshot?{sigmaV:record.stressSnapshot.sigmaV0,porePressure:record.stressSnapshot.porePressureU0,sigmaVPrime:record.stressSnapshot.effectiveStressV0,covered:record.depth}:calculatedStress
     const fineContent=record.fineContent??layer?.finesContent,pi=record.plasticityIndex??layer?.plasticityIndex
     const clayContent=record.clayContent??layer?.clayContent,soil=record.soil??layer?.soil
     const claySoil=isClaySoilCode(soil)
@@ -99,7 +109,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       {symbol:'β',title:'İnce dane katsayısı',formula:'β=f(IDI)',value:beta},
       {symbol:'(N1)60f',title:'İnce dane düzeltilmiş SPT',formula:'(N1)60f=α+β(N1)60',value:n1_60f}
     ]
-    const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent:clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha,beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired}
+    const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent:clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha,beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionEvaluation:'not-evaluable' as const}
     if(!stressSnapshotReady)warnings.push('SPT deney koşulları sabitlenmedi; sıvılaşma için onaylı test-zamanı σv0/u0/σ′v0 snapshotı gereklidir.')
     if(npt.hasAssumptions||!stressSnapshotReady){ warnings.push(...npt.warnings); return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace} }
     if(stress.covered<Math.max(0,record.depth)-1e-9){
@@ -117,7 +127,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     if(!saturated||!within20||!potentiallyLiquefiable||exemption){
       const note=!saturated?'YASS üzerinde':!within20?'20 m dışında':!potentiallyLiquefiable?'16.6.4 potansiyel zemin tanımına girmiyor':'DTS=4 istisnası'
       trace.push({symbol:'Kapsam',title:'TBDY kapsam kontrolü',formula:'16.6.1–16.6.6',value:record.depth,note})
-      return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
+      return{...base,postLiquefactionEvaluation:'not-required',status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     if(!scopeComplete){
       trace.push({symbol:'Kapsam',title:'16.6.1 proje kapsam verisi',formula:'DTS + Zemin grubu + sürekli tabaka/kalın mercek',value:0,note:'Kapsam girdileri tamamlanmadan sıvılaşma zorunluluğu hakkında uygunluk sonucu verilmez.'})
@@ -125,7 +135,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     }
     if(!mandatoryAnalysis){
       trace.push({symbol:'DTS/Zemin',title:'16.6.1 zorunluluğu',formula:'DTS=1/1a/2/2a + ZD/ZE/ZF + sürekli tabaka/kalın mercek',value:0,note:'Tamamlanan proje kapsamı koşulları sıvılaşma zorunluluğunu tetiklemedi.'})
-      return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
+      return{...base,postLiquefactionEvaluation:'not-required',status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     if(!researchDataComplete){
       trace.push({symbol:'Veri',title:'Zemin araştırması veri seti',formula:'SPT + dane dağılımı + w + Atterberg',value:0,note:'16.6.3 asgari veri seti tamamlanmadan nihai SPT sıvılaşma sonucu üretilmez.'})
@@ -133,7 +143,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     }
     if(npt.n1_60>=30){
       trace.push({symbol:'(N1)60',title:'Tetiklenme eşiği',formula:'(N1)60<30',value:npt.n1_60,note:'16.6.5 gereği tetiklenme değerlendirmesi yapılmaz.'})
-      return{...base,status:'ANALİZ GEREKLİ',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
+      return{...base,postLiquefactionEvaluation:'review',status:'ANALİZ GEREKLİ',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     if(n1_60f>=34){
       trace.push({symbol:'(N1)60f',title:'CRR aralığı',formula:'(N1)60f<34',value:n1_60f,note:'Ek 16B CRR bağıntısı için geçerli aralık dışı.'})
@@ -157,7 +167,8 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       {symbol:'τdeprem',title:'Deprem kayma gerilmesi',formula:'0.65·(0.4SDS)·σv0·rd',value:tauEarthquake,unit:'kPa'},
       {symbol:'FS',title:'Sıvılaşmaya karşı güvenlik',formula:'Rτ/τdeprem',value:FS,note:'TBDY 16.6.9: FS≥1.10'}
     )
-    return{...base,crrM75,CM:core.CM,tauResistance,tauEarthquake,FS,status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:FS<1.10?'SIVILAŞMA RİSKİ VAR':'SIVILAŞMA RİSKİ YOK',liquefactionCheck:'evaluate',trace}
+    if(FS<1.10)warnings.push('TBDY 16.6.7, 16.6.9 ve 16.6.10: FS<1.10 nedeniyle sıvılaşma sonrası dayanım/rijitlik kaybı, taşıma gücü, oturma ve yanal yayılma etkileri ayrıca değerlendirilmelidir; bu motor kalıcı yerdeğiştirmeyi hesaplamaz.')
+    return{...base,crrM75,CM:core.CM,tauResistance,tauEarthquake,FS,postLiquefactionTrigger:FS<1.10?'FS<1.10':'none',postLiquefactionEvaluation:FS<1.10?'required':'review',status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:FS<1.10?'SIVILAŞMA RİSKİ VAR':'SIVILAŞMA RİSKİ YOK',liquefactionCheck:'evaluate',trace}
   })
   if(!input.spt.length)warnings.push('SPT kaydı bulunmadığı için profil hesabı üretilemedi.')
   if(!input.layers.length)warnings.push('Zemin katmanı yok; düşey gerilme hesabı yapılamaz.')

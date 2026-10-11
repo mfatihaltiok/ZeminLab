@@ -91,7 +91,20 @@ export function fineContentCorrection(fines:number){
 export function calculateSpt(input:SptEngineInput):SptEngineResult{
   if(!Number.isInteger(input.nField)||input.nField<0)throw new Error('SPT N değeri sıfır veya pozitif bir tamsayı olmalıdır.')
   const warnings:string[]=[]
+  if(input.sptDepthM!==undefined&&(!Number.isFinite(input.sptDepthM)||input.sptDepthM<0))throw new Error('SPT deney derinliği negatif olmayan sonlu bir değer olmalıdır.')
   if(input.rodLengthM!==undefined&&input.sptDepthM!==undefined&&input.rodLengthM<input.sptDepthM)throw new Error('Toplam tij boyu SPT deney derinliğinden kısa olamaz.')
+  if(input.effectiveStress!==undefined&&(!Number.isFinite(input.effectiveStress)||input.effectiveStress<0))throw new Error('SPT örtü düzeltmesi için efektif düşey gerilme negatif olmayan sonlu değer olmalıdır.')
+  if(input.boreholeDiameterMm!==undefined){
+    const diameterCb=boreholeFactor(input.boreholeDiameterMm)
+    if(input.cb!=null&&Math.abs(input.cb-diameterCb)>1e-9)throw new Error('CB katsayısı ile sondaj çapı sınıfı birbiriyle çelişiyor.')
+  }
+  if(input.samplerCorrection!==undefined&&input.sampler!=='without-liner')throw new Error('CS düzeltmesi yalnız iç tüpsüz numune alıcı için girilebilir.')
+  if(input.cs!==undefined&&input.cs>1&&input.sampler!=null&&input.sampler!=='without-liner')throw new Error('Standart numune alıcı için CS=1.00 olmalıdır; CS>1 yalnız iç tüpsüz numune alıcı için kullanılabilir.')
+  if(input.cs!=null&&input.cs>1&&input.sampler==null&&(input.cs<1.10||input.cs>1.30))throw new Error('CS için yalnız 1.00 veya iç tüpsüz numune alıcıda 1.10–1.30 aralığı geçerlidir.')
+  if(input.sampler==='without-liner'&&input.cs!=null&&input.cs<1.10)throw new Error('İç tüpsüz numune alıcı için CS=1.10–1.30 aralığında olmalıdır.')
+  if(input.cs!=null&&input.samplerCorrection!=null&&Math.abs(input.cs-input.samplerCorrection)>1e-9)throw new Error('Girilen CS ile numune alıcı düzeltmesi birbiriyle çelişiyor.')
+  if(input.hammerType==='measured'&&input.energyRatio===undefined&&input.ce===undefined)throw new Error('Ölçülmüş enerji oranı seçildiğinde ER veya karşılık gelen CE açıkça girilmelidir.')
+  if(input.energyRatio!=null&&input.ce!=null&&Math.abs(input.energyRatio-input.ce*60)>1e-6)throw new Error('ER ile CE katsayısı tutarsız; ER=60·CE olmalıdır.')
   if(input.energyRatio!==undefined)validateEnergyRatioForHammer(input.energyRatio,input.hammerType)
   const ceResolved=input.ce!==undefined?(validateEnergyRatioForHammer(input.ce*60,input.hammerType),directCoefficient('CE',input.ce,.45,1.60)!):( ()=>{const er=resolveEnergyRatio(input);validateEnergyRatioForHammer(er.value,input.hammerType);return{value:er.value/60,source:er.source,assumption:er.assumption}})()
   const cbResolved=input.cb!==undefined?directCoefficient('CB',input.cb,1,1.15,[1,1.05,1.15])!: {value:boreholeFactor(input.boreholeDiameterMm),source:'sondaj çapından',assumption:false}
