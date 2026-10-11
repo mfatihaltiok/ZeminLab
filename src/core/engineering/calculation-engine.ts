@@ -1,5 +1,6 @@
 import { calculateSurfaceFoundation, compressionContact } from './surface-foundation'
 import { effectiveStressAtDepth } from './stress-profile'
+import { jetGroutAdvanced as jetGroutComposite } from './advanced-geotech'
 
 export type BearingMethod='Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
 export interface CalculationStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string;source?:string}
@@ -14,7 +15,7 @@ function factors(phiDeg:number,method:BearingMethod){
   const Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
   let Ngamma=0
   if(phi>0){
-    if(method==='Terzaghi')Ngamma=2*(Nq-1)*t
+    if(method==='Terzaghi')Ngamma=1.5*(Nq-1)*t
     else if(method==='Meyerhof')Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
     else if(method==='Hansen')Ngamma=1.5*(Nq-1)*t
     else Ngamma=2*(Nq+1)*t
@@ -69,6 +70,8 @@ export function settlement(i:SettlementInput):CalculationResult<{immediate:numbe
   if(![i.B,i.q,i.Es,i.nu].every(Number.isFinite)||i.B<=0||i.q<0||i.Es<=0||i.nu<=-1||i.nu>=.5)throw new Error('Oturma girdileri geçersiz; B/Es pozitif, q negatif olmayan ve -1<ν<0.5 olmalıdır.')
   for(const [index,l] of (i.layers??[]).entries()){
     if(!Number.isFinite(l.thickness)||l.thickness<0)throw new Error('Oturma katmanı '+(index+1)+': kalınlık negatif olmayan sonlu bir değer olmalıdır.')
+    const consolidationInputs=[l.Cc,l.e0,l.sigma0,l.dSigma]
+    if(consolidationInputs.some(v=>v!==undefined)&&consolidationInputs.some(v=>v===undefined))throw new Error('Oturma katmanı '+(index+1)+': Cc, e0, sigma0 ve dSigma birlikte girilmelidir.')
     for(const [name,value] of [['Cc',l.Cc],['e0',l.e0],['sigma0',l.sigma0],['dSigma',l.dSigma]] as const)if(value!==undefined&&!Number.isFinite(value))throw new Error('Oturma katmanı '+(index+1)+': '+name+' sonlu olmalıdır.')
     if(l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<0||l.sigma0!=null&&l.sigma0<=0||l.dSigma!=null&&l.dSigma<0)throw new Error('Oturma katmanı '+(index+1)+': konsolidasyon parametreleri geçersiz.')
   }
@@ -184,16 +187,13 @@ export function foundationChecks(i:FoundationCheckInput){
 }
 
 export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number;}){
-  if(!Number.isFinite(i.columnDiameter)||i.columnDiameter<=0)throw new Error('Jet Grout kolon çapı pozitif olmalıdır.')
-  if(!Number.isFinite(i.spacing)||i.spacing<=0)throw new Error('Jet Grout aks aralığı pozitif olmalıdır.')
   if(!Number.isFinite(i.FS)||i.FS<=0)throw new Error('Jet Grout güvenlik katsayısı pozitif olmalıdır.')
-  if(!Number.isFinite(i.qultSoil)||i.qultSoil<0||!Number.isFinite(i.qultColumn)||i.qultColumn<0||!Number.isFinite(i.columnStrength)||i.columnStrength<0)throw new Error('Jet Grout dayanım girdileri geçerli olmalıdır.')
-  if(!Number.isFinite(i.improvementFactor)||i.improvementFactor<0)throw new Error('Jet Grout iyileştirme katsayısı negatif olamaz.')
-  const Ac=Math.PI*i.columnDiameter**2/4,cell=i.spacing**2,ratio=Ac/Math.max(cell,1e-9)
-  if(ratio>1)throw new Error('Kolon kesit alanı hücre alanını aşamaz; çap/aks aralığını kontrol edin.')
-  const composite=(1-ratio)*i.qultSoil+ratio*i.qultColumn*i.improvementFactor
-  const warnings=['Bu hesap kompozit ön modeldir; jet grout nihai tasarımı kolon geometrisi, kalite kontrol, dayanım deneyleri, süreklilik ve saha doğrulaması ile ayrıca doğrulanmalıdır.']
-  return{value:{Ac,ratio,composite,allowable:composite/i.FS,columnLoad:Ac*i.columnStrength/i.FS,screeningOnly:true},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio},{symbol:'qcomp',title:'Kompozit taşıma modeli',formula:'(1−ρ)qsoil+ρ·qcolumn·I',value:composite}],method:'Jet Grout ön model',source:'Proje kaynak paketi',warnings}
+  if(!Number.isFinite(i.columnStrength)||i.columnStrength<0)throw new Error('Jet Grout kolon dayanımı negatif olmayan sonlu bir değer olmalıdır.')
+  if(!Number.isFinite(i.improvementFactor)||i.improvementFactor<0)throw new Error('Jet Grout iyileştirme katsayısı negatif olmayan sonlu bir değer olmalıdır.')
+  const r=jetGroutComposite({columnDiameter:i.columnDiameter,spacing:i.spacing,qSoil:i.qultSoil,qColumn:i.qultColumn*i.improvementFactor,FS:i.FS})
+  const Ac=r.areaColumn,ratio=r.areaReplacementRatio,composite=r.compositeCapacity
+  const warnings=['Mevcut uyumluluk API’si kanonik Jet Grout kompozit fonksiyonunu kullanır. Sonuç ön değerlendirmedir; nihai tasarım kolon geometrisi, zemin tabakaları, imalat ve saha kalite kontrolü ile doğrulanmalıdır.']
+  return{value:{Ac,ratio,composite,allowable:r.allowableCapacity!,columnLoad:Ac*i.columnStrength/i.FS,screeningOnly:true},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio},{symbol:'qcomp',title:'Kompozit taşıma modeli',formula:'(1−ρ)qsoil+ρ·(qcolumn·I)',value:composite}],method:'Jet Grout ön model',source:r.source,warnings}
 }
 
 export function stressAtDepth(depth:number,layers:{top:number;bottom:number;gamma:number;gammaSat:number}[],gwt:number){const r=effectiveStressAtDepth(depth,layers,gwt);return{sigmaV:r.sigmaV,sigmaVPrime:r.sigmaVPrime,u:r.porePressure}}
