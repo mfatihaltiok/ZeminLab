@@ -133,7 +133,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       <Card title="OTURMA YÖNTEMİ">
         <div className="form-grid">
           <label>Hesap yöntemi
-            <select value={selectedMethod} onChange={e => changeMethod(e.target.value as IdealizedSettlementMethod)}>
+            <select value={selectedMethod} onChange={e => changeMethod(e.target.value as IdealizedSettlementMethod)} disabled={!profile}>
               <option value="burland-burbidge">Yöntem 1 · Burland &amp; Burbidge + kilde konsolidasyon</option>
               <option value="elasticity">Yöntem 2 · Elastisite teorisi + kilde konsolidasyon</option>
               <option value="2to1-layer">Yöntem 3 · 2:1 gerilme yayılımı + tabaka</option>
