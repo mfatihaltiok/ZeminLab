@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { jetGroutEngineering, type JetGroutEngineeringResult } from '../../../core/engineering/jet-grout-advanced'
+import { jetGroutEngineering, verifyJetGroutQC, type JetGroutEngineeringResult } from '../../../core/engineering/jet-grout-advanced'
 import { Card, Field, Frame, Metric, Source } from '../workspace/WorkspaceShell'
 import { updateProjectInfo, useProjectInfo } from '../../../core/state/project-store'
 import { forceToBase, stressToBase, projectUnits } from '../../../core/units/project-units'
