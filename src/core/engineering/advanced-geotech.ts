@@ -24,7 +24,7 @@ export function stressSpread21(i: StressSpreadInput): StressSpreadResult {
   const z = i.z
   const area = (B + z) * (L + z)
   return {
-    deltaSigma: Math.max(0, i.q) * B * L / area,
+    deltaSigma: i.q * B * L / area,
     influenceArea: area,
     method: '2:1',
     formula: 'Δσz = q·B·L / [(B+z)(L+z)]'
