@@ -142,6 +142,9 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.equal(noStress.n1_60f,undefined)
   assert.equal(noStress.hasAssumptions,true)
   assert.ok(noStress.warnings.some(w=>w.includes('σ′v0 verilmedi')))
+  const unknownSoil=calculateSpt({nField:10,effectiveStress:25,fineContent:20,rodLengthM:5})
+  assert.equal(unknownSoil.n1_60f,undefined)
+  assert.equal(unknownSoil.hasAssumptions,true)
 
 }
 
