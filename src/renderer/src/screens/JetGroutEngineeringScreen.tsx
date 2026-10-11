@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { jetGroutEngineering, verifyJetGroutQC, type JetGroutEngineeringResult } from '../../../core/engineering/jet-grout-advanced'
 import { Card, Field, Frame, Metric, Source } from '../workspace/WorkspaceShell'
 import { updateProjectInfo, useProjectInfo } from '../../../core/state/project-store'
-import { forceToBase, stressToBase, projectUnits } from '../../../core/units/project-units'
+import { forceToBase, momentToBase, stressToBase, projectUnits } from '../../../core/units/project-units'
 import { CalculationTrace } from '../components/CalculationTrace'
 
 export let latestJetGroutResult:JetGroutEngineeringResult|undefined
@@ -11,8 +11,11 @@ const num=(value:string)=>{if(value.trim()==='')return undefined;const n=Number(
 
 export function JetGroutEngineeringScreen(){
   const p=useProjectInfo(),f=p.foundationParameters,j=p.jetGrout,units=projectUnits(p.unitSystem)
-  const projectArea=Math.max(0,f.footingWidth*f.footingLength)
   const projectLoad=forceToBase(f.structuralWeight,p.unitSystem)
+  const ex=projectLoad>0?momentToBase(f.momentY,p.unitSystem)/projectLoad:0,ey=projectLoad>0?momentToBase(f.momentX,p.unitSystem)/projectLoad:0
+  const effectiveWidth=f.footingWidth-2*Math.abs(ex),effectiveLength=f.footingLength-2*Math.abs(ey)
+  const projectArea=effectiveWidth>0&&effectiveLength>0?effectiveWidth*effectiveLength:0
+  const eccentricityInvalid=projectLoad>0&&f.footingWidth>0&&f.footingLength>0&&projectArea<=0
   const projectH=Math.hypot(forceToBase(f.vtX,p.unitSystem),forceToBase(f.vtY,p.unitSystem))
   const set=(key:keyof typeof j,value:number|undefined|string|boolean)=>updateProjectInfo({...p,jetGrout:{...j,[key]:value}})
   const d=j.columnDiameter?.toString()??'',spacing=j.spacing?.toString()??'',soil=j.qSoil?.toString()??'',column=j.qColumn?.toString()??'',fs=j.safetyFactor?.toString()??''
@@ -25,6 +28,7 @@ export function JetGroutEngineeringScreen(){
   const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)&&projectLoad>0&&projectArea>0
   const qcResult=useMemo(()=>verifyJetGroutQC({requiredUcs:num(qcRequiredUcs)==null?undefined:stressToBase(num(qcRequiredUcs)!,p.unitSystem),measuredUcs:num(qcMeasuredUcs)==null?undefined:stressToBase(num(qcMeasuredUcs)!,p.unitSystem),requiredDiameter:num(qcRequiredDiameter),measuredDiameter:num(qcMeasuredDiameter),requiredCoreSamples:num(qcRequiredCoreSamples),measuredCoreSamples:num(qcMeasuredCoreSamples),continuityVerified:j.qcContinuityVerified,constructionLogsVerified:j.qcConstructionLogsVerified,testReportReviewed:j.qcTestReportReviewed}),[p.unitSystem,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed])
   const computation=useMemo(()=>{
+    if(eccentricityInvalid)return {result:undefined,error:'Momentler nedeniyle pozitif basınçlı etkin temel alanı kalmıyor; temel geometrisi/yükler yeniden kontrol edilmelidir.'}
     if(!ready)return {result:undefined,error:undefined}
     try{return {result:jetGroutEngineering({
       columnDiameter:Number(d),spacing:Number(spacing),layout,qSoil:stressToBase(Number(soil),p.unitSystem),qColumn:stressToBase(Number(column),p.unitSystem),FS:num(fs),
@@ -43,7 +47,7 @@ export function JetGroutEngineeringScreen(){
         continuityVerified:j.qcContinuityVerified,constructionLogsVerified:j.qcConstructionLogsVerified,testReportReviewed:j.qcTestReportReviewed
       }
     }),error:undefined}}catch(error){return {result:undefined,error:error instanceof Error?error.message:'Jet Grout hesabı doğrulanamadı'}}
-  },[ready,d,spacing,soil,column,fs,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed,projectLoad,projectArea,projectH])
+  },[ready,eccentricityInvalid,d,spacing,soil,column,fs,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed,projectLoad,projectArea,projectH])
   const r=computation.result,calculationError=computation.error
   latestJetGroutResult=r
 
