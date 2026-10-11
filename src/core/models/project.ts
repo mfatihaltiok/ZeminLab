@@ -13,14 +13,25 @@ export interface JetGroutProjectParameters{
   layout?:'square'|'triangular'
   qSoil?:number
   qColumn?:number
+  safetyFactor?:number
   cSoil?:number
   cColumn?:number
   EsSoil?:number
   EsColumn?:number
   foundationThickness?:number
+  soilPoissonRatio?:number
   columnFrictionAngle?:number
   interfaceCohesion?:number
   interfaceFrictionAngle?:number
+  qcRequiredUcs?:number
+  qcMeasuredUcs?:number
+  qcRequiredDiameter?:number
+  qcMeasuredDiameter?:number
+  qcRequiredCoreSamples?:number
+  qcMeasuredCoreSamples?:number
+  qcContinuityVerified?:boolean
+  qcConstructionLogsVerified?:boolean
+  qcTestReportReviewed?:boolean
 }
 export interface GeophysicalParameters{vs30?:number;soilGroup?:'ZA'|'ZB'|'ZC'|'ZD'|'ZE'|'ZF';soilGroupSource?:'VS30'|'USER'|'SITE_SPECIFIC';siteSpecificResponseAnalysisCompleted?:boolean;source?:string;notes?:string}
 export interface SeismicParameters{
@@ -59,6 +70,7 @@ export interface FoundationParameters{
   passiveResistanceCharacteristic:number
   usePassiveResistance:boolean
   foundationInterface?:FoundationInterface
+  foundationTanDelta?:number
 }
 
 export interface ProjectInfo{

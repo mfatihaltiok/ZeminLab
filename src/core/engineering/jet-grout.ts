@@ -9,9 +9,9 @@
  */
 
 import { jetGroutAdvanced, type JetGroutAdvancedInput, type JetGroutAdvancedResult } from './advanced-geotech'
+import { bearingCapacity } from './calculation-engine'
 import { 
   jetGroutEngineering, 
-  jetGroutAxialCapacity, 
   jetGroutShearSafety, 
   virtualRaftSettlement,
   type JetGroutEngineeringInput,
@@ -50,6 +50,8 @@ export interface JetGroutDesignParameters {
   
   // Zemin parametreleri
   soilUnitWeight: number        // kN/m³
+  saturatedUnitWeight?: number // kN/m³
+  groundwaterDepth?: number    // m below ground surface
   soilCohesion: number          // kPa
   soilFrictionAngle: number     // derece
   soilEs?: number               // kPa (elastisite modülü)
@@ -91,8 +93,12 @@ export interface JetGroutDesignResult {
   
   // Taşıma gücü kontrolü
   appliedStress: number             // kPa
+  effectiveWidth: number
+  effectiveLength: number
   bearingCapacityUtilization: number // %
   bearingCapacitySafe: boolean
+  screeningOnly: true
+  designEligible: false
   
   // Oturma kontrolü
   untreatedSettlement?: number      // m
@@ -144,146 +150,107 @@ export interface JetGroutDesignResult {
  * 5. Eksenel kolon kapasitesi
  */
 export function calculateJetGroutDesign(params: JetGroutDesignParameters): JetGroutDesignResult {
-  const warnings: string[] = []
+  const warnings: string[] = [
+    'Bu eski birleşik Jet Grout fonksiyonu yalnız ön taramadır; nihai TBDY tasarımı değildir.',
+    'Gerçek tabaka bazlı efektif gerilmeler, kolon sürekliliği ve saha kalite kontrolü bu girdi modelinde bulunmadığından eksenel kolon/grup kapasitesi üretilmez.'
+  ]
   const notes: string[] = []
-  
-  // Validasyon
-  if (params.columnDiameter <= 0) throw new Error('Kolon çapı pozitif olmalıdır')
-  if (params.spacing <= 0) throw new Error('Kolon aralığı pozitif olmalıdır')
-  if (params.spacing < params.columnDiameter) throw new Error('Kolon aralığı kolon çapından küçük olamaz')
-  if (params.columnStrength <= 0) throw new Error('Kolon dayanımı pozitif olmalıdır')
-  if (params.verticalLoad <= 0) throw new Error('Düşey yük pozitif olmalıdır')
-  
-  // 1. Kompozit zemin parametreleri
+  const required = [
+    params.columnDiameter, params.spacing, params.soilUnitWeight, params.soilCohesion,
+    params.soilFrictionAngle, params.columnStrength, params.verticalLoad,
+    params.safetyFactorBearing, params.safetyFactorSliding,
+    params.foundationWidth, params.foundationLength, params.foundationDepth
+  ]
+  if (required.some(v => v == null || !Number.isFinite(v))) {
+    throw new Error('Jet Grout ön taraması için kolon, zemin, yük, güvenlik katsayıları ve temel B/L/Df girdileri eksiksiz olmalıdır.')
+  }
+  if (params.columnDiameter <= 0 || params.spacing <= 0 || params.spacing < params.columnDiameter) throw new Error('Kolon çapı ve aralığı geçerli olmalı; aralık çapından küçük olamaz.')
+  if (params.soilUnitWeight <= 0 || params.soilCohesion < 0 || params.soilFrictionAngle < 0 || params.soilFrictionAngle > 50 || params.columnStrength <= 0 || params.verticalLoad <= 0) throw new Error('Jet Grout zemin, kolon dayanımı veya düşey yük girdileri fiziksel sınırlar dışında.')
+  if (params.foundationWidth! <= 0 || params.foundationLength! <= 0 || params.foundationDepth! < 0) throw new Error('Temel genişliği/uzunluğu pozitif, temel derinliği negatif olmayan değer olmalıdır.')
+  if (params.safetyFactorBearing <= 0 || params.safetyFactorSliding <= 0 || !Number.isFinite(params.safetyFactorBearing) || !Number.isFinite(params.safetyFactorSliding)) throw new Error('Jet Grout güvenlik katsayıları pozitif ve sonlu olmalıdır.')
+  for (const [name, value] of [['Es zemin', params.soilEs], ['Es kolon', params.columnEs], ['Poisson oranı', params.soilNu], ['kolon uzunluğu', params.columnLength], ['yatay yük', params.horizontalLoad], ['kolon birim hacim ağırlığı', params.columnUnitWeight], ['YASS derinliği',params.groundwaterDepth], ['γsat',params.saturatedUnitWeight], ['Mx', params.momentX], ['My', params.momentY]] as const) {
+    if (value !== undefined && !Number.isFinite(value)) throw new Error(name + ' sonlu bir sayı olmalıdır.')
+  }
+  if (params.soilEs != null && params.soilEs <= 0 || params.columnEs != null && params.columnEs <= 0 || params.columnLength != null && params.columnLength <= 0 || params.horizontalLoad != null && params.horizontalLoad < 0 || params.soilNu != null && (params.soilNu <= -1 || params.soilNu >= 0.5) || params.groundwaterDepth!=null&&params.groundwaterDepth<0 || params.saturatedUnitWeight!=null&&params.saturatedUnitWeight<=9.80665) throw new Error('Jet Grout elastisite, YASS, γsat, uzunluk, yatay yük veya Poisson girdisi geçersiz.')
+
+  const ex=(params.momentY??0)/params.verticalLoad,ey=(params.momentX??0)/params.verticalLoad
+  const effectiveWidth=params.foundationWidth!-2*Math.abs(ex),effectiveLength=params.foundationLength!-2*Math.abs(ey)
+  if(effectiveWidth<=0||effectiveLength<=0)throw new Error('Jet Grout ön kontrolünde momentler nedeniyle pozitif basınçlı etkin temel alanı kalmıyor.')
+  const foundationArea = effectiveWidth * effectiveLength
+  const gammaW=9.80665
+  let surcharge=params.soilUnitWeight*params.foundationDepth!,gammaBearing=params.soilUnitWeight
+  if(params.groundwaterDepth==null)warnings.push('Jet Grout taşıma gücü ön kontrolünde YASS derinliği girilmedi; su etkisi düzeltilmedi ve kuru koşul varsayımı nihai tasarım için kullanılamaz.')
+  else if(params.groundwaterDepth<=params.foundationDepth!||params.groundwaterDepth<params.foundationDepth!+effectiveWidth){
+    if(params.saturatedUnitWeight==null)throw new Error('YASS temel tabanı/etki derinliği içindeyse Jet Grout taşıma gücü için γsat>γw açıkça girilmelidir.')
+    const gammaSub=params.saturatedUnitWeight-gammaW
+    if(params.groundwaterDepth<=params.foundationDepth!){
+      surcharge=params.soilUnitWeight*Math.max(0,params.groundwaterDepth)+gammaSub*Math.max(0,params.foundationDepth!-params.groundwaterDepth)
+      gammaBearing=gammaSub
+    }else{
+      const z=params.groundwaterDepth-params.foundationDepth!
+      gammaBearing=gammaSub+(z/effectiveWidth)*(params.soilUnitWeight-gammaSub)
+    }
+  }
+  const soilCapacity = bearingCapacity({
+    B: effectiveWidth, L: effectiveLength, Df: params.foundationDepth!,
+    gamma: params.soilUnitWeight, gammaBearing, surcharge, c: params.soilCohesion, phi: params.soilFrictionAngle,
+    FS: params.safetyFactorBearing, method: 'Meyerhof'
+  })
   const compositeResult = jetGroutAdvanced({
     columnDiameter: params.columnDiameter,
     spacing: params.spacing,
     layout: params.layout,
-    qSoil: params.soilCohesion * 5.14 + params.soilUnitWeight * (params.foundationDepth ?? 1) * 2, // Basit taşıma gücü
+    qSoil: soilCapacity.value.ultimate,
     qColumn: params.columnStrength,
     cSoil: params.soilCohesion,
-    cColumn: params.columnStrength * 0.1, // Kolon kohezyonu dayanımın %10'u
     EsSoil: params.soilEs,
     EsColumn: params.columnEs,
     load: params.verticalLoad,
-    foundationArea: params.foundationWidth && params.foundationLength 
-      ? params.foundationWidth * params.foundationLength 
-      : undefined,
+    foundationArea,
     FS: params.safetyFactorBearing
   })
-  
-  // 2. Taşıma gücü kontrolü
-  const foundationArea = params.foundationWidth && params.foundationLength 
-    ? params.foundationWidth * params.foundationLength 
-    : 1
   const appliedStress = params.verticalLoad / foundationArea
-  const bearingCapacityUtilization = (appliedStress / compositeResult.compositeCapacity) * 100
+  const bearingCapacityUtilization = compositeResult.compositeCapacity > 0
+    ? (appliedStress / compositeResult.compositeCapacity) * 100
+    : Number.POSITIVE_INFINITY
   const bearingCapacitySafe = bearingCapacityUtilization <= 100 / params.safetyFactorBearing
-  
-  if (bearingCapacityUtilization > 80) {
-    warnings.push('Taşıma gücü utilization %80 üzerinde. Kolon aralığını azaltmayı veya kolon çapını artırmayı düşünün.')
-  }
-  
-  // 3. Oturma azaltma hesabı
+  if (bearingCapacityUtilization > 80) warnings.push('Ön tarama kullanım oranı %80 üzerindedir; geometri ve iyileştirme tasarımı yeniden değerlendirilmelidir.')
+  if((params.momentX??0)!==0||(params.momentY??0)!==0)warnings.push('Momentler etkin temel boyutlarına B′=B−2|ey| ve L′=L−2|ex| yaklaşımıyla yansıtıldı; bu sonuç hâlâ ön taramadır.')
+  if(params.columnUnitWeight!=null)warnings.push('Kolon birim hacim ağırlığı bu kompozit kapasite ön modelinde kullanılmaz; kendi ağırlık etkisi ayrıca modellenmelidir.')
   let untreatedSettlement: number | undefined
   let treatedSettlement: number | undefined
   let settlementReduction: number | undefined
-  
-  if (params.soilEs && params.columnEs && params.columnLength) {
+  if (params.soilEs && params.columnEs && params.columnLength && params.soilNu!=null) {
     const virtualRaft = virtualRaftSettlement({
-      load: params.verticalLoad,
-      area: foundationArea,
-      treatedThickness: params.columnLength,
-      untreatedModulus: params.soilEs,
-      treatedModulus: compositeResult.compositeModulus ?? params.columnEs,
-      poissonRatio: params.soilNu ?? 0.3
+      load: params.verticalLoad, area: foundationArea, treatedThickness: params.columnLength,
+      untreatedModulus: params.soilEs, treatedModulus: compositeResult.compositeModulus ?? params.columnEs,
+      poissonRatio: params.soilNu
     })
     untreatedSettlement = virtualRaft.untreatedSettlement
     treatedSettlement = virtualRaft.treatedSettlement
     settlementReduction = virtualRaft.reductionPercent
-    
-    if (settlementReduction < 30) {
-      warnings.push('Oturma azaltma oranı %30 altında. Kolon uzunluğunu veya modülünü artırmayı düşünün.')
-    }
+    warnings.push('Oturma azaltma sonucu eşdeğer tabaka/sanal radye taramasıdır; katman bazlı oturma analizinin yerine geçmez.')
+  }else if(params.soilEs&&params.columnEs&&params.columnLength&&params.soilNu==null){warnings.push('Sanal radye oturması hesaplanmadı: Poisson oranı ν açıkça girilmelidir.')
   }
-  
-  // 4. Kayma güvenliği kontrolü
   let slidingResistance: number | undefined
   let slidingDemand: number | undefined
   let slidingSafetyFactor: number | undefined
   let slidingSafe: boolean | undefined
-  
-  if (params.horizontalLoad && params.horizontalLoad > 0) {
+  if (params.horizontalLoad != null && params.horizontalLoad > 0) {
     const shearCheck = jetGroutShearSafety({
-      verticalLoad: params.verticalLoad,
-      horizontalLoad: params.horizontalLoad,
-      area: foundationArea,
-      cohesion: compositeResult.compositeCohesion ?? params.soilCohesion,
-      frictionAngle: params.soilFrictionAngle
+      verticalLoad: params.verticalLoad, horizontalLoad: params.horizontalLoad, area: foundationArea,
+      cohesion: params.soilCohesion, frictionAngle: params.soilFrictionAngle
     })
     slidingResistance = shearCheck.shearResistance * foundationArea
     slidingDemand = params.horizontalLoad
     slidingSafetyFactor = shearCheck.FS
     slidingSafe = slidingSafetyFactor >= params.safetyFactorSliding
-    
-    if (!slidingSafe) {
-      warnings.push(`Kayma güvenliği katsayısı ${slidingSafetyFactor.toFixed(2)}, gereken ${params.safetyFactorSliding}. Kolon sayısı veya çapı artırılmalı.`)
-    }
   }
-  
-  // 5. Eksenel kolon kapasitesi (basitleştirilmiş)
-  let axialCapacity: JetGroutDesignResult['axialCapacity'] | undefined
-  
-  if (params.columnLength && params.columnLength > 0) {
-    // Basit katman modeli: tek tabaka
-    const layers = [{
-      thickness: params.columnLength,
-      gamma: params.soilUnitWeight,
-      cohesion: params.soilCohesion,
-      frictionAngle: params.soilFrictionAngle,
-      effectiveStressAtTop: params.soilUnitWeight * (params.foundationDepth ?? 0),
-      effectiveStressAtBottom: params.soilUnitWeight * ((params.foundationDepth ?? 0) + params.columnLength)
-    }]
-    
-    const axial = jetGroutAxialCapacity({
-      diameter: params.columnDiameter,
-      layers,
-      columnStrength: params.columnStrength,
-      numberOfColumns: Math.ceil(foundationArea / (params.spacing * params.spacing)),
-      groupSpacing: params.spacing,
-      resistanceFactor: 1.0
-    })
-    
-    axialCapacity = {
-      shaftCapacity: axial.shaftCharacteristic,
-      tipCapacity: axial.tipCharacteristic,
-      totalCapacity: axial.columnCharacteristic,
-      designCapacity: axial.designCapacity,
-      groupEfficiency: axial.groupEfficiency,
-      governingMode: axial.governingMode
-    }
-    
-    if (axial.groupEfficiency < 0.8) {
-      notes.push(`Grup verimi %{(axial.groupEfficiency * 100).toFixed(0)}. Kolon aralığı artırılabilir.`)
-    }
-  }
-  
-  // Kaynak referansları
+  if (params.columnLength != null) notes.push('Eksenel kolon/grup kapasitesi hesaplanmadı: bu eski API gerçek efektif gerilme profili ve yeraltı suyu girdisi almıyor.')
   const sources = [
-    {
-      key: 'EROL-CHEKINMEZ-BAYRAM-2018',
-      title: 'Jet Enjeksiyon Yöntemi',
-      reference: 'Erol, A. O. & Çekinmez Bayram, Z. (2018)',
-      section: 'Bölüm 4-6: Kompozit zemin parametreleri'
-    },
-    {
-      key: 'TBDY-2018-16',
-      title: 'TBDY 2018 Bölüm 16',
-      reference: 'Türkiye Bina Deprem Yönetmeliği 2018',
-      section: 'Zemin iyileştirme ve temel tasarımı'
-    }
+    { key: 'EROL-CHEKINMEZ-BAYRAM-2018', title: 'Jet Enjeksiyon Yöntemi', reference: 'Erol, A. O. & Çekinmez Bayram, Z. (2018)', section: 'Kompozit parametreler; saha deneyleri ve kalite kontrolle doğrulanmalıdır' },
+    { key: 'TBDY-2018-16', title: 'TBDY 2018 Bölüm 16', reference: 'Türkiye Bina Deprem Yönetmeliği 2018', section: 'Nihai tasarım için ilgili temel ve zemin iyileştirme kontrolleri ayrıca yapılmalıdır' }
   ]
-  
   return {
     areaReplacementRatio: compositeResult.areaReplacementRatio,
     compositeBearingCapacity: compositeResult.compositeCapacity,
@@ -291,26 +258,15 @@ export function calculateJetGroutDesign(params: JetGroutDesignParameters): JetGr
     compositeCohesion: compositeResult.compositeCohesion,
     columnLoadShare: compositeResult.columnLoadShare,
     soilLoadShare: compositeResult.soilLoadShare,
-    stressConcentrationFactor: compositeResult.columnLoadShare / compositeResult.areaReplacementRatio,
-    appliedStress,
-    bearingCapacityUtilization,
-    bearingCapacitySafe,
-    untreatedSettlement,
-    treatedSettlement,
-    settlementReduction,
-    slidingResistance,
-    slidingDemand,
-    slidingSafetyFactor,
-    slidingSafe,
-    axialCapacity,
-    columnArea: compositeResult.areaColumn,
-    cellArea: compositeResult.cellArea,
-    numberOfColumns: params.foundationWidth && params.foundationLength && params.spacing
-      ? Math.ceil(params.foundationWidth / params.spacing) * Math.ceil(params.foundationLength / params.spacing)
-      : undefined,
-    warnings,
-    notes,
-    sources
+    stressConcentrationFactor: compositeResult.areaReplacementRatio > 0 ? compositeResult.columnLoadShare / compositeResult.areaReplacementRatio : 0,
+    appliedStress,effectiveWidth,effectiveLength,bearingCapacityUtilization,bearingCapacitySafe,
+    screeningOnly: true, designEligible: false,
+    untreatedSettlement, treatedSettlement, settlementReduction,
+    slidingResistance, slidingDemand, slidingSafetyFactor, slidingSafe,
+    axialCapacity: undefined,
+    columnArea: compositeResult.areaColumn, cellArea: compositeResult.cellArea,
+    numberOfColumns: Math.ceil(params.foundationWidth! / params.spacing) * Math.ceil(params.foundationLength! / params.spacing),
+    warnings, notes, sources
   }
 }
 
@@ -323,6 +279,8 @@ export function calculateNumberOfColumns(
   spacing: number,
   layout: 'square' | 'triangular' = 'square'
 ): number {
+  if(![foundationWidth,foundationLength,spacing].every(Number.isFinite)||foundationWidth<=0||foundationLength<=0||spacing<=0)throw new Error('Temel boyutları ve kolon aralığı pozitif sonlu değerler olmalıdır.')
+  if(layout!=='square'&&layout!=='triangular')throw new Error('Desteklenmeyen Jet Grout yerleşim düzeni.')
   const colsX = Math.ceil(foundationWidth / spacing) + 1
   const colsY = Math.ceil(foundationLength / spacing) + 1
   
@@ -343,6 +301,8 @@ export function calculateImprovementRatio(
   spacing: number,
   layout: 'square' | 'triangular' = 'square'
 ): number {
+  if(![columnDiameter,spacing].every(Number.isFinite)||columnDiameter<=0||spacing<=0||spacing<columnDiameter)throw new Error('Kolon çapı ve aralığı pozitif olmalı; aralık çapından küçük olamaz.')
+  if(layout!=='square'&&layout!=='triangular')throw new Error('Desteklenmeyen Jet Grout yerleşim düzeni.')
   const columnArea = Math.PI * (columnDiameter / 2) ** 2
   
   if (layout === 'square') {
@@ -364,6 +324,7 @@ export function estimateColumnDiameter(
   soilType: 'clay' | 'silt' | 'sand' | 'gravel',
   method: 'single' | 'double' | 'triple' = 'double'
 ): { min: number; typical: number; max: number } {
+  if(!['clay','silt','sand','gravel'].includes(soilType)||!['single','double','triple'].includes(method))throw new Error('Jet Grout zemin türü veya enjeksiyon yöntemi geçersiz.')
   const table: Record<string, Record<string, { min: number; typical: number; max: number }>> = {
     clay: {
       single: { min: 0.3, typical: 0.5, max: 0.7 },
@@ -399,6 +360,8 @@ export function estimateColumnStrength(
   soilType: 'clay' | 'silt' | 'sand' | 'gravel',
   cementContent?: number // kg/m³
 ): { min: number; typical: number; max: number } {
+  if(!['clay','silt','sand','gravel'].includes(soilType))throw new Error('Jet Grout zemin türü geçersiz.')
+  if(cementContent!=null&&(!Number.isFinite(cementContent)||cementContent<=0))throw new Error('Çimento içeriği pozitif ve sonlu kg/m³ olmalıdır.')
   // Tipik değerler (cement content ~300 kg/m³)
   const baseTable: Record<string, { min: number; typical: number; max: number }> = {
     clay: { min: 1000, typical: 2500, max: 5000 },

@@ -4,7 +4,7 @@ export type SurfaceFoundationMethod='TBDY-2018'|'Terzaghi'|'Meyerhof'|'Hansen'|'
 export interface SurfaceFoundationLayer{topDepth:number;bottomDepth:number;gamma:number;gammaSat?:number;cohesion:number;phi:number;name?:string}
 export interface SurfaceFoundationInput{
   B:number;L:number;Df:number;gamma1:number;gamma2?:number;c:number;phi:number;verticalLoad:number;horizontalLoad?:number;momentX?:number;momentY?:number
-  groundSlope?:number;baseSlope?:number;resistanceFactor?:number;method?:SurfaceFoundationMethod;safetyFactor?:number;undrainedCu?:number
+  groundSlope?:number;baseSlope?:number;resistanceFactor?:number;method?:SurfaceFoundationMethod;safetyFactor?:number;undrainedCu?:number;additionalSurcharge?:number
   foundationType?:FoundationType;unitSystem?:UnitSystem;groundwaterDepth?:number;layers?:SurfaceFoundationLayer[]
 }
 export interface SurfaceFoundationStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string;source?:string}
@@ -25,13 +25,14 @@ const clamp=(x:number,min:number,max:number)=>Math.max(min,Math.min(max,x))
 function factors(phiDeg:number,method:SurfaceFoundationMethod){
   const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi))
   const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
-  const Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
+  const Nc=phi===0?(method==='Terzaghi'?5.7:5.14):(Nq-1)/Math.max(t,1e-12)
   let Ngamma=0
   if(phi>0){
     if(method==='Meyerhof')Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
     else if(method==='Hansen')Ngamma=1.5*(Nq-1)*t
     else if(method==='Vesic')Ngamma=2*(Nq+1)*t
-    else Ngamma=2*(Nq-1)*t
+    else if(method==='Terzaghi')Ngamma=1.5*(Nq-1)*t
+    else Ngamma=2*(Nq+1)*t
   }
   return{phi,t,Nq,Nc,Ngamma}
 }
@@ -69,7 +70,7 @@ function vesicBaseFactors(thetaDeg:number,phi:number,Nq:number){
 }
 
 function methodFactors(method:SurfaceFoundationMethod,B:number,L:number,Df:number,phi:number,Nq:number,Nc:number,H:number,N:number,c:number,groundSlope:number,baseSlope:number){
-  const r=Math.min(B,L)/Math.max(L,1e-9),t=Math.tan(rad(phi)),sin=Math.sin(rad(phi))
+  const r=Math.min(B,L)/Math.max(B,L,1e-9),t=Math.tan(rad(phi)),sin=Math.sin(rad(phi))
   const Nphi=Math.tan(Math.PI/4+rad(phi)/2)**2
   const slope=method==='TBDY-2018'||method==='Hansen'||method==='Vesic'?vesicGroundFactors(groundSlope,phi,Nq):{gc:1,gq:1,gg:1}
   const base=method==='TBDY-2018'||method==='Hansen'||method==='Vesic'?vesicBaseFactors(baseSlope,phi,Nq):{bc:1,bq:1,bg:1}
@@ -192,16 +193,32 @@ function equivalentLayerParameters(layers:SurfaceFoundationLayer[]|undefined,Df:
 }
 
 export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoundationResult{
+  const required=[i.B,i.L,i.Df,i.gamma1,i.c,i.phi,i.verticalLoad]
+  if(required.some(x=>!finite(x)))throw new Error('Temel geometrisi, zemin parametreleri ve düşey yük sonlu sayılar olmalıdır.')
   if(i.B<=0||i.L<=0||i.Df<0)throw new Error('Temel B ve L pozitif, Df negatif olmayan değer olmalıdır.')
   if(i.gamma1<=0)throw new Error('γ doğal birim hacim ağırlığı pozitif olmalıdır.')
-  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&(!finite(i.gamma2)||i.gamma2!<=0))throw new Error('YASS tanımlandıysa γsat pozitif olmalıdır.')
-  if(i.c<0||i.verticalLoad<0)throw new Error('c negatif, düşey yük negatif olamaz.')
+  if(finite(i.groundwaterDepth)&&i.groundwaterDepth!>=0&&i.groundwaterDepth!<=i.Df+i.B&&(!finite(i.gamma2)||i.gamma2!<=gammaW))throw new Error('YASS, temel tabanından B derinliğine kadar etkiliyse γsat, γw=9.80665 kN/m³ değerinden büyük olmalıdır.')
+  if((i.groundSlope??0)<0||(i.groundSlope??0)>=90||(i.baseSlope??0)<0||(i.baseSlope??0)>=90)throw new Error('Arazi ve temel tabanı eğimleri 0°≤β<90° aralığında olmalıdır.')
+  if(i.additionalSurcharge!=null&&i.additionalSurcharge<0)throw new Error('Ek sürşarj negatif olamaz.')
+  if(i.c<0||i.verticalLoad<=0)throw new Error('c negatif olamaz; taşıma gücü hesabı için düşey yük pozitif olmalıdır.')
   if(!finite(i.phi)||i.phi<0||i.phi>50)throw new Error('φ 0° ile 50° arasında olmalıdır.')
+  for(const [name,value] of [['ek sürşarj',i.additionalSurcharge],['yatay yük',i.horizontalLoad],['Mx',i.momentX],['My',i.momentY],['arazi eğimi',i.groundSlope],['temel tabanı eğimi',i.baseSlope],['YASS derinliği',i.groundwaterDepth],['Cu',i.undrainedCu],['direnç katsayısı',i.resistanceFactor],['güvenlik katsayısı',i.safetyFactor]] as const){if(value!==undefined&&!finite(value))throw new Error(name+' sonlu bir sayı olmalıdır.')}
+  if(i.horizontalLoad!=null&&i.horizontalLoad<0)throw new Error('Yatay yük büyüklüğü negatif girilemez; yön ayrı temsil edilmelidir.')
+  if(i.undrainedCu!=null&&i.undrainedCu<0)throw new Error('Cu negatif olamaz.')
+  if(i.additionalSurcharge!=null&&i.additionalSurcharge<0)throw new Error('Ek sürşarj negatif olamaz.')
+  if(i.groundwaterDepth!=null&&i.groundwaterDepth<0)throw new Error('YASS derinliği negatif olamaz.')
+  if(i.layers?.some(l=>![l.topDepth,l.bottomDepth,l.gamma,l.cohesion,l.phi].every(finite)||l.topDepth<0||l.bottomDepth<=l.topDepth||l.gamma<=0||l.cohesion<0||l.phi<0||l.phi>50||(l.gammaSat!=null&&(!finite(l.gammaSat)||l.gammaSat<=gammaW))||(i.groundwaterDepth!=null&&l.topDepth<i.Df+i.B&&l.bottomDepth>i.groundwaterDepth&&l.gammaSat==null)))throw new Error('Tabakalı zemin verilerinde derinlik, γ, γsat, kohezyon veya sürtünme açısı geçersiz; YASS altındaki katmanlarda γsat açıkça girilmelidir.')
+  if(i.layers?.length){const ordered=[...i.layers].sort((a,b)=>a.topDepth-b.topDepth);for(let k=1;k<ordered.length;k++)if(ordered[k].topDepth<ordered[k-1].bottomDepth-1e-9)throw new Error('Tabakalı zemin profili çakışan derinlik aralıkları içeremez.')}
   const method=i.method??'TBDY-2018',foundationType=i.foundationType??'tekil',N=i.verticalLoad
+  if(!['TBDY-2018','Terzaghi','Meyerhof','Hansen','Vesic'].includes(method))throw new Error('Desteklenmeyen yüzeysel temel yöntemi.')
+  if(!['tekil','surekli','radye'].includes(foundationType))throw new Error('Temel tipi geçersiz.')
+  if(i.safetyFactor!=null&&(!finite(i.safetyFactor)||i.safetyFactor<=0))throw new Error('Klasik güvenlik katsayısı pozitif ve sonlu olmalıdır.')
+  if(i.resistanceFactor!=null&&(!finite(i.resistanceFactor)||i.resistanceFactor<=0))throw new Error('Direnç katsayısı pozitif ve sonlu olmalıdır.')
   const Vh=Math.abs(i.horizontalLoad??0)
   const groundSlope=Math.abs(i.groundSlope??0),baseSlope=Math.abs(i.baseSlope??0)
   if(groundSlope>=90||baseSlope>=90||groundSlope+baseSlope>=90)throw new Error('Arazi ve temel tabanı eğimleri geçersiz.')
   const warnings:string[]=[]
+  if(i.groundwaterDepth==null)warnings.push('YASS girilmedi; hesap kuru zemin kabulüyle ön değerlendirme olarak üretildi. Nihai tasarım için YASS derinliği doğrulanmalıdır.')
   const ex=N>0?(i.momentY??0)/N:0,ey=N>0?(i.momentX??0)/N:0
   if(N===0&&(i.momentX!==0||i.momentY!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
   const coreContact=Math.abs(ex)<=i.B/6+1e-12&&Math.abs(ey)<=i.L/6+1e-12
@@ -212,11 +229,21 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const Bp=Math.min(Math.max(Be,1e-9),Math.max(Le,1e-9)),Lp=Math.max(Be,Le)
   const f=factors(i.phi,method)
   const water=groundwater(i.Df,Bp,i.gamma1,i.gamma2,i.groundwaterDepth)
-  const mf=methodFactors(method,Bp,Lp,i.Df,f.phi,f.Nq,f.Nc,Vh,N,i.c,groundSlope,baseSlope)
+  let mf=methodFactors(method,Bp,Lp,i.Df,f.phi,f.Nq,f.Nc,Vh,N,i.c,groundSlope,baseSlope)
 
   let representativeC=i.c,representativePhi=f.phi,representativeGamma=water.gammaBelow
   let layerData:ReturnType<typeof equivalentLayerParameters>=null
   let layeredComplete=true
+  if(i.layers?.length){
+    let profileCursor=0
+    for(const layer of [...i.layers].sort((a,b)=>a.topDepth-b.topDepth)){
+      if(layer.topDepth>profileCursor+1e-9){layeredComplete=false;break}
+      profileCursor=Math.max(profileCursor,layer.bottomDepth)
+      if(profileCursor>=i.Df+2*Bp-1e-9)break
+    }
+    if(profileCursor<i.Df+2*Bp-1e-9)layeredComplete=false
+    if(!layeredComplete)warnings.push('Tabakalı zemin profili yüzeyden temel altındaki 2B′ etki derinliğine kadar sürekli değil; sürşarj/katmanlı nihai değerlendirme tamamlanmış sayılmaz.')
+  }
   if(i.layers?.length){
     layerData=equivalentLayerParameters(i.layers,i.Df,2*Bp,i.groundwaterDepth)
     if(!layerData){
@@ -236,7 +263,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
     }
   }
 
-  if(layerData?.complete && i.layers?.length){
+  if(layerData?.complete && layeredComplete && i.layers?.length){
     const ordered=[...i.layers].filter(l=>l.bottomDepth>l.topDepth&&l.topDepth<i.Df).sort((a,b)=>a.topDepth-b.topDepth)
     let sigmaBase=0
     for(const l of ordered){
@@ -252,10 +279,11 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
     water.gammaBelow=layerData.gamma??water.gammaBelow
   }
 
-  const rf=method==='TBDY-2018'?i.resistanceFactor??1.4:1
-  if(rf<=0)throw new Error('Direnç katsayısı pozitif olmalıdır.')
-  if(method==='TBDY-2018'&&Math.abs(rf-1.4)>1e-9)warnings.push('TBDY 2018 Tablo 16.2 yüzeysel temel taşıma gücü için γRv=1.40 kullanılmalıdır.')
+  water.surcharge += i.additionalSurcharge ?? 0
+  const rf=method==='TBDY-2018'?1.4:1
+  if(method==='TBDY-2018'&&i.resistanceFactor!=null&&Math.abs(i.resistanceFactor-1.4)>1e-9)throw new Error('TBDY 2018 Tablo 16.2 için γRv=1.40 kullanılmalıdır; farklı direnç katsayısı kabul edilmez.')
   const ef=factors(representativePhi,method)
+  mf=methodFactors(method,Bp,Lp,i.Df,ef.phi,ef.Nq,ef.Nc,Vh,N,representativeC,groundSlope,baseSlope)
   const equivalentQk=representativeC*ef.Nc*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+
     water.surcharge*ef.Nq*mf.sq*mf.dq*mf.iq*mf.gq*mf.bq+
     0.5*representativeGamma*Bp*ef.Ngamma*mf.sg*mf.dg*mf.ig*mf.gg*mf.bg
@@ -263,7 +291,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const layerQk=checks.length?Math.min(...checks.map(x=>x.qk)):Infinity
   const qk=checks.length?Math.min(equivalentQk,layerQk):equivalentQk
   if(checks.length){for(const x of checks)x.controlling=Math.abs(x.qk-layerQk)<=1e-9}
-  const qt=qk/rf
+  const qt=method==='TBDY-2018'?qk/rf:i.safetyFactor!=null?qk/i.safetyFactor:0
   const qAvg=effectiveArea>0?N/(i.B*i.L):Infinity
   const qo=effectiveArea>0?N/effectiveArea:Infinity
   const contact=compressionContact(i.B,i.L,N,i.momentX??0,i.momentY??0)
@@ -271,11 +299,12 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   const qMin=contact.qMin
   const contactArea=contact.area
   const utilization=qt>0?qo/qt:Infinity
+  const edgePressurePass=method!=='TBDY-2018'||(qk>0&&Number.isFinite(qMax)&&qMax<=1.25*qk)
   if(contactState==='NO_CONTACT')warnings.push('Temel tabanında basınçlı temas bulunmadığından q0/qt karşılaştırması nihai uygunluk için kullanılamaz.')
   if(contactState==='PARTIAL')warnings.push('Kısmi temas alanı compression-only lineer basınç dağılımından nümerik olarak çözüldü; qmin=0 ve qmax gerçek temas alanı üzerinden raporlanır.')
-  let adequate=qo<=qt&&contactState!=='NO_CONTACT'&&(!i.layers||layeredComplete)
-  if(finite(qMax)&&qk>0&&qMax>1.25*qk)warnings.push('TBDY 2018 16.7.3.3: Kenar taban basıncı qmax='+qMax.toFixed(2)+' kPa, 1.25×qk='+(1.25*qk).toFixed(2)+' kPa sınırını aşıyor. Temel boyutları veya yük eksantrisitesi gözden geçirilmelidir.')
-  const finalDesignEligible=!i.layers?.length && contactState!=='NO_CONTACT'
+  let adequate=qo<=qt&&contactState!=='NO_CONTACT'&&!(i.layers?.length)&&edgePressurePass
+  if(method==='TBDY-2018'&&finite(qMax)&&qk>0&&qMax>1.25*qk)warnings.push('TBDY 2018 16.7.3.3: Kenar taban basıncı qmax='+qMax.toFixed(2)+' kPa, 1.25×qk='+(1.25*qk).toFixed(2)+' kPa sınırını aşıyor. Temel boyutları veya yük eksantrisitesi gözden geçirilmelidir.')
+  const finalDesignEligible=method==='TBDY-2018'&&!(i.layers?.length)&&i.groundwaterDepth!=null&&contactState!=='NO_CONTACT'&&layeredComplete&&Number.isFinite(qk)&&qk>0&&Number.isFinite(qt)&&qt>0
   if(i.layers?.length&&layerData?.complete)warnings.push('Tabakalı zemin için 2B′ etki derinliğinde eşdeğer parametre + aktif tabaka yerel kontrolleri yalnız muhafazakâr ön değerlendirmedir. TBDY 16.8.3.3 tabakaların etkisinin dikkate alınmasını ister; çok-tabakalı kayma yüzeyi yöntemi bu modülde uygulanmadığından sonuç nihai tasarım uygunluğu olarak işaretlenmez.')
   if(finite(i.groundwaterDepth)&&i.groundwaterDepth!<=i.Df+Bp)warnings.push('YASS temel tabanına yakın/üstünde: sürşarj ve γ′/ağırlıklı γ dikkate alındı.')
   if(groundSlope>0)warnings.push('Arazi eğimi katsayıları genel kabul görmüş Vesic tipi bağıntılarla uygulanmıştır; β<φ′ koşulu kontrol edildi.')
@@ -283,12 +312,13 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   if(foundationType==='radye')warnings.push('Radye temel için taşıma gücünün yanında toplam ve farklı oturma ayrıca kontrol edilmelidir.')
   if(i.groundwaterDepth!=null&&i.groundwaterDepth<=i.Df&&i.undrainedCu==null)warnings.push('Temel YASS altında/aynı kotta ise deprem durumunda 16.8.4.6 gereği cu ile drenajsız kayma ayrıca gereklidir.')
 
+  if(method!=='TBDY-2018'&&i.safetyFactor==null)warnings.push('Klasik izin verilebilir taşıma gücü için güvenlik katsayısı girilmedi; allowableClassical üretilmedi.')
   const steps:SurfaceFoundationStep[]=[
     {symbol:'ex/ey',title:'Yük eksantriklikleri',formula:'ex=My/N ; ey=Mx/N',value:Math.max(Math.abs(ex),Math.abs(ey)),unit:'m'},
     {symbol:'B′/L′',title:'Taşıma gücü etkin boyutları',formula:'B′=B−2|ex| ; L′=L−2|ey|',value:Math.min(Be,Le),unit:'m',note:'Etkin boyutlar taşıma gücü hesabında kullanılır; temas basıncı dağılımı için qmax/qmin ayrı hesaplanır.'},
     {symbol:'qavg',title:'Gerçek taban ortalama basıncı',formula:'qavg=N/(B·L)',value:qAvg,unit:'kPa'},
     {symbol:'qmax/qmin',title:'Temas basıncı',formula:coreContact?'qmax/min=qavg[1±6|ex|/B±6|ey|/L]':'p=max(0,a+b·x+c·y), ∫p dA=N, ∫p·y dA=Mx, ∫p·x dA=My',value:qMax,unit:'kPa',note:coreContact?'İki eksenli doğrusal basınç dağılımı.':'Çekme gerilmesi sıfırlanarak gerçek kısmi temas alanı nümerik olarak çözüldü.'},
-    {symbol:'Nq/Nc/Nγ',title:'Taşıma gücü katsayıları',formula:'Nq=e^(πtanφ)tan²(45°+φ/2); Nc=(Nq−1)cotφ; Nγ=2(Nq−1)tanφ',value:ef.Nq,note:method==='TBDY-2018'?'TBDY 2018 Denk. 16.8b':''},
+    {symbol:'Nq/Nc/Nγ',title:'Taşıma gücü katsayıları',formula:method==='Terzaghi'?'Nq=e^(πtanφ)tan²(45°+φ/2); Nc=(Nq−1)cotφ; Nγ=1.5(Nq−1)tanφ':method==='Meyerhof'?'Nq=e^(πtanφ)tan²(45°+φ/2); Nc=(Nq−1)cotφ; Nγ=(Nq−1)tan(1.4φ)':method==='Hansen'?'Nq=e^(πtanφ)tan²(45°+φ/2); Nc=(Nq−1)cotφ; Nγ=1.5(Nq−1)tanφ':'Nq=e^(πtanφ)tan²(45°+φ/2); Nc=(Nq−1)cotφ; Nγ=2(Nq+1)tanφ',value:ef.Nq,note:method==='TBDY-2018'?'TBDY 2018 Denk. 16.8b':undefined},
     {symbol:'s',title:'Şekil katsayıları',formula:'sc,sq,sγ',value:mf.sc},
     {symbol:'d',title:'Derinlik katsayıları',formula:'dc,dq,dγ',value:mf.dc},
     {symbol:'i',title:'Yük eğikliği katsayıları',formula:'ic,iq,iγ',value:mf.ic},
@@ -304,7 +334,7 @@ export function calculateSurfaceFoundation(i:SurfaceFoundationInput):SurfaceFoun
   return{
     Nq:ef.Nq,Nc:ef.Nc,Ngamma:ef.Ngamma,...mf,surcharge:water.surcharge,gammaBelow:representativeGamma,ex,ey,Be,Le,effectiveArea,qk,qt,qo,utilization,adequate,effectiveDepth:2*Bp,
     qAvg,qMax,qMin,contactState,coreContact,
-    representativeC,representativePhi,representativeGamma,ultimateClassical:qk,allowableClassical:qk/Math.max(i.safetyFactor??3,1e-9),
+    representativeC,representativePhi,representativeGamma,ultimateClassical:method==='TBDY-2018'?undefined:qk,allowableClassical:method!=='TBDY-2018'&&i.safetyFactor!=null?qk/i.safetyFactor:undefined,
     undrainedQk:i.undrainedCu!=null?i.undrainedCu*5.14*mf.sc*mf.dc*mf.ic*mf.gc*mf.bc+water.surcharge:undefined,
     layeredScreeningOnly:Boolean(i.layers?.length),finalDesignEligible,
     layerChecks:checks,warnings,method,foundationType,

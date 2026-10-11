@@ -1,10 +1,10 @@
 {
-  "name": "faluzmn-app",
+  "name": "zeminlab-app",
   "version": "1.0.0",
-  "description": "FALUZMN geotechnical engineering desktop application",
+  "description": "ZeminLab geotechnical engineering desktop application",
   "main": "./out/main/index.js",
   "author": "mfa38",
-  "homepage": "https://github.com/mfatihaltiok/FALUZMN",
+  "homepage": "https://github.com/mfatihaltiok/ZeminLab",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",

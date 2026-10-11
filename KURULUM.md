@@ -1,6 +1,6 @@
-# FALUZMN (ZeminLab) Windows Kurulum Rehberi
+# ZeminLab (ZeminLab) Windows Kurulum Rehberi
 
-Bu belge, FALUZMN geoteknik mühendisliği uygulamasını Windows bilgisayarınızda kurma ve çalıştırma adımlarını açıklar.
+Bu belge, ZeminLab geoteknik mühendisliği uygulamasını Windows bilgisayarınızda kurma ve çalıştırma adımlarını açıklar.
 
 ## Gereksinimler
 
@@ -33,7 +33,7 @@ Bu script otomatik olarak:
 Kurulum tamamlandığında `dist` klasöründe `.exe` dosyası oluşur:
 
 ```
-dist\FALUZMN-Setup-1.0.0.exe
+dist\ZeminLab-Setup-1.0.0.exe
 ```
 
 Bu dosyayı çift tıklayarak uygulamayı kurun.
@@ -125,7 +125,7 @@ npm install
 
 ## Uygulama Özellikleri
 
-FALUZMN (ZeminLab) aşağıdaki geoteknik mühendisliği hesaplamalarını yapar:
+ZeminLab (ZeminLab) aşağıdaki geoteknik mühendisliği hesaplamalarını yapar:
 
 ### Temel Hesaplamalar
 - **SPT Düzeltmeleri**: CE, CB, CS, CR, CN, (N1)60, (N1)60f
@@ -153,7 +153,7 @@ FALUZMN (ZeminLab) aşağıdaki geoteknik mühendisliği hesaplamalarını yapar
 
 Sorun yaşarsanız:
 1. `npm-debug.log` dosyasını kontrol edin
-2. GitHub Issues sayfasını ziyaret edin: https://github.com/mfatihaltiok/FALUZMN/issues
+2. GitHub Issues sayfasını ziyaret edin: https://github.com/mfatihaltiok/ZeminLab/issues
 3. Node.js ve npm sürümlerinizin güncel olduğundan emin olun
 
 ## Lisans

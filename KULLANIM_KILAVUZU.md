@@ -1,4 +1,4 @@
-# FALUZMN - Geoteknik Mühendisliği Hesaplama Yazılımı
+# ZeminLab - Geoteknik Mühendisliği Hesaplama Yazılımı
 
 ## Kurulum ve Kullanım Kılavuzu
 
@@ -23,7 +23,7 @@
 
 ## Genel Bakış
 
-FALUZMN, geoteknik mühendisliği hesaplamaları için geliştirilmiş bir masaüstü uygulamasıdır. TBDY 2018 (Türkiye Bina Deprem Yönetmeliği) ve ilgili standartlara uygun hesaplamalar yapar.
+ZeminLab, geoteknik mühendisliği hesaplamaları için geliştirilmiş bir masaüstü uygulamasıdır. TBDY 2018 kapsamındaki kontrolleri ve ilgili mühendislik literatüründeki yöntemleri ayrı hesap yollarında sunar. Literatür bağıntıları yönetmelik şartı olarak yorumlanmamalı; sonuçlar proje verileri ve sorumlu geoteknik mühendisin incelemesiyle doğrulanmalıdır.
 
 ### Temel Özellikler
 
@@ -514,7 +514,7 @@ npm run typecheck
 
 ### Sorun Bildirme
 
-GitHub Issues: https://github.com/mfatihaltiok/FALUZMN/issues
+GitHub Issues: https://github.com/mfatihaltiok/ZeminLab/issues
 
 ### Katkıda Bulunma
 
