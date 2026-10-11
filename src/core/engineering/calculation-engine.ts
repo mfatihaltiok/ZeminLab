@@ -33,8 +33,12 @@ function classicalFactors(method:BearingMethod,B:number,L:number,Df:number,phi:n
   return{sc,sq,sg,dc,dq,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
 }
 export function bearingCapacity(i:BearingInput):CalculationResult<any>{
-  if(i.B<=0||i.L<=0||i.Df<0||i.gamma<=0||i.c<0||i.FS<=0)throw new Error('Taşıma gücü girdileri geçersiz.')
-  const f=factors(i.phi,i.method),m=classicalFactors(i.method,i.B,i.L,i.Df,f.phi,f.Nq,f.Nc),q=i.gamma*i.Df,gammaTerm=i.waterReduction??1
+  if(![i.B,i.L,i.Df,i.gamma,i.c,i.phi,i.FS].every(Number.isFinite))throw new Error('Taşıma gücü girdileri sonlu sayılar olmalıdır.')
+  if(i.B<=0||i.L<=0||i.Df<0||i.gamma<=0||i.c<0||i.FS<=0||i.phi<0||i.phi>50)throw new Error('Taşıma gücü girdileri fiziksel sınırlar dışında.')
+  if(!['Terzaghi','Meyerhof','Hansen','Vesic'].includes(i.method))throw new Error('Desteklenmeyen klasik taşıma gücü yöntemi.')
+  const gammaTerm=i.waterReduction??1
+  if(!Number.isFinite(gammaTerm)||gammaTerm<0||gammaTerm>1)throw new Error('Su düzeltme katsayısı 0 ile 1 arasında olmalıdır.')
+  const f=factors(i.phi,i.method),m=classicalFactors(i.method,i.B,i.L,i.Df,f.phi,f.Nq,f.Nc),q=i.gamma*i.Df
   const ultimate=i.c*f.Nc*m.sc*m.dc*m.ic*m.gc*m.bc+q*f.Nq*m.sq*m.dq*m.iq*m.gq*m.bq+.5*i.gamma*i.B*f.Ngamma*m.sg*m.dg*m.ig*m.gg*m.bg*gammaTerm
   const netUltimate=ultimate-q
   const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:m.sc,sq:m.sq,sg:m.sg,dc:m.dc,dq:m.dq,dg:m.dg,ultimate,netUltimate,allowableGross:ultimate/i.FS,allowableNet:netUltimate/i.FS}
@@ -59,9 +63,14 @@ export function tbdyBearingCapacity(i:TbdyBearingInput):CalculationResult<any>{
 
 export interface SettlementInput{B:number;q:number;Es:number;nu:number;layers?:{thickness:number;Cc?:number;e0?:number;sigma0?:number;dSigma?:number}[]}
 export function settlement(i:SettlementInput):CalculationResult<{immediate:number;consolidation:number;total:number}>{
-  if(i.B<=0||i.q<0||i.Es<=0||i.nu<=-1||i.nu>=.5)throw new Error('Oturma girdileri geçersiz.')
+  if(![i.B,i.q,i.Es,i.nu].every(Number.isFinite)||i.B<=0||i.q<0||i.Es<=0||i.nu<=-1||i.nu>=.5)throw new Error('Oturma girdileri geçersiz; B/Es pozitif, q negatif olmayan ve -1<ν<0.5 olmalıdır.')
+  for(const [index,l] of (i.layers??[]).entries()){
+    if(!Number.isFinite(l.thickness)||l.thickness<0)throw new Error('Oturma katmanı '+(index+1)+': kalınlık negatif olmayan sonlu bir değer olmalıdır.')
+    for(const [name,value] of [['Cc',l.Cc],['e0',l.e0],['sigma0',l.sigma0],['dSigma',l.dSigma]] as const)if(value!==undefined&&!Number.isFinite(value))throw new Error('Oturma katmanı '+(index+1)+': '+name+' sonlu olmalıdır.')
+    if(l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<=-1||l.sigma0!=null&&l.sigma0<=0||l.dSigma!=null&&l.dSigma<0)throw new Error('Oturma katmanı '+(index+1)+': konsolidasyon parametreleri geçersiz.')
+  }
   const immediate=i.q*i.B*(1-i.nu*i.nu)/i.Es
-  const consolidation=(i.layers??[]).reduce((sum,l)=>l.Cc!=null&&l.e0!=null&&l.sigma0!=null&&l.dSigma!=null&&l.sigma0>0&&l.Cc>=0&&l.e0>-1?sum+Math.max(0,l.thickness)*l.Cc/(1+l.e0)*Math.log10(Math.max(l.sigma0+l.dSigma,l.sigma0)/l.sigma0):sum,0)
+  const consolidation=(i.layers??[]).reduce((sum,l)=>l.Cc!=null&&l.e0!=null&&l.sigma0!=null&&l.dSigma!=null&&l.sigma0>0&&l.Cc>=0&&l.e0>-1?sum+ l.thickness*l.Cc/(1+l.e0)*Math.log10((l.sigma0+l.dSigma)/l.sigma0):sum,0)
   return{value:{immediate,consolidation,total:immediate+consolidation},method:'Basit elastik + açık konsolidasyon parametreleri',source:'Parametre eksikleri sessizce varsayılmaz.',steps:[
     {symbol:'si',title:'Elastik oturma',formula:'s=qB(1−ν²)/Es',value:immediate,unit:'m'},
     {symbol:'sc',title:'Konsolidasyon',formula:'ΣH·Cc/(1+e0)·log10(σ1/σ0)',value:consolidation,unit:'m'},
@@ -71,8 +80,9 @@ export function settlement(i:SettlementInput):CalculationResult<{immediate:numbe
 
 export interface LiquefactionInput{Mw:number;Sds:number;depth:number;N160f:number;sigmaV:number;sigmaVPrime:number}
 export function liquefaction(i:LiquefactionInput):CalculationResult<any>{
-  if(!Number.isFinite(i.depth)||i.depth<0||!Number.isFinite(i.N160f)||i.N160f<=0||i.N160f>=34)throw new Error('N1,60f değeri Ek 16B CRR bağıntısının 0<N1,60f<34 geçerlilik aralığında olmalıdır.')
-  if(!Number.isFinite(i.Mw)||i.Mw<=0||!Number.isFinite(i.Sds)||i.Sds<0||!Number.isFinite(i.sigmaV)||i.sigmaV<0||!Number.isFinite(i.sigmaVPrime)||i.sigmaVPrime<=0)throw new Error('Sıvılaşma gerilme ve deprem girdileri geçerli olmalıdır.')
+  if(![i.depth,i.N160f,i.Mw,i.Sds,i.sigmaV,i.sigmaVPrime].every(Number.isFinite))throw new Error('Sıvılaşma girdileri sonlu sayılar olmalıdır.')
+  if(i.depth<0||i.N160f<=0||i.N160f>=34)throw new Error('N1,60f değeri Ek 16B CRR bağıntısının 0<N1,60f<34 geçerlilik aralığında olmalıdır.')
+  if(i.Mw<=0||i.Sds<0||i.sigmaV<=0||i.sigmaVPrime<=0||i.sigmaVPrime>i.sigmaV)throw new Error('Sıvılaşma gerilme ve deprem girdileri geçerli olmalıdır; 0<σ′v0≤σv0.')
   const z=i.depth,rd=z<=9.15?1-.00765*z:z<=23?1.174-.0267*z:z<=30?.744-.008*z:.5,N=i.N160f
   const CRRM75=1/(34-N)+N/135+50/(10*N+45)**2-1/200
   const CM=10**2.24/i.Mw**2.56,Rtau=CRRM75*CM*i.sigmaVPrime,tau=.65*.4*i.Sds*i.sigmaV*rd,ratio=tau>0?Rtau/tau:Infinity
@@ -90,15 +100,19 @@ export interface FoundationCheckInput{
   seismic?:boolean;interfaceType?:FoundationInterface
 }
 export function foundationChecks(i:FoundationCheckInput){
-  if(i.B<=0||i.L<=0)throw new Error('Temel boyutları pozitif olmalıdır.')
-  if(!Number.isFinite(i.N)||i.N<0)throw new Error('Düşey temel yükü N sıfır veya pozitif olmalıdır.')
+  if(![i.B,i.L,i.N,i.Mx,i.My].every(Number.isFinite)||i.B<=0||i.L<=0)throw new Error('Temel boyutları, yükler ve momentler sonlu; B/L pozitif olmalıdır.')
+  if(i.N<0)throw new Error('Düşey temel yükü N sıfır veya pozitif olmalıdır.')
+  for(const [name,value] of [['Vx',i.Vx],['Vy',i.Vy],['V',i.V],['tanδ',i.deltaTan],['Cu',i.cu],['alan',i.area],['YASS',i.groundwaterDepth],['temel derinliği',i.foundationDepth],['pasif direnç',i.passiveResistanceCharacteristic],['γRh',i.gammaRh],['γRp',i.gammaRp]] as const)if(value!==undefined&&!Number.isFinite(value))throw new Error(name+' sonlu bir sayı olmalıdır.')
+  if(i.area!=null&&i.area<=0)throw new Error('Temel alanı pozitif olmalıdır.')
+  if(i.cu!=null&&i.cu<0)throw new Error('Cu negatif olamaz.')
+  if(i.groundwaterDepth!=null&&i.groundwaterDepth<0||i.foundationDepth!=null&&i.foundationDepth<0)throw new Error('YASS ve temel derinliği negatif olamaz.')
   const N=i.N,ex=N>0?i.My/N:0,ey=N>0?i.Mx/N:0
   const qAvg=N/(i.B*i.L)
   const contact=compressionContact(i.B,i.L,N,i.Mx,i.My)
   const qMax=contact.qMax,qMin=contact.qMin
   const effectiveLength=Math.max(0,i.L-2*Math.abs(ey)),effectiveWidth=Math.max(0,i.B-2*Math.abs(ex))
   const geometricEffectiveArea=effectiveWidth*effectiveLength
-  const contactArea=i.area!=null?Math.max(0,i.area):contact.area
+  const contactArea=i.area!=null?Math.min(i.area,contact.area):contact.area
   const rh=i.gammaRh??1.10,rp=i.gammaRp??1.40
   if(rh<=0||rp<=0)throw new Error('γRh ve γRp pozitif olmalıdır.')
   const interfaceLimits:Record<FoundationInterface,number>={
