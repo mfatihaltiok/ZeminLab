@@ -124,7 +124,7 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
           if(layer.sigmaPc==null)warnings.push('Katman '+(index+1)+': σpc girilmedi; normal konsolide davranış (σpc=σ′v0) varsayıldı.')
           if(!Number.isFinite(pc)||pc<=0||pc<sigma0||!Number.isFinite(Cr)||Cr<0)throw new Error('Oturma tabakası '+(index+1)+': sigmaPc ve Cr geçersiz.')
           if(pc>sigma0&&layer.Cr==null)throw new Error('Oturma tabakası '+(index+1)+': aşırı konsolide davranış için Cr açıkça girilmelidir; Cc yerine varsayılamaz.')
-          s=sigma1<=pc?H*Cr/(1+layer.e0)*Math.log10(sigma1/sigma0):H*Cr/(1+layer.e0)*Math.log10(pc/sigma0)+H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/pc),type='oedometer
+          s=sigma1<=pc?H*Cr/(1+layer.e0)*Math.log10(sigma1/sigma0):H*Cr/(1+layer.e0)*Math.log10(pc/sigma0)+H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/pc),type='oedometer'
         }else warnings.push('Katman '+(index+1)+': mv veya Cc/e0 eksik.')
       }
     }
