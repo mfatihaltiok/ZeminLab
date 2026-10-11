@@ -134,7 +134,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   const gwt=finite(input.groundwaterDepth)?input.groundwaterDepth!:-1
   if(profile.status!=='SABİTLENDİ')warnings.push('İdealize Zemin Profili SABİTLENDİ durumunda değil.')
   const invalidInput=![B,L,Df,qGross].every(finite)||B<=0||L<=0||Df<0||qGross<=0||input.groundwaterDepth!=null&&(!finite(input.groundwaterDepth)||input.groundwaterDepth<0)||input.timeYears!=null&&(!finite(input.timeYears)||input.timeYears<0)||input.secondaryStartTimeYears!=null&&(!finite(input.secondaryStartTimeYears)||input.secondaryStartTimeYears<=0)
-  const invalidLayer=layers.some(layer=>!finite(layer.topDepth)||!finite(layer.bottomDepth)||layer.topDepth<0||layer.bottomDepth<=layer.topDepth||!finite(layer.gamma)||layer.gamma<=0||layer.gammaSat!=null&&(!finite(layer.gammaSat)||layer.gammaSat<=0)||layer.poissonRatio!=null&&(!finite(layer.poissonRatio)||layer.poissonRatio<=-1||layer.poissonRatio>=0.5)||layer.initialVoidRatio!=null&&(!finite(layer.initialVoidRatio)||layer.initialVoidRatio<0))
+  const invalidLayer=layers.some(layer=>!finite(layer.topDepth)||!finite(layer.bottomDepth)||layer.topDepth<0||layer.bottomDepth<=layer.topDepth||!finite(layer.gamma)||layer.gamma<=0||layer.gammaSat!=null&&(!finite(layer.gammaSat)||layer.gammaSat<=9.80665)||layer.poissonRatio!=null&&(!finite(layer.poissonRatio)||layer.poissonRatio<=-1||layer.poissonRatio>=0.5)||layer.initialVoidRatio!=null&&(!finite(layer.initialVoidRatio)||layer.initialVoidRatio<0)||layer.compressionIndexCc!=null&&(!finite(layer.compressionIndexCc)||layer.compressionIndexCc<0)||layer.recompressionIndexCr!=null&&(!finite(layer.recompressionIndexCr)||layer.recompressionIndexCr<0)||layer.secondaryCompressionIndex!=null&&(!finite(layer.secondaryCompressionIndex)||layer.secondaryCompressionIndex<0)||layer.preconsolidationPressure!=null&&(!finite(layer.preconsolidationPressure)||layer.preconsolidationPressure<=0))
   let overlaps=false
   for(let k=1;k<layers.length;k++)if(layers[k].topDepth<layers[k-1].bottomDepth-1e-9)overlaps=true
   if(invalidInput||invalidLayer||overlaps)return{method,layers:[],totalImmediate:0,totalConsolidation:0,totalSecondary:0,totalSettlement:0,influenceDepth:0,netFoundationPressure:0,foundationEffectiveStress:0,ready:false,warnings:[...warnings,invalidInput?'Temel, yük, YASS veya zaman girdileri geçersiz.':invalidLayer?'Zemin profilinde derinlik, γ, γsat, ν veya e0 parametreleri geçersiz.':'Zemin profili çakışan tabakalar içeriyor.'],source:'ZeminLab idealize zemin profili oturma motoru'}
@@ -153,6 +153,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
   }
   if(coverageCursor<coverageLimit-1e-9)coverageOk=false
   if(!coverageOk)warnings.push('Temel altındaki oturma etki derinliğinde profil sürekliliği veya γ verisi eksik; eksik tabaka sıfır gerilme ile geçiştirilmez.')
+  if(method==='burland-burbidge'&&layers.some(layer=>finite(layer.representativeN60)&&(layer.representativeN60!<5||layer.representativeN60!>60)))warnings.push('Burland–Burbidge korelasyonunda N60, kaynak yöntemin 5–60 uygulama aralığına sınırlandırıldı; aralık dışındaki tabakalar için bağımsız doğrulama gerekir.')
   const rawQNet=qGross-baseStress.effective
   const qNet=Math.max(0,rawQNet)
   if(qNet<=0)warnings.push('Temel seviyesinde net ilave basınç sıfır/negatif; yükleme oturması hesabı geçerli değildir.')
@@ -171,7 +172,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       if(cohesive){
         methodName='Kil/kohezyonlu tabaka: konsolidasyon'
         const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective)
-        if(r.ok){consolidation=r.value;if(r.crAssumed)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): Geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.')}else{status='VERİ EKSİK';note='Cc, e0 ve başlangıç efektif gerilmesi gerekir.'}
+        if(r.ok){consolidation=r.value;if(r.crAssumed)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): Geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.');if(layer.preconsolidationPressure==null||layer.preconsolidationPressure<=midStress.effective)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): σ′pc girilmedi veya başlangıç gerilmesinden yüksek değil; normal konsolide varsayımı kullanıldı.')}else{status='VERİ EKSİK';note='Cc, e0 ve başlangıç efektif gerilmesi gerekir.'}
       }else{
         methodName='Burland & Burbidge (1985)'
         const r=burlandSettlement(layer,qNet,B,L,zTop,zBottom,influenceDepth,zMid,gwt);immediate=r.value;note=r.note
@@ -182,7 +183,7 @@ export function calculateIdealizedSettlement(input:IdealizedSettlementInput):Ide
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
       if(finite(M)&&M>0)immediate=deltaSigma*thickness/M*1000
       else{status='VERİ EKSİK';note='Constrained/oedometric modül gerekir.'}
-      if(cohesive){const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective);if(r.ok){consolidation=r.value;if(r.crAssumed)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): Geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.')}else status='VERİ EKSİK'}
+      if(cohesive){const r=consolidationSettlement(layer,thickness,midStress.effective,finalEffective);if(r.ok){consolidation=r.value;if(r.crAssumed)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): Geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.');if(layer.preconsolidationPressure==null||layer.preconsolidationPressure<=midStress.effective)warnings.push('Katman '+layer.soilCode+' ('+layer.soilName+'): σ′pc girilmedi veya başlangıç gerilmesinden yüksek değil; normal konsolide varsayımı kullanıldı.')}else status='VERİ EKSİK'}
     }else if(method==='boussinesq'){
       methodName='Boussinesq alan integrasyonu + elastik tabaka'
       const M=finite(layer.constrainedModulus)?layer.constrainedModulus:layer.oedometricModulus
