@@ -63,8 +63,9 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
   const [ksMethod, setKsMethod] = useState<SubgradeReactionMethod>('erol-plate')
   const [kv1Input, setKv1Input] = useState('')
   const [ksSoilType, setKsSoilType] = useState<SubgradeSoilType>('cohesive')
-  const [selected, setSelected] = useState(boreholes[0]?.id ?? '')
-  const b = boreholes.find(x => x.id === selected) ?? boreholes[0]
+  const [selected, setSelected] = useState(profile?.sourceBoreholeIds[0] ?? boreholes[0]?.id ?? '')
+  const eligibleBoreholes=profile?.sourceBoreholeIds.length?boreholes.filter(x=>profile.sourceBoreholeIds.includes(x.id)):boreholes
+  const b=eligibleBoreholes.find(x=>x.id===selected)??eligibleBoreholes[0]??boreholes[0]
   const f = p.foundationParameters
   const qGross = finite(f.structuralWeight) && finite(f.footingWidth) && finite(f.footingLength)
     ? forceToBase(f.structuralWeight, p.unitSystem) / Math.max(f.footingWidth * f.footingLength, 1e-9)
@@ -142,9 +143,9 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
             </select>
           </label>
           <label>Sondaj / YASS
-            <select value={b?.id ?? ''} onChange={e => setSelected(e.target.value)} disabled={!boreholes.length}>
+            <select value={b?.id ?? ''} onChange={e => setSelected(e.target.value)} disabled={!eligibleBoreholes.length}>
               <option value="">Sondaj seç</option>
-              {boreholes.map(x => <option key={x.id} value={x.id}>{x.name} · YASS {x.groundwaterDepth ?? '—'} m</option>)}
+              {eligibleBoreholes.map(x => <option key={x.id} value={x.id}>{x.name} · YASS {x.groundwaterDepth ?? '—'} m</option>)}
             </select>
           </label>
           <Metric label="Profil durumu" value={profile?.status ?? 'YOK'} />
