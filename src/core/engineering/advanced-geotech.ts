@@ -18,9 +18,10 @@ export interface StressSpreadResult {
 
 /** 2:1 vertical stress spread below a rectangular loaded area. */
 export function stressSpread21(i: StressSpreadInput): StressSpreadResult {
-  const B = Math.max(i.B, 1e-9)
-  const L = Math.max(i.L, 1e-9)
-  const z = Math.max(i.z, 0)
+  if (![i.q,i.B,i.L,i.z].every(Number.isFinite) || i.q < 0 || i.B <= 0 || i.L <= 0 || i.z < 0) throw new Error('2:1 gerilme yayılımında q≥0, B/L>0 ve z≥0 sonlu olmalıdır.')
+  const B = i.B
+  const L = i.L
+  const z = i.z
   const area = (B + z) * (L + z)
   return {
     deltaSigma: Math.max(0, i.q) * B * L / area,
@@ -77,9 +78,12 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
   let consolidation = 0
   const details: LayerSettlementResult['layers'] = []
   const warnings: string[] = []
-  for (const l of layers) {
-    const H = Math.max(0, l.thickness)
-    const ds = Math.max(0, l.deltaSigma)
+  for (const [index,l] of layers.entries()) {
+    const values=[l.thickness,l.sigma0,l.deltaSigma,l.Es,l.mv,l.Cc,l.e0,l.Cr,l.sigmaPc]
+    if(values.some(v=>v!==undefined&&!Number.isFinite(v)))throw new Error('Oturma katmanı '+(index+1)+': parametreler sonlu olmalıdır.')
+    if(l.thickness<=0||l.deltaSigma<0||l.Es!=null&&l.Es<=0||l.mv!=null&&l.mv<0||l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<=-1||l.Cr!=null&&l.Cr<0||l.sigmaPc!=null&&l.sigmaPc<=0)throw new Error('Oturma katmanı '+(index+1)+': fiziksel olmayan parametre.')
+    const H = l.thickness
+    const ds = l.deltaSigma
     let s = 0
     let type: 'elastic' | 'oedometer' = 'elastic'
     if (H <= 0 || ds <= 0) {
@@ -118,8 +122,10 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
 
 export interface SchmertmannLayer { thickness: number; Es: number; Iz: number }
 export function schmertmannSettlement(q: number, layers: SchmertmannLayer[], C1 = 1, C2 = 1) {
-  const settlement = Math.max(0, C1) * Math.max(0, C2) * Math.max(0, q) * layers.reduce((sum, l) => {
-    return sum + Math.max(0, l.Iz) * Math.max(0, l.thickness) / Math.max(l.Es, 1e-9)
+  if(![q,C1,C2].every(Number.isFinite)||q<0||C1<=0||C2<=0)throw new Error('Schmertmann hesabında q≥0 ve C1/C2>0 sonlu olmalıdır.')
+  for(const [index,l] of layers.entries())if(![l.thickness,l.Es,l.Iz].every(Number.isFinite)||l.thickness<=0||l.Es<=0||l.Iz<0)throw new Error('Schmertmann katmanı '+(index+1)+': kalınlık/Es pozitif, Iz negatif olmayan sonlu değer olmalıdır.')
+  const settlement = C1 * C2 * q * layers.reduce((sum, l) => {
+    return sum + l.Iz * l.thickness / l.Es
   }, 0)
   return { settlement, formula: 's = C1·C2·q·Σ(Iz/Es)Δz', method: 'Schmertmann strain-integration framework' }
 }
@@ -167,6 +173,9 @@ export interface JetGroutAdvancedResult {
  * silently applied to Jet Grout.
  */
 export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResult {
+  for(const [name,value] of [['qSoil',i.qSoil],['qColumn',i.qColumn]] as const)if(!Number.isFinite(value)||value<0)throw new Error(name+' sonlu ve negatif olmayan bir değer olmalıdır.')
+  for(const [name,value] of [['cSoil',i.cSoil],['cColumn',i.cColumn],['EsSoil',i.EsSoil],['EsColumn',i.EsColumn],['load',i.load],['foundationArea',i.foundationArea],['FS',i.FS]] as const)if(value!==undefined&&!Number.isFinite(value))throw new Error(name+' sonlu olmalıdır.')
+  if(i.cSoil!=null&&i.cSoil<0||i.cColumn!=null&&i.cColumn<0||i.EsSoil!=null&&i.EsSoil<=0||i.EsColumn!=null&&i.EsColumn<=0||i.load!=null&&i.load<0||i.foundationArea!=null&&i.foundationArea<=0||i.FS!=null&&i.FS<=0)throw new Error('Jet Grout kompozit parametreleri fiziksel sınırlar dışında.')
   if (!Number.isFinite(i.columnDiameter) || i.columnDiameter <= 0) throw new Error('Jet Grout kolon çapı d > 0 olmalıdır.')
   if (!Number.isFinite(i.spacing) || i.spacing <= 0) throw new Error('Jet Grout aks aralığı s > 0 olmalıdır.')
   if (i.spacing < i.columnDiameter) throw new Error('Aks aralığı kolon çapından küçük olamaz; örtüşen kolon geometrisi bu modelde desteklenmez.')
@@ -177,8 +186,8 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
   const cellArea = layout === 'triangular' ? Math.sqrt(3) * s * s / 2 : s * s
   const ar = Ac / cellArea
   if (ar >= 1) throw new Error('Jet Grout alan değiştirme oranı 1.0 veya üzeri olamaz.')
-  const qSoil = Math.max(0, i.qSoil)
-  const qColumn = Math.max(0, i.qColumn)
+  const qSoil = i.qSoil
+  const qColumn = i.qColumn
   const compositeCapacity = ar * qColumn + (1 - ar) * qSoil
   const compositeModulus = i.EsSoil != null && i.EsColumn != null && i.EsSoil > 0 && i.EsColumn > 0
     ? ar * i.EsColumn + (1 - ar) * i.EsSoil
