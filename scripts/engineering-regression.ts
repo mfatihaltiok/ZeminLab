@@ -486,6 +486,12 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   approx(clayLiquefaction.rows[0].cn,1,1e-12)
   approx(clayLiquefaction.rows[0].n1_60,clayLiquefaction.rows[0].n60,1e-12)
   assert.ok(clayLiquefaction.rows[0].trace.some(x=>x.symbol==='CN'&&x.note==='Zemin sınıfı CIM'))
+  const unknownSoilLiquefaction=liquefactionProfile({
+    Mw:7.5,Sds:1,gwt:2,soilGroup:'ZE',dts:'1',continuousOrThickLens:true,foundationDepth:2,
+    layers:[{top:0,bottom:10,gamma:18,gammaSat:19,soil:'UNKNOWN',finesContent:30,plasticityIndex:5}],
+    spt:[{depth:5,nField:10,fineContent:30,plasticityIndex:5,waterContent:20,soil:'UNKNOWN',energyRatio:60,boreholeDiameterMm:115,sampler:'standard',rodLengthM:10,stressSnapshot:{sigmaV0:93,porePressureU0:29.43,effectiveStressV0:63.57,groundwaterDepth:2,capturedAt:new Date(0).toISOString()}}]
+  })
+  assert.equal(unknownSoilLiquefaction.rows[0].status,'VERİ EKSİK')
 }
 
 {
