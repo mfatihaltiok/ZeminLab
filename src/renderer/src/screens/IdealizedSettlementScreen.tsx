@@ -59,6 +59,8 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
   const p = useProjectInfo()
   const updateProjectInfo=useProjectInfo().updateProjectInfo
   const [method, setMethod] = useState<IdealizedSettlementMethod>('burland-burbidge')
+  const selectedMethod:IdealizedSettlementMethod=profile?.settlementMethod??method
+  const changeMethod=(value:IdealizedSettlementMethod)=>{setMethod(value);if(profile)updateProjectInfo({idealizedSoilProfile:{...profile,settlementMethod:value}})}
   const [ksMethod, setKsMethod] = useState<SubgradeReactionMethod>('erol-plate')
   const [kv1Input, setKv1Input] = useState('')
   const [ksSoilType, setKsSoilType] = useState<SubgradeSoilType>('cohesive')
@@ -74,7 +76,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
     if (!profile || profile.status !== 'SABİTLENDİ') return undefined
     return calculateIdealizedSettlement({
       profile,
-      method,
+      method:selectedMethod,
       B: f.footingWidth,
       L: f.footingLength,
       Df: f.footingDepth,
@@ -82,7 +84,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       groundwaterDepth: b?.groundwaterDepth ?? p.soilParameters.groundwaterDepth,
       timeYears:profile.settlementTimeYears,secondaryStartTimeYears:profile.secondaryStartTimeYears
     })
-  }, [profile, method, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth, p.soilParameters.groundwaterDepth,profile?.settlementTimeYears,profile?.secondaryStartTimeYears])
+  }, [profile, selectedMethod, f.footingWidth, f.footingLength, f.footingDepth, qGross, b?.groundwaterDepth, p.soilParameters.groundwaterDepth,profile?.settlementTimeYears,profile?.secondaryStartTimeYears])
 
   latestIdealizedSettlementResult = result
 
@@ -131,7 +133,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
       <Card title="OTURMA YÖNTEMİ">
         <div className="form-grid">
           <label>Hesap yöntemi
-            <select value={method} onChange={e => setMethod(e.target.value as IdealizedSettlementMethod)}>
+            <select value={selectedMethod} onChange={e => changeMethod(e.target.value as IdealizedSettlementMethod)}>
               <option value="burland-burbidge">Yöntem 1 · Burland &amp; Burbidge + kilde konsolidasyon</option>
               <option value="elasticity">Yöntem 2 · Elastisite teorisi + kilde konsolidasyon</option>
               <option value="2to1-layer">Yöntem 3 · 2:1 gerilme yayılımı + tabaka</option>
@@ -211,7 +213,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
             <ProfileDiagram result={result} />
           </Card>
 
-          <Card title={`TABAKA BAZINDA OTURMA · ${methodLabel[method]}`}>
+          <Card title={`TABAKA BAZINDA OTURMA · ${methodLabel[selectedMethod]}`}>
             <div className="table-wrap">
               <table>
                 <thead><tr><th>#</th><th>Zemin</th><th>Üst</th><th>Alt</th><th>zorta</th><th>σ′v0</th><th>Δσ′</th><th>σ′vf</th><th>Ani</th><th>Kons.</th><th>Durum</th></tr></thead>
