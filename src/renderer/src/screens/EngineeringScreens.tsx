@@ -9,7 +9,7 @@ import { CalculationTrace } from '../components/CalculationTrace'
 
 export const SOURCE_NOTES={
   investigation:'TBDY 2018 Bölüm 16 ve Ek 16A.',
-  liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B.',
+  liquefaction:'TBDY 2018 Bölüm 16.6 ve Ek 16B; FS<1.10 ise 16.6.7, 16.6.9 ve 16.6.10 kapsamında sıvılaşma sonrası etkiler ayrıca değerlendirilir.',
   bearing:'TBDY 2018 Bölüm 16.8.2–16.8.3.',
   settlement:'TBDY 2018 Bölüm 16.8.3.4; yöntem ve parametreler ayrıca kaynaklandırılır.',
   foundation:'TBDY 2018 16.7.3.3 ve 16.8.4; γRv=1.40, γRh=1.10, γRp=1.40.',
@@ -58,14 +58,14 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
   },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,p.geophysical.soilGroup,p.soilParameters.liquefactionContinuousOrThickLens,p.sptCorrections,validSpt])
 
   return <Frame screen="liquefaction">
-    <Source>{SOURCE_NOTES.liquefaction} 16.6.1 kapsam koşulları, 16.6.2–16.6.6 tetiklenme koşulları ve Ek 16B hesabı aynı sonuç zincirinde gösterilir.</Source>
+    <Source>{SOURCE_NOTES.liquefaction} 16.6.1 kapsam koşulları, 16.6.2–16.6.6 tetiklenme koşulları ve Ek 16B hesabı aynı sonuç zincirinde gösterilir. Sıvılaşma sonrası yerdeğiştirme otomatik hesaplanmaz; FS<1.10 olduğunda 16.6.7/16.6.9/16.6.10 değerlendirmesi zorunlu olarak işaretlenir.</Source>
     {!b?<Card title="SONDAJ GEREKLİ"><div className="inline-empty">Sıvılaşma için sondaj ve SPT verisi gerekir.</div></Card>:
       <><Card title="HESAP KAPSAMI"><div className="form-grid"><label>Sondaj<select value={b.id} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><Metric label="DTS" value={p.seismic.dts??'—'}/><Metric label="SDS" value={sds?.toFixed(3)??'—'}/><Metric label="Mw" value={p.seismic.magnitude??'—'}/><Metric label="YASS" value={b.groundwaterDepth??'—'}/><Metric label="SPT" value={validSpt.length}/><Metric label="CE" value={p.sptCorrections.ce.toFixed(2)}/><Metric label="CB" value={p.sptCorrections.cb.toFixed(2)}/><Metric label="CS" value={p.sptCorrections.cs.toFixed(2)}/><Metric label="CR" value="SPT başına"/></div></Card>
         {!profileInput?
           <Card title="HESAP İÇİN EKSİK VERİ"><div className="inline-empty">YASS, SDS, Mw ve geçerli SPT kayıtları birlikte bulunmalıdır. YASS bilinmiyorsa 16.6.2 kapsamında sıvılaşma değerlendirmesi başlatılmaz.</div></Card>:
           <><div className="metric-strip"><Metric label="TBDY zorunluluğu" value={profileInput.mandatoryByProject?'EVET':'DTS/zemin koşuluna bağlı'}/></div>
             {profileInput.warnings.length>0&&<Card title="TBDY UYARILARI"><div className="inline-empty">{profileInput.warnings.join(' ')}</div></Card>}
-            <Card title="SPT · SIVILAŞMA DERİNLİK TABLOSU"><div className="table-wrap"><table><thead><tr><th>z</th><th>Zemin</th><th>FC%</th><th>PI</th><th>σ′v</th><th>CN</th><th>CR</th><th>N60</th><th>(N1)60</th><th>(N1)60f</th><th>CRR7.5</th><th>CSR</th><th>FS</th><th>Sonuç</th></tr></thead><tbody>{profileInput.rows.map((row,i)=><tr key={i}><td>{row.depth.toFixed(2)}</td><td>{row.soil??'—'}</td><td>{row.fineContent?.toFixed(1)??'—'}</td><td>{row.plasticityIndex?.toFixed(1)??'—'}</td><td>{row.sigmaVPrime.toFixed(2)}</td><td>{row.cn.toFixed(3)}</td><td>{row.cr.toFixed(2)}</td><td>{row.n60.toFixed(2)}</td><td>{row.n1_60.toFixed(2)}</td><td>{row.n1_60f.toFixed(2)}</td><td>{row.crrM75?.toFixed(4)??'—'}</td><td>{row.tauEarthquake?.toFixed(2)??'—'}</td><td>{row.FS?.toFixed(3)??'—'}</td><td>{row.conclusion}</td></tr>)}</tbody></table></div></Card>
+            <Card title="SPT · SIVILAŞMA DERİNLİK TABLOSU"><div className="table-wrap"><table><thead><tr><th>z</th><th>Zemin</th><th>FC%</th><th>PI</th><th>σ′v</th><th>CN</th><th>CR</th><th>N60</th><th>(N1)60</th><th>(N1)60f</th><th>CRR7.5</th><th>CSR</th><th>FS</th><th>Sonuç</th><th>Post-sıvılaşma</th></tr></thead><tbody>{profileInput.rows.map((row,i)=><tr key={i}><td>{row.depth.toFixed(2)}</td><td>{row.soil??'—'}</td><td>{row.fineContent?.toFixed(1)??'—'}</td><td>{row.plasticityIndex?.toFixed(1)??'—'}</td><td>{row.sigmaVPrime.toFixed(2)}</td><td>{row.cn.toFixed(3)}</td><td>{row.cr.toFixed(2)}</td><td>{row.n60.toFixed(2)}</td><td>{row.n1_60.toFixed(2)}</td><td>{row.n1_60f.toFixed(2)}</td><td>{row.crrM75?.toFixed(4)??'—'}</td><td>{row.tauEarthquake?.toFixed(2)??'—'}</td><td>{row.FS?.toFixed(3)??'—'}</td><td>{row.conclusion}</td><td>{row.postLiquefactionEvaluation==='required'?'GEREKLİ':row.postLiquefactionEvaluation==='review'?'ETKİLERİ İNCELE':row.postLiquefactionEvaluation==='not-required'?'KAPSAM DIŞI':'VERİ EKSİK'}</td></tr>)}</tbody></table></div></Card>
             {profileInput.rows.length>0&&<CalculationTrace title="İlk SPT hesap izi" source={profileInput.source} rows={profileInput.rows[0].trace}/>}
           </>}
       </>}
