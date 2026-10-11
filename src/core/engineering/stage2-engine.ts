@@ -20,13 +20,14 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
   const required=[i.B,i.L,i.Df,i.gamma,i.c,i.phi]
   if(required.some(x=>!Number.isFinite(x)))throw new Error('Taşıma gücü girdileri sonlu sayılar olmalıdır.')
   if(i.B<=0||i.L<=0||i.Df<0||i.gamma<=0||i.c<0||i.phi<0||i.phi>50)throw new Error('Taşıma gücü girdileri fiziksel sınırlar dışında.')
+  if(design!=='classical-allowable'&&design!=='tbdy-2018')throw new Error('Desteklenmeyen taşıma gücü tasarım yolu.')
   if(V<0||!Number.isFinite(V)||!Number.isFinite(H))throw new Error('Düşey ve yatay yükler geçerli olmalıdır.')
   if(i.FS!=null&&(!Number.isFinite(i.FS)||i.FS<=0))throw new Error('Güvenlik katsayısı pozitif olmalıdır.')
   if(i.waterTableDepth!=null&&(!Number.isFinite(i.waterTableDepth)||i.waterTableDepth<0))throw new Error('YASS derinliği negatif olmayan sonlu bir değer olmalıdır.')
   if(i.surcharge!=null&&(!Number.isFinite(i.surcharge)||i.surcharge<0))throw new Error('Ek sürşarj negatif olmayan sonlu bir değer olmalıdır.')
   if(i.waterTableDepth!=null&&i.gammaSat==null)throw new Error('YASS tanımlandığında γsat girilmelidir.')
   if(i.gammaSat!=null&&(!Number.isFinite(i.gammaSat)||i.gammaSat<=9.80665))throw new Error('γsat, su birim hacim ağırlığından büyük ve sonlu olmalıdır.')
-  if(i.layers?.some(x=>!Number.isFinite(x.thickness)||x.thickness<=0||!Number.isFinite(x.c)||x.c<0||!Number.isFinite(x.phi)||x.phi<0||x.phi>50||!Number.isFinite(x.gamma)||x.gamma<=0||(x.gammaSat!=null&&(!Number.isFinite(x.gammaSat)||x.gammaSat<=0))))throw new Error('Taşıma gücü tabaka parametreleri geçersiz.')
+  if(i.layers?.some(x=>!Number.isFinite(x.thickness)||x.thickness<=0||!Number.isFinite(x.c)||x.c<0||!Number.isFinite(x.phi)||x.phi<0||x.phi>50||!Number.isFinite(x.gamma)||x.gamma<=0||(x.gammaSat!=null&&(!Number.isFinite(x.gammaSat)||x.gammaSat<=9.80665))))throw new Error('Taşıma gücü tabaka parametreleri geçersiz.')
   let layerTop=i.Df
   const mappedLayers=i.layers?.map(x=>{const layer={topDepth:layerTop,bottomDepth:layerTop+x.thickness,gamma:x.gamma,gammaSat:x.gammaSat??x.gamma,cohesion:x.c,phi:x.phi};layerTop+=x.thickness;return layer})
   if(design==='tbdy-2018'){
@@ -53,6 +54,7 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
   }
   if(i.layers?.length)warnings.push('Klasik yöntem katmanlı zemin parametrelerini hesapta kullanmaz; katmanlı nihai değerlendirme için TBDY yüzeysel temel motoru ve zemin profili analizi gerekir.')
   const r=authoritativeBearing({B:i.B,L:i.L,Df:i.Df,gamma:i.gamma,gammaBearing,surcharge,c:i.c,phi:i.phi,FS:i.FS??3,method:i.method})
+  if(H>0)warnings.push('Klasik taşıma gücü API yatay yük ve kayma güvenliğini değerlendirmez; temel kayma kontrolü ayrı yapılmalıdır.')
   if((i.momentX??0)!==0||(i.momentY??0)!==0)warnings.push('Klasik taşıma gücü API merkezi düşey yük varsayar; momentli temas için TBDY motoru kullanılmalıdır.')
   return{
     value:{Nq:r.value.Nq,Nc:r.value.Nc,Ngamma:r.value.Ngamma,sc:r.value.sc,sq:r.value.sq,sgamma:r.value.sg,dc:r.value.dc,dq:r.value.dq,dgamma:r.value.dg,ic:r.value.ic,iq:r.value.iq,igamma:r.value.ig,characteristic:r.value.ultimate,designResistance:undefined,allowableGross:r.value.allowableGross,qApplied:V/Math.max(i.B*i.L,1e-9),BEffective:i.B,LEffective:i.L,ex:0,ey:0,qSurcharge:i.gamma*i.Df,resistanceFactor:undefined},
@@ -79,12 +81,15 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
     if(!Number.isFinite(layer.thickness)||layer.thickness<=0||!Number.isFinite(layer.sigmaV0)||layer.sigmaV0<=0||!Number.isFinite(layer.deltaSigma)||layer.deltaSigma<0)throw new Error('Oturma tabakası '+(index+1)+': kalınlık, başlangıç gerilmesi veya gerilme artışı geçersiz.')
     if(layer.nu!=null&&(layer.nu<=-1||layer.nu>=0.5))throw new Error('Oturma tabakası '+(index+1)+': Poisson oranı -1 ile 0.5 arasında olmalıdır.')
     if(layer.mv!=null&&layer.mv<0||layer.Cc!=null&&layer.Cc<0||layer.Cr!=null&&layer.Cr<0||layer.e0!=null&&layer.e0<0||layer.sigmaPc!=null&&layer.sigmaPc<=0||layer.Iz!=null&&layer.Iz<0)throw new Error('Oturma tabakası '+(index+1)+': sıkışma ve etki katsayıları fiziksel sınırlar dışında.')
-    if(method==='elastic'||method==='2:1'){if(!Number.isFinite(layer.Es)||layer.Es!<=0)throw new Error('Oturma tabakası '+(index+1)+': Es pozitif olmalıdır.')}
+    if(method==='elastic'||method==='2:1'){
+      if(!Number.isFinite(layer.Es)||layer.Es!<=0)throw new Error('Oturma tabakası '+(index+1)+': Es pozitif olmalıdır.')
+      if(!Number.isFinite(layer.nu)||layer.nu!<=-1||layer.nu!>=0.5)throw new Error('Oturma tabakası '+(index+1)+': elastik integrasyon için geçerli ν açıkça girilmelidir.')
+    }
     if(method==='janbu'&&(!Number.isFinite(layer.M)||layer.M!<=0))throw new Error('Oturma tabakası '+(index+1)+': Janbu M parametresi pozitif olmalıdır.')
     if(method==='schmertmann'&&(!Number.isFinite(layer.Es)||layer.Es!<=0||!Number.isFinite(layer.Iz)||layer.Iz!<0))throw new Error('Oturma tabakası '+(index+1)+': Schmertmann Es pozitif ve Iz negatif olmayan bir değer olmalıdır.')
-    if(method==='consolidation'&&!(layer.mv!=null&&Number.isFinite(layer.mv)&&layer.mv>=0)&&!(layer.Cc!=null&&Number.isFinite(layer.Cc)&&layer.Cc>=0&&layer.e0!=null&&Number.isFinite(layer.e0)&&layer.e0>-1))throw new Error('Oturma tabakası '+(index+1)+': konsolidasyon için mv veya Cc/e0 parametreleri gereklidir.')
+    if(method==='consolidation'&&!(layer.mv!=null&&Number.isFinite(layer.mv)&&layer.mv>=0)&&!(layer.Cc!=null&&Number.isFinite(layer.Cc)&&layer.Cc>=0&&layer.e0!=null&&Number.isFinite(layer.e0)&&layer.e0>=0))throw new Error('Oturma tabakası '+(index+1)+': konsolidasyon için mv veya Cc/e0 parametreleri gereklidir.')
+    if(method==='consolidation'&&layer.mv==null&&((layer.Cc==null)!==(layer.e0==null)))throw new Error('Oturma tabakası '+(index+1)+': Cc ve e0 birlikte girilmelidir.')
   }
-  if(method==='schmertmann'&&i.schmertmannC1==null)warnings.push('Schmertmann C1 verilmedi; 1.0 kullanılmadı, sonuç yalnız verilen katsayılarla üretilebilir.')
   const C1=i.schmertmannC1,C2=i.schmertmannC2
   const results:any[]=[]
   let cumulativeDepth=0
@@ -94,7 +99,7 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
     if(H>0&&ds>0){
       if(method==='elastic'||method==='2:1'){
         const E=layer.Es
-        if(E!=null&&Number.isFinite(E)&&E>0){const nu=layer.nu??0;s=ds*H*(1-nu*nu)/E;type=method==='elastic'?'elastic':'2:1 + elastic'}else warnings.push('Katman '+(index+1)+': Es eksik.')
+        if(E!=null&&Number.isFinite(E)&&E>0){const nu=layer.nu!;s=ds*H*(1-nu*nu)/E;type=method==='elastic'?'elastic':'2:1 + elastic'}else warnings.push('Katman '+(index+1)+': Es eksik.')
       }else if(method==='janbu'){
         const M=layer.M
         if(M!=null&&Number.isFinite(M)&&M>0){s=ds*H/M;type='Janbu M integration'}else warnings.push('Katman '+(index+1)+': Janbu için açık M parametresi eksik; Es otomatik olarak M yerine kullanılmaz.')
