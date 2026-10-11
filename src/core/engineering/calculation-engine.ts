@@ -12,7 +12,7 @@ export interface BearingInput{B:number;L:number;Df:number;gamma:number;c:number;
 function factors(phiDeg:number,method:BearingMethod){
   const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi))
   const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
-  const Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
+  const Nc=phi===0?(method==='Terzaghi'?5.7:5.14):(Nq-1)/Math.max(t,1e-12)
   let Ngamma=0
   if(phi>0){
     if(method==='Terzaghi')Ngamma=1.5*(Nq-1)*t
