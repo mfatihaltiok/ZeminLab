@@ -12,7 +12,6 @@ import { jetGroutAdvanced, type JetGroutAdvancedInput, type JetGroutAdvancedResu
 import { bearingCapacity } from './calculation-engine'
 import { 
   jetGroutEngineering, 
-  jetGroutAxialCapacity, 
   jetGroutShearSafety, 
   virtualRaftSettlement,
   type JetGroutEngineeringInput,
