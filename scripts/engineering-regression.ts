@@ -679,6 +679,10 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
     safetyFactorSliding: 1.5
   }
   const design=calculateJetGroutDesign(designInput)
+  assert.ok(design.warnings.some(w=>w.includes('YASS derinliği girilmedi')))
+  assert.throws(()=>calculateJetGroutDesign({...designInput,groundwaterDepth:0}),/γsat>γw/)
+  const withGwt=calculateJetGroutDesign({...designInput,groundwaterDepth:0,saturatedUnitWeight:20})
+  assert.ok(withGwt.compositeBearingCapacity>0)
   const withoutNu=calculateJetGroutDesign({...designInput,soilNu:undefined})
   assert.equal(withoutNu.untreatedSettlement,undefined)
   assert.ok(withoutNu.warnings.some(w=>w.includes('Poisson oranı')))
