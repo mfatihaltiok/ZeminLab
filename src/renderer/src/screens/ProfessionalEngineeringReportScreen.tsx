@@ -87,9 +87,9 @@ function buildBearingSection(p: ReturnType<typeof useProjectInfo>, profile?: Ide
         { label: 'Karakteristik Taşıma Gücü (qk)', value: fmt(result.value.qk), unit: 'kPa' },
         { label: 'Tasarım Taşıma Gücü (qt)', value: fmt(result.value.qt), unit: 'kPa' },
         { label: 'Uygulanan Basınç (q₀)', value: fmt(result.value.qo), unit: 'kPa' },
-        { label: 'Maksimum taban basıncı (qmax)', value: fmt(result.qMax), unit: 'kPa', status: !designEligible?'warning':result.qMax<=1.25*result.qk?'ok':'fail' },
+        { label: 'Maksimum taban basıncı (qmax)', value: fmt(result.qMax), unit: 'kPa', status: result.qMax>1.25*result.qk?'fail':!designEligible?'warning':'ok' },
         { label: 'Kenar basıncı sınırı (1.25·qk)', value: fmt(1.25*result.qk), unit: 'kPa' },
-        { label: 'Kullanım Oranı (η)', value: fmt(result.value.utilization * 100, 1), unit: '%', status: designEligible ? (result.value.utilization <= 1 ? 'ok' : 'fail') : 'warning' },
+        { label: 'Kullanım Oranı (η)', value: fmt(result.value.utilization * 100, 1), unit: '%', status: result.value.utilization>1?'fail':!designEligible?'warning':'ok' },
         { label: 'Tasarım durumu', value: designEligible ? (result.value.adequate ? 'UYGUN' : 'UYGUN DEĞİL') : 'ÖN DEĞERLENDİRME — NİHAİ TASARIM DEĞİL', unit: '', status: designEligible ? (result.value.adequate ? 'ok' : 'fail') : 'warning' }
       ],
       notes: designWarnings
