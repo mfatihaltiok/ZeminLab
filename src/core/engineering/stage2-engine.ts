@@ -57,7 +57,7 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
   if(![B,L,q,qNet].every(Number.isFinite)||B<=0||L<=0||q<0||qNet<0)throw new Error('Oturma hesabında B/L pozitif, q/qNet sıfır veya pozitif ve tüm girdiler sonlu olmalıdır.')
   if(!Array.isArray(i.layers)||!i.layers.length)throw new Error('Oturma hesabı için en az bir zemin tabakası gereklidir.')
   if(!['elastic','2:1','janbu','schmertmann','consolidation'].includes(method))throw new Error('Desteklenmeyen oturma yöntemi.')
-  if(method==='schmertmann'&&(!Number.isFinite(i.schmertmannC1)||!Number.isFinite(i.schmertmannC2)))throw new Error('Schmertmann yöntemi için C1 ve C2 sonlu değerlerle girilmelidir.')
+  if(method==='schmertmann'&&(!Number.isFinite(i.schmertmannC1)||i.schmertmannC1!<=0||!Number.isFinite(i.schmertmannC2)||i.schmertmannC2!<=0))throw new Error('Schmertmann yöntemi için C1 ve C2 sonlu değerlerle girilmelidir.')
   for(const [index,layer] of i.layers.entries()){
     if(!Number.isFinite(layer.thickness)||layer.thickness<=0||!Number.isFinite(layer.sigmaV0)||layer.sigmaV0<=0||!Number.isFinite(layer.deltaSigma)||layer.deltaSigma<0)throw new Error('Oturma tabakası '+(index+1)+': kalınlık, başlangıç gerilmesi veya gerilme artışı geçersiz.')
     if(layer.nu!=null&&(!Number.isFinite(layer.nu)||layer.nu<=-1||layer.nu>=0.5))throw new Error('Oturma tabakası '+(index+1)+': Poisson oranı -1 ile 0.5 arasında olmalıdır.')
@@ -68,9 +68,10 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
   }
   if(method==='schmertmann'&&i.schmertmannC1==null)warnings.push('Schmertmann C1 verilmedi; 1.0 kullanılmadı, sonuç yalnız verilen katsayılarla üretilebilir.')
   const C1=i.schmertmannC1,C2=i.schmertmannC2
-  const results:any[]=[],missing=false
+  const results:any[]=[]
+  let cumulativeDepth=0
   for(const [index,layer] of i.layers.entries()){
-    const H=layer.thickness,zmid=H/2,ds=method==='2:1'?qNet*B*L/((B+zmid)*(L+zmid)):layer.deltaSigma
+    const H=layer.thickness,zmid=cumulativeDepth+H/2,ds=method==='2:1'?qNet*B*L/((B+zmid)*(L+zmid)):layer.deltaSigma
     let s=0,type='none'
     if(H>0&&ds>0){
       if(method==='elastic'||method==='2:1'){
@@ -95,6 +96,7 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
       }
     }
     results.push({index,thickness:H,zmid,deltaSigma:ds,settlement:s,type})
+    cumulativeDepth+=H
   }
   const immediate=results.filter(x=>x.type!=='oedometer').reduce((a,x)=>a+x.settlement,0)
   const consolidation=results.filter(x=>x.type==='oedometer').reduce((a,x)=>a+x.settlement,0)
