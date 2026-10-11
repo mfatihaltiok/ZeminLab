@@ -2,18 +2,19 @@ import assert from 'node:assert/strict'
 import { calculateSpt } from '../src/core/engineering/spt/spt-engine.ts'
 import { calculateSurfaceFoundation } from '../src/core/engineering/surface-foundation.ts'
 import { liquefactionProfile } from '../src/core/engineering/liquefaction/liquefaction-profile.ts'
-import { foundationChecks } from '../src/core/engineering/calculation-engine.ts'
+import { foundationChecks, jetGrout as legacyJetGrout } from '../src/core/engineering/calculation-engine.ts'
 import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-settlement-engine.ts'
 import { stage2BearingCapacity, stage2Settlement } from '../src/core/engineering/stage2-engine.ts'
 import { bearingCapacity as classicalBearingCapacity } from '../src/core/engineering/calculation-engine.ts'
 import { stressSpread21, layerSettlement, schmertmannSettlement, jetGroutAdvanced } from '../src/core/engineering/advanced-geotech.ts'
-import { jetGroutAxialCapacity, verifyJetGroutQC } from '../src/core/engineering/jet-grout-advanced.ts'
+import { jetGroutAxialCapacity, verifyJetGroutQC, virtualRaftSettlement } from '../src/core/engineering/jet-grout-advanced.ts'
 import { calculateSubgradeReaction } from '../src/core/engineering/subgrade-reaction.ts'
 import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
 import { effectiveStressAtDepth } from '../src/core/engineering/stress-profile.ts'
 import { captureSptStressSnapshot, deriveSptValues } from '../src/core/engineering/field-calculations.ts'
 import { toEngineeringSI } from '../src/core/units/engineering-input-adapter.ts'
+import { sptCorrection } from '../src/core/calculations/engineering.ts'
 import { normalizeEngineeringRenderModel } from '../src/renderer/src/components/engineering-render-model.ts'
 
 const approx=(actual:number,expected:number,tolerance=1e-9)=>{
@@ -130,6 +131,8 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.throws(() => calculateSpt({nField:10,cs:1.05,effectiveStress:100,rodLengthM:5}), /CS için yalnız/)
   assert.throws(() => calculateSpt({nField:10,cs:1.2,sampler:'standard',effectiveStress:100,rodLengthM:5}), /Standart numune alıcı/)
   assert.throws(() => calculateSpt({nField:10,energyRatio:40,hammerType:'measured',effectiveStress:100,rodLengthM:5}), /ER %45–%160/)
+  const compatNoFines=sptCorrection({depth:3,nField:10},100)
+  assert.equal(compatNoFines.N160f,undefined)
   const noStress=calculateSpt({nField:10,fineContent:20,rodLengthM:5})
   assert.equal(noStress.n1_60f,undefined)
   assert.equal(noStress.hasAssumptions,true)
@@ -336,6 +339,13 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   })
   approx(terzaghi.sc,1.15)
   approx(terzaghi.sg,.9)
+  approx(terzaghi.Ngamma,1.5*(terzaghi.Nq-1)*Math.tan(Math.PI/6),1e-10)
+  const edgePressure=calculateSurfaceFoundation({B:2,L:4,Df:1,gamma1:18,gamma2:19,c:0,phi:0,verticalLoad:1000,momentX:100,momentY:40,resistanceFactor:1.4,method:'TBDY-2018',groundwaterDepth:10})
+  assert.equal(edgePressure.finalDesignEligible,true)
+  assert.equal(edgePressure.adequate,false)
+  assert.ok(edgePressure.qMax>1.25*edgePressure.qk)
+  const classicalOnly=calculateSurfaceFoundation({B:2,L:4,Df:1,gamma1:18,gamma2:19,c:10,phi:30,verticalLoad:1000,method:'Terzaghi',groundwaterDepth:10})
+  assert.equal(classicalOnly.finalDesignEligible,false)
 }
 
 
@@ -594,6 +604,12 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   // Kompozit taşıma gücü: qcomp = ρ·qcol + (1-ρ)·qsoil
   const expectedQ = expectedAr * 2000 + (1 - expectedAr) * 100
   approx(result.compositeCapacity, expectedQ, 1e-6)
+  const withFS=jetGroutAdvanced({columnDiameter:0.6,spacing:1.5,qSoil:100,qColumn:2000,FS:3,load:0,foundationArea:4})
+  approx(withFS.allowableCapacity!,withFS.compositeCapacity/3,1e-12)
+  assert.equal(withFS.capacityFS,undefined)
+  assert.throws(()=>virtualRaftSettlement({load:100,area:4,treatedThickness:3,untreatedModulus:10000,treatedModulus:50000} as any),/Poisson oranı/)
+  const legacy=legacyJetGrout({columnDiameter:0.6,spacing:1.5,qultSoil:100,qultColumn:2000,improvementFactor:1.2,FS:3,columnStrength:2500})
+  approx(legacy.value.allowable,legacy.value.composite/3,1e-12)
   
   // Kompozit modül: Ecomp = ρ·Ecol + (1-ρ)·Esoil
   const expectedE = expectedAr * 50000 + (1 - expectedAr) * 5000
@@ -817,6 +833,7 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.equal(qcMissing.status,'not-evaluable')
   const ks=calculateSubgradeReaction({B:2,L:4,Es:20000,nu:0.3,method:'elastic',unitSystem:'kN-m'})
   assert.ok(Number.isFinite(ks.ks)&&ks.ks>0)
+  assert.equal(calculateSubgradeReaction({B:2,Es:10000,nu:0.3}).method,'elastic')
   const ksTon=calculateSubgradeReaction({B:2,L:4,Es:20000/9.80665,nu:0.3,method:'elastic',unitSystem:'ton-m'})
   approx(ksTon.ks,ks.ks/9.80665,1e-8)
   const plateClay=calculateSubgradeReaction({B:0.3048,L:0.3048,Kv1:10000,soilType:'cohesive',method:'erol-plate',unitSystem:'kN-m'})
