@@ -116,29 +116,32 @@ export function foundationChecks(i:FoundationCheckInput){
   const geometricEffectiveArea=effectiveWidth*effectiveLength
   const contactArea=i.area!=null?Math.min(i.area,contact.area):contact.area
   const rh=i.gammaRh??1.10,rp=i.gammaRp??1.40
-  if(rh<=0||rp<=0)throw new Error('γRh ve γRp pozitif olmalıdır.')
+  if(Math.abs(rh-1.10)>1e-9||Math.abs(rp-1.40)>1e-9)throw new Error('TBDY 2018 Tablo 16.2 için γRh=1.10 ve γRp=1.40 kullanılmalıdır.')
   const interfaceLimits:Record<FoundationInterface,number>={
     'cast-in-place-soil':.60,
     'precast-soil':.40,
     'concrete-concrete':.50,
     'concrete-bedrock':.50
   }
+  const interfaceProvided=i.interfaceType!=null
   const interfaceType=i.interfaceType??'cast-in-place-soil'
-  const tanLimit=interfaceLimits[interfaceType]
-  const rawTan=i.deltaTan??tanLimit
+  const tanLimit=interfaceProvided?interfaceLimits[interfaceType]:0
+  const rawTan=i.deltaTan??(interfaceProvided?tanLimit:0)
   if(rawTan<0||!Number.isFinite(rawTan))throw new Error('tanδ sıfır veya pozitif ve sonlu olmalıdır.')
-  const deltaTan=Math.min(tanLimit,rawTan)
+  if(interfaceProvided&&rawTan>tanLimit+1e-9)throw new Error('Girilen tanδ, TBDY Tablo 16.3 seçilen arayüz üst sınırını aşamaz.')
+  const deltaTan=rawTan
   const warnings:string[]=[]
-  if(i.interfaceType==null)warnings.push('Temel-zemin arayüzü ayrıca girilmedi; basitleştirilmiş proje akışında yerinde dökme beton-zemin arayüzü ve TBDY Tablo 16.3 üst sınırı kullanıldı.')
-  if(i.deltaTan==null)warnings.push('tanδ girilmedi; seçilen arayüz için TBDY Tablo 16.3 üst sınırı kullanıldı. Proje özelinde deney/veri varsa doğrudan girilmelidir.')
-  if(rawTan>tanLimit)warnings.push('Girilen tanδ, TBDY Tablo 16.3 seçilen arayüz üst sınırını aştığı için sınırlandırıldı.')
-  if(rh!==1.10)warnings.push('TBDY 2018 Tablo 16.2 için γRh=1.10 kullanılmalıdır.')
-  if(rp!==1.40)warnings.push('TBDY 2018 Tablo 16.2 için γRp=1.40 kullanılmalıdır.')
+  if(!interfaceProvided)warnings.push('Temel-zemin arayüzü seçilmedi; arayüz dayanımı kredilendirilmedi ve nihai kontrol veri eksik olarak işaretlendi.')
+  if(i.deltaTan==null&&interfaceProvided)warnings.push('tanδ girilmedi; seçilen arayüz için TBDY Tablo 16.3 üst sınırı kullanıldı. Proje özelinde deney/veri varsa doğrudan girilmelidir.')
   const submerged=i.groundwaterDepth!=null&&i.foundationDepth!=null&&i.groundwaterDepth<=i.foundationDepth
   const seismic=Boolean(i.seismic)
+  const groundwaterKnown=i.groundwaterDepth!=null&&i.foundationDepth!=null
   let rth=0
   let slidingMode:'undrained-cu'|'drained-interface'|'data-missing'='drained-interface'
-  if(seismic&&submerged){
+  if(seismic&&!groundwaterKnown){
+    slidingMode='data-missing'
+    warnings.push('Deprem kayma kontrolünde YASS ve temel derinliği açıkça tanımlanmalıdır; su koşulu belirlenmeden sürtünme direnci kredilendirilmedi.')
+  }else if(seismic&&submerged){
     slidingMode='undrained-cu'
     if(i.cu!=null&&Number.isFinite(i.cu)&&i.cu>0){
       rth=contactArea*i.cu/rh
@@ -147,8 +150,8 @@ export function foundationChecks(i:FoundationCheckInput){
       warnings.push('Temel tabanı YASS altında/aynı kotta ve deprem durumu seçili. TBDY 16.8.4.6 gereği sürtünme direnci drenajsız cu ile hesaplanmalıdır; cu girilmeden sürtünme direnci kredilendirilmedi.')
     }
   }else{
-    rth=N*deltaTan/rh
-    if(seismic&&submerged===false&&i.groundwaterDepth!=null)warnings.push('Deprem sürtünme kontrolünde temel tabanı YASS altında olmadığı için drenajlı arayüz yaklaşımı kullanıldı.')
+    rth=contactArea>0?N*deltaTan/rh:0
+    if(seismic&&submerged===false)warnings.push('Deprem sürtünme kontrolünde temel tabanı YASS altında olmadığı için drenajlı arayüz yaklaşımı kullanıldı.')
   }
   const rpk=Math.max(0,i.passiveResistanceCharacteristic??0)
   const rpt=i.usePassiveResistance?rpk/rp:0
@@ -165,7 +168,7 @@ export function foundationChecks(i:FoundationCheckInput){
   if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
   if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; kayma için sürtünme direncinde yalnızca gerçek basınçlı temas alanı esas alınmalıdır.')
   if(contactArea<=0)warnings.push('Temas alanı sıfırdır; sürtünme direnci ve temel temas kontrolleri geçersizdir.')
-  const requiredData=slidingMode==='data-missing'||(i.usePassiveResistance&&rpk<=0)
+  const requiredData=slidingMode==='data-missing'||!interfaceProvided||(i.usePassiveResistance&&rpk<=0)
   return{
     ex,ey,qAvg,qMax,qMin,contactArea,effectiveWidth,effectiveLength,
     horizontalResultant:vh,slidingFS:vh>0?designResistance/vh:Infinity,
