@@ -148,6 +148,8 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   const unknownSoil=calculateSpt({nField:10,effectiveStress:25,fineContent:20,rodLengthM:5})
   assert.equal(unknownSoil.n1_60f,undefined)
   assert.equal(unknownSoil.hasAssumptions,true)
+  const noClassDilatancy=calculateSpt({nField:30,effectiveStress:25,fineContent:20,rodLengthM:5,applyDilatancy:true})
+  assert.equal(noClassDilatancy.dilatancyApplied,false)
 
 }
 
