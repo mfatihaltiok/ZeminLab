@@ -19,7 +19,7 @@ export function classifySoilISO14688(ll?:number,pi?:number){
 }
 export function stressAtDepth(depth:number,layers:Pick<SoilLayerInput,'top'|'bottom'|'gamma'|'gammaSat'>[],gwt:number){return stressEngine(depth,layers,gwt)}
 export function sptCorrection(x:SptInput,sigmaVPrime:number){
-  const r=calculateSpt({nField:x.nField,energyRatio:x.energyRatio,hammerType:x.hammerType,boreholeDiameterMm:x.boreholeDiameter,sampler:x.sampler==='without-liner'?'without-liner':'standard',samplerCorrection:x.samplerCorrection,rodLengthM:x.rodLengthM,effectiveStress:sigmaVPrime,fineContent:x.fines,soilCode:x.soil,claySoil:x.claySoil,soilCode:x.soil,claySoilSource:x.claySoil!=null?'explicit classification':x.soil!=null?'soil code':'classification not supplied',applyOverburden:true,applyDilatancy:false})
+  const r=calculateSpt({nField:x.nField,energyRatio:x.energyRatio,hammerType:x.hammerType,boreholeDiameterMm:x.boreholeDiameter,sampler:x.sampler==='without-liner'?'without-liner':'standard',samplerCorrection:x.samplerCorrection,rodLengthM:x.rodLengthM,effectiveStress:sigmaVPrime,fineContent:x.fines,soilCode:x.soil,claySoil:x.claySoil,claySoilSource:x.claySoil!=null?'explicit classification':x.soil!=null?'soil code':'classification not supplied',applyOverburden:true,applyDilatancy:false})
   return{CE:r.ce,CB:r.cb,CS:r.cs,CR:r.cr,CN:r.cn,N60:r.n60,N160:r.n1_60,N160f:r.n1_60f,alpha:r.alpha,beta:r.beta,sigmaVPrime}
 }
 
