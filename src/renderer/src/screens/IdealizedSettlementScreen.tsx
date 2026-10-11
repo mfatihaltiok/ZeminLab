@@ -142,7 +142,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [], onChange }:
             </select>
           </label>
           <label>Sondaj / YASS
-            <select value={b?.id ?? ''} onChange={e => {setSelected(e.target.value);if(profile)updateProjectInfo({idealizedSoilProfile:{...profile,settlementGroundwaterBoreholeId:e.target.value}})}} disabled={!eligibleBoreholes.length}>
+            <select value={b?.id ?? ''} onChange={e => {setSelected(e.target.value);if(profile)onChange({...profile,settlementGroundwaterBoreholeId:e.target.value})}} disabled={!eligibleBoreholes.length}>
               <option value="">Sondaj seç</option>
               {eligibleBoreholes.map(x => <option key={x.id} value={x.id}>{x.name} · YASS {x.groundwaterDepth ?? '—'} m</option>)}
             </select>
