@@ -78,6 +78,7 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
   const B=i.B,L=i.L??i.B,q=i.q,qNet=i.qNet??q,method=i.method??'elastic'
   const warnings:string[]=[]
   if(![B,L,q,qNet].every(Number.isFinite)||B<=0||L<=0||q<0||qNet<0||qNet>q+1e-9)throw new Error('Oturma hesabında B/L pozitif, q≥qNet≥0 ve tüm girdiler sonlu olmalıdır.')
+  if((method==='2:1'||method==='schmertmann')&&i.qNet==null)throw new Error('2:1 ve Schmertmann yöntemleri için net temel basıncı qNet açıkça girilmelidir; qNet=q varsayılmaz.')
   if(i.timeYears!=null&&(!Number.isFinite(i.timeYears)||i.timeYears<0))throw new Error('Oturma hesabı zamanı negatif olmayan sonlu bir değer olmalıdır.')
   if(!Array.isArray(i.layers)||!i.layers.length)throw new Error('Oturma hesabı için en az bir zemin tabakası gereklidir.')
   if(!['elastic','2:1','janbu','schmertmann','consolidation'].includes(method))throw new Error('Desteklenmeyen oturma yöntemi.')
