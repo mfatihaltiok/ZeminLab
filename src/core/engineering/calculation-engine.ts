@@ -69,7 +69,7 @@ export function settlement(i:SettlementInput):CalculationResult<{immediate:numbe
   for(const [index,l] of (i.layers??[]).entries()){
     if(!Number.isFinite(l.thickness)||l.thickness<0)throw new Error('Oturma katmanı '+(index+1)+': kalınlık negatif olmayan sonlu bir değer olmalıdır.')
     for(const [name,value] of [['Cc',l.Cc],['e0',l.e0],['sigma0',l.sigma0],['dSigma',l.dSigma]] as const)if(value!==undefined&&!Number.isFinite(value))throw new Error('Oturma katmanı '+(index+1)+': '+name+' sonlu olmalıdır.')
-    if(l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<=-1||l.sigma0!=null&&l.sigma0<=0||l.dSigma!=null&&l.dSigma<0)throw new Error('Oturma katmanı '+(index+1)+': konsolidasyon parametreleri geçersiz.')
+    if(l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<0||l.sigma0!=null&&l.sigma0<=0||l.dSigma!=null&&l.dSigma<0)throw new Error('Oturma katmanı '+(index+1)+': konsolidasyon parametreleri geçersiz.')
   }
   const immediate=i.q*i.B*(1-i.nu*i.nu)/i.Es
   const consolidation=(i.layers??[]).reduce((sum,l)=>l.Cc!=null&&l.e0!=null&&l.sigma0!=null&&l.dSigma!=null&&l.sigma0>0&&l.Cc>=0&&l.e0>-1?sum+ l.thickness*l.Cc/(1+l.e0)*Math.log10((l.sigma0+l.dSigma)/l.sigma0):sum,0)
