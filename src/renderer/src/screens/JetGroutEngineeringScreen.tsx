@@ -47,12 +47,12 @@ export function JetGroutEngineeringScreen(){
         continuityVerified:j.qcContinuityVerified,constructionLogsVerified:j.qcConstructionLogsVerified,testReportReviewed:j.qcTestReportReviewed
       }
     }),error:undefined}}catch(error){return {result:undefined,error:error instanceof Error?error.message:'Jet Grout hesabı doğrulanamadı'}}
-  },[ready,eccentricityInvalid,d,spacing,soil,column,fs,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed,projectLoad,projectArea,projectH])
+  },[ready,eccentricityInvalid,d,spacing,soil,column,fs,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,p.unitSystem,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed,projectLoad,projectArea,projectH])
   const r=computation.result,calculationError=computation.error
   latestJetGroutResult=r
 
   return <Frame screen="jet-grout">
-    <Source>Erol &amp; Çekinmez Bayram (2018) kompozit yaklaşımı kullanılır. Priebe yalnızca taş kolon/vibro-replacement referansıdır. TBDY 2018 geoteknik kontrolleri ayrı motorlardan yürütülür.</Source>
+    <Source>Erol &amp; Çekinmez Bayram (2018) kompozit ön kontrolü. FS girilmeden izin verilebilir kapasite üretilmez; qSoil/qColumn girdileri kaynak hesabında YASS düzeltmeli olmalıdır. Momentler etkin temel alanına yansıtılır. Priebe yalnızca taş kolon/vibro-replacement referansıdır; nihai TBDY kontrolü ayrı yürütülür.</Source>
     <Card title="JET GROUT GİRDİLERİ"><div className="form-grid">
       <Field label="Kolon çapı d (m)" value={d} onChange={v=>set('columnDiameter',num(v))}/>
       <Field label="Aks aralığı s (m)" value={spacing} onChange={v=>set('spacing',num(v))}/>
