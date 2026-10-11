@@ -36,6 +36,10 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
     {thickness:-1,sigmaV0:100,deltaSigma:10,Es:10000}
   ]}))
   assert.throws(()=>stage2Settlement({B:2,L:2,Df:0,q:150,qNet:100,method:'consolidation',layers:[{thickness:1,sigmaV0:100,deltaSigma:50,Cc:0.2,e0:0.7,sigmaPc:150}]}),/Cr açıkça girilmelidir/)
+  const layerElastic=layerSettlement([{thickness:1,sigma0:100,deltaSigma:50,Es:10000}])
+  approx(layerElastic.total,0.005)
+  assert.throws(()=>layerSettlement([{thickness:-1,sigma0:100,deltaSigma:50,Es:10000}]),/kalınlığı/)
+  assert.throws(()=>layerSettlement([{thickness:1,sigma0:100,deltaSigma:50,Cc:0.2,e0:0.7,sigmaPc:150}]),/Cr girilmelidir/)
 }
 
 
