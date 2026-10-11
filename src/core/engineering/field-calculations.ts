@@ -174,7 +174,7 @@ export function deriveSptValues(borehole:BoreholeRecord,record:SptRecord,laborat
   if(classificationConflict)warnings.push('SPT zemin kodu ile laboratuvar Atterberg sınıflandırması çelişiyor; laboratuvar sınıflandırması CN kararında önceliklendirildi.')
   if(record.testStressSnapshot===undefined)warnings.push('SPT test koşulları henüz sabitlenmedi; saha koşullarını kontrol edip SPT satırını Onayla ile kilitleyin.')
   const hasAssumptions=result.hasAssumptions||classificationConflict||record.testStressSnapshot===undefined
-  return{...result,warnings,hasAssumptions,verticalStress:stress.verticalStress,porePressure:stress.porePressure,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:stress.effectiveStress!=null||claySoil,n60DilatancyCorrected:result.n1_60_dilatancy}
+  return{...result,warnings,hasAssumptions,verticalStress:stress.verticalStress,porePressure:stress.porePressure,effectiveStress:stress.effectiveStress,stressSource:stress.source,overburdenCorrection:result.cn,overburdenCorrectionApplied:result.overburdenCorrectionApplied,n60DilatancyCorrected:result.n1_60_dilatancy}
 }
 export function classifyLaboratoryRecord(record:LaboratoryRecord):SoilClassificationResult|null{return classifyFineSoil(record.liquidLimit,laboratoryPlasticityIndex(record))}
 
