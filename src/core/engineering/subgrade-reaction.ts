@@ -92,7 +92,7 @@ export function calculateSubgradeReaction(i: SubgradeReactionInput): SubgradeRea
   if (i.soilType === 'cohesive') {
     if (Math.abs(L - i.B) <= 1e-9) {
       ksBase = Kv1Base / Bft
-      formula = 'Kv = Kv1 / B  (Denk. 6.15a)'
+      formula = 'Kv = Kv1 / Bft  (Denk. 6.15a; Bft=B/0.3048)'
     } else {
       ksBase = Kv1Base * (ratio + 0.5) / (1.5 * ratio * Bft)
       formula = 'Kv = Kv1·(m+0.5)/(1.5·m·Bft)  (Denk. 6.15b)'
