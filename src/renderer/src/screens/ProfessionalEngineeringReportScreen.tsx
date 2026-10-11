@@ -3,6 +3,7 @@ import { useProjectInfo } from '../../../core/state/project-store'
 import { forceToBase, stressToBase, unitWeightToBase, momentToBase } from '../../../core/units/project-units'
 import { bearingCapacity, tbdyBearingCapacity, foundationChecks } from '../../../core/calculations/engineering'
 import { jetGroutEngineering, verifyJetGroutQC } from '../../../core/engineering/jet-grout-advanced'
+import { calculateSubgradeReaction } from '../../../core/engineering/subgrade-reaction'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
 import { calculateIdealizedSettlement } from '../../../core/engineering/idealized-settlement-engine'
 import { EngineeringReportProfessional, type ReportSection, type ReportCalculationStep } from '../components/EngineeringReportProfessional'
@@ -315,6 +316,27 @@ function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile?: 
   }
 }
 
+
+function buildSubgradeReactionSection(p: ReturnType<typeof useProjectInfo>, profile?: IdealizedSoilProfile): ReportSection {
+  const f=p.foundationParameters,B=f.footingWidth,L=f.footingLength
+  const layer=profile?.layers[0],Es=layer?.elasticModulus,nu=layer?.poissonRatio
+  const inputs=[
+    {label:'Temel genişliği B',value:fmt(B),unit:'m'},
+    {label:'Temel uzunluğu L',value:fmt(L),unit:'m'},
+    {label:'Young modülü Es',value:Es==null?'—':fmt(stressToBase(Es,profile?.unitSystem??p.unitSystem)),unit:'kPa'},
+    {label:'Poisson oranı ν',value:fmt(nu),unit:''}
+  ]
+  if(!profile||profile.status!=='SABİTLENDİ'||!(B>0&&L>0)||Es==null||nu==null){
+    return {id:'6',title:'Yatak Katsayısı (ks)',subtitle:'Elastik yarı-uzay eşdeğeri',method:'Es ve ν ile elastik yaklaşım',source:'Elastik yarı-uzay yaklaşımı; nihai modelleme girdisi değildir',inputs,steps:[],results:[{label:'Hesap durumu',value:'VERİ EKSİK — Es, ν ve sabitlenmiş profil gerekir',unit:'',status:'warning'}],notes:['Yatak katsayısı temel geometrisine, zemin rijitliğine ve seçilen modele bağlıdır; evrensel bir zemin sabiti değildir. M veya Moed, Es yerine kullanılamaz.']}
+  }
+  try{
+    const result=calculateSubgradeReaction({B,L,Es:stressToBase(Es,profile.unitSystem??p.unitSystem),nu,method:'elastic',unitSystem:'kN-m'})
+    return {id:'6',title:'Yatak Katsayısı (ks)',subtitle:'Elastik yarı-uzay eşdeğeri',method:result.method,source:result.source,inputs,steps:[{index:1,symbol:'ks',title:'Eşdeğer yatak katsayısı',formula:result.formula,value:result.ks,unit:'kN/m³'}],results:[{label:'Eşdeğer ks',value:fmt(result.ks),unit:'kN/m³',status:'warning'}],notes:[...result.assumptions,'Bu sonuç, SAP2000/Winkler yayları için ön değerlendirme değeridir; temel boyutuna ve seçilen idealizasyona duyarlıdır.']}
+  }catch(error){
+    return {id:'6',title:'Yatak Katsayısı (ks)',subtitle:'Hesap üretilemedi',method:'Elastik yaklaşım',source:'ZeminLab yatak katsayısı motoru',inputs,steps:[],results:[{label:'Hesap durumu',value:'VERİ EKSİK / GEÇERSİZ',unit:'',status:'warning'}],notes:[error instanceof Error?error.message:'Yatak katsayısı girdileri doğrulanamadı.']}
+  }
+}
+
 function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSection {
   const j = p.jetGrout
   const qcInput={
@@ -405,8 +427,9 @@ export function ProfessionalEngineeringReport({ profile }: Props) {
     result.push(liquefaction)
 
     const jetGrout = buildJetGroutSection(p)
-    if (jetGrout) result.push(jetGrout)
-    
+    result.push(jetGrout)
+    result.push(buildSubgradeReactionSection(p, profile))
+
     return result
   }, [p, profile, boreholes, labs])
 
