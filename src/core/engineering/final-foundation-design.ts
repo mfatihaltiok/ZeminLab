@@ -85,8 +85,13 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
       const slideStatus=!sliding?'VERİ EKSİK':sliding.evaluable?(sliding.slidingSafeResultant?'UYGUN':'UYGUN DEĞİL'):'VERİ EKSİK'
       trace.push({check:'Kayma',status:slideStatus,source:'TBDY 2018 16.8.4',details:sliding?('Vh='+sliding.horizontalResultant.toFixed(3)+'; R='+sliding.slidingCapacityResultant.toFixed(3)):'Ara yüzü seçilmedi.'})
       if(sliding){
-        if(!sliding.evaluable)missing.push('Deprem + YASS altında kayma için cu')
-        else if(!sliding.slidingSafeResultant)failed.push('Kayma')
+        if(!sliding.evaluable){
+          if(seismicDesign&&sp.groundwaterDepth==null)missing.push('Temel kayma kontrolü için YASS derinliği')
+          if(seismicDesign&&sp.groundwaterDepth!=null&&sp.groundwaterDepth<=fp.footingDepth&&!(finite(sp.undrainedCohesion)&&sp.undrainedCohesion>0))missing.push('YASS altındaki deprem kayma kontrolü için cu')
+          if(sliding.slidingMode==='drained-interface'&&fp.foundationTanDelta==null)missing.push('Drenajlı kayma kontrolü için tanδ')
+          if(sliding.contactArea<=0)missing.push('Kayma kontrolü için pozitif basınçlı temas alanı')
+          if(!sliding.warnings.length)missing.push('Kayma kontrolü için gerekli geoteknik veriler')
+        }else if(!sliding.slidingSafeResultant)failed.push('Kayma')
         warnings.push(...sliding.warnings)
       }
     }catch(e){
