@@ -430,7 +430,7 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
   }
 }
 
-export function ProfessionalEngineeringReport({ profile }: Props) {
+export function ProfessionalEngineeringReport({ profile, boreholes, labs }: Props) {
   const p = useProjectInfo()
 
   const sections = useMemo(() => {
