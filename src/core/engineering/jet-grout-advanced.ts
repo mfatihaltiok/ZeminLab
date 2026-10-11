@@ -86,9 +86,10 @@ export interface JetGroutAxialResult {
 export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResult {
   if(!Number.isFinite(i.diameter)||i.diameter<=0)throw new Error('Jet Grout kolon çapı pozitif olmalıdır.')
   if(!Array.isArray(i.layers)||i.layers.length===0)throw new Error('Jet Grout eksenel kapasitesi için zemin tabakaları gereklidir.')
-  if(i.columnStrength!=null&&(!Number.isFinite(i.columnStrength)||i.columnStrength<=0))throw new Error('Jet Grout kolon dayanımı pozitif olmalıdır.')
+  if(i.columnStrength==null||!Number.isFinite(i.columnStrength)||i.columnStrength<=0)throw new Error('Jet Grout kolon malzeme dayanımı pozitif ve açıkça girilmelidir.')
   if(i.numberOfColumns!=null&&(!Number.isInteger(i.numberOfColumns)||i.numberOfColumns<1))throw new Error('Kolon sayısı pozitif tamsayı olmalıdır.')
   if(i.groupRows!=null&&(!Number.isInteger(i.groupRows)||i.groupRows<1)||i.groupColumns!=null&&(!Number.isInteger(i.groupColumns)||i.groupColumns<1))throw new Error('Grup satır/sütun sayıları pozitif tamsayı olmalıdır.')
+  if(i.numberOfColumns!=null&&i.numberOfColumns>1&&(i.groupRows==null||i.groupColumns==null||i.groupSpacing==null))throw new Error('Çok kolonlu grup kapasitesi için satır, sütun ve aks aralığı açıkça girilmelidir.')
   if(i.groupSpacing!=null&&(!Number.isFinite(i.groupSpacing)||i.groupSpacing<=0))throw new Error('Grup aks aralığı pozitif olmalıdır.')
   if(i.resistanceFactor!=null&&(!Number.isFinite(i.resistanceFactor)||i.resistanceFactor<=0))throw new Error('Direnç katsayısı pozitif olmalıdır.')
   for(const [index,l] of i.layers.entries())if(![l.thickness,l.gamma,l.cohesion,l.frictionAngle].every(Number.isFinite)||l.thickness<=0||l.gamma<=0||l.cohesion<0||l.frictionAngle<0||l.frictionAngle>50||(l.effectiveStressAtTop!=null&&(!Number.isFinite(l.effectiveStressAtTop)||l.effectiveStressAtTop<0))||(l.effectiveStressAtBottom!=null&&(!Number.isFinite(l.effectiveStressAtBottom)||l.effectiveStressAtBottom<0))||(l.interfaceAlpha!=null&&(!Number.isFinite(l.interfaceAlpha)||l.interfaceAlpha<0||l.interfaceAlpha>1))||(l.interfaceDelta!=null&&(!Number.isFinite(l.interfaceDelta)||l.interfaceDelta<0||l.interfaceDelta>50)))throw new Error('Jet Grout tabaka '+(index+1)+' parametreleri geçersiz.')
@@ -118,7 +119,8 @@ export function jetGroutAxialCapacity(i: JetGroutAxialInput): JetGroutAxialResul
   const n = Math.max(1, Math.round(i.numberOfColumns ?? 1))
   const rows = Math.max(1, Math.round(i.groupRows ?? Math.sqrt(n))), cols = Math.max(1, Math.round(i.groupColumns ?? Math.ceil(n / rows)))
   const spacing = Math.max(i.groupSpacing ?? d, d)
-  const groupWidth = Math.max(d, (cols - 1) * spacing + d), groupLength = Math.max(d, (rows - 1) * spacing + d)
+  const staggerOffset = i.groupLayout === 'triangular' && rows > 1 ? spacing / 2 : 0
+  const groupWidth = Math.max(d, (cols - 1) * spacing + d + staggerOffset), groupLength = Math.max(d, (rows - 1) * spacing + d)
   const blockPerimeter = 2 * (groupWidth + groupLength)
   const blockArea = groupWidth * groupLength
   const blockBase = Math.max(0, tipSoil * blockArea)
