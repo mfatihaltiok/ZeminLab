@@ -319,7 +319,7 @@ function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile?: 
 
 function buildSubgradeReactionSection(p: ReturnType<typeof useProjectInfo>, profile?: IdealizedSoilProfile): ReportSection {
   const f=p.foundationParameters,B=f.footingWidth,L=f.footingLength
-  const layer=profile?.layers[0],Es=layer?.elasticModulus,nu=layer?.poissonRatio
+  const layer=profile?.layers.find(x=>x.topDepth<=f.footingDepth&&x.bottomDepth>f.footingDepth)??profile?.layers.find(x=>x.bottomDepth>f.footingDepth),Es=layer?.elasticModulus,nu=layer?.poissonRatio
   const inputs=[
     {label:'Temel genişliği B',value:fmt(B),unit:'m'},
     {label:'Temel uzunluğu L',value:fmt(L),unit:'m'},
