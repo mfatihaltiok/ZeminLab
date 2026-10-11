@@ -171,7 +171,7 @@ export function foundationChecks(i:FoundationCheckInput){
   if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
   if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; kayma için sürtünme direncinde yalnızca gerçek basınçlı temas alanı esas alınmalıdır.')
   if(contactArea<=0)warnings.push('Temas alanı sıfırdır; sürtünme direnci ve temel temas kontrolleri geçersizdir.')
-  const requiredData=slidingMode==='data-missing'||!interfaceProvided||(i.usePassiveResistance&&rpk<=0)
+  const requiredData=slidingMode==='data-missing'||!interfaceProvided||contactArea<=0||(i.usePassiveResistance&&rpk<=0)
   return{
     ex,ey,qAvg,qMax,qMin,contactArea,effectiveWidth,effectiveLength,
     horizontalResultant:vh,slidingFS:vh>0?designResistance/vh:Infinity,
