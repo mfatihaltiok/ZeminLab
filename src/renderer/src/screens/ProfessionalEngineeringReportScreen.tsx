@@ -158,10 +158,10 @@ function buildFoundationCheckSection(p: ReturnType<typeof useProjectInfo>): Repo
 
 function buildLiquefactionSection(
   p: ReturnType<typeof useProjectInfo>,
-  boreholes: BoreholeRecord[],
-  labs: LaboratoryRecord[]
+  b: BoreholeRecord | undefined,
+  labs: LaboratoryRecord[],
+  index: number
 ): ReportSection {
-  const b = boreholes[0]
   const sds = p.seismic.sds
   const spt = b ? b.spt.filter(x => x.testType === 'SPT' && Number.isFinite(x.n2) && Number.isFinite(x.n3)).sort((a, z) => a.depth - z.depth) : []
   const gammaSatComplete = Boolean(b && b.lithology.length > 0 && b.lithology.every(l =>
@@ -177,7 +177,7 @@ function buildLiquefactionSection(
   ].filter((x): x is string => Boolean(x))
   if (missing.length) {
     return {
-      id: '5', title: 'Sıvılaşma ve Sıvılaşma Sonrası Etkiler',
+      id: '5-'+index, title: 'Sıvılaşma ve Sıvılaşma Sonrası Etkiler',
       subtitle: 'TBDY 2018 Bölüm 16.6 ve Ek 16B',
       method: 'SPT tabanlı tetiklenme kontrolü',
       source: 'TBDY 2018 16.6.1–16.6.10 ve Ek 16B',
@@ -228,7 +228,7 @@ function buildLiquefactionSection(
     const postStatus = postRequired > 0 ? 'GEREKLİ' : postReview ? 'ETKİLERİ İNCELE' : postNotEvaluable ? 'VERİ EKSİK' : 'KAPSAM DIŞI'
     const firstTrace = result.rows[0]?.trace ?? []
     return {
-      id: '5', title: 'Sıvılaşma ve Sıvılaşma Sonrası Etkiler',
+      id: '5-'+index, title: 'Sıvılaşma ve Sıvılaşma Sonrası Etkiler',
       subtitle: 'TBDY 2018 Bölüm 16.6 ve Ek 16B',
       method: result.method, source: result.source,
       inputs: [
@@ -423,8 +423,8 @@ export function ProfessionalEngineeringReport({ profile }: Props) {
     const settlement = buildSettlementSection(p, profile)
     if (settlement) result.push(settlement)
 
-    const liquefaction = buildLiquefactionSection(p, boreholes, labs)
-    result.push(liquefaction)
+    const liquefactionSections = boreholes.length ? boreholes.map((borehole, index) => buildLiquefactionSection(p, borehole, labs, index)) : [buildLiquefactionSection(p, undefined, labs, 0)]
+    result.push(...liquefactionSections)
 
     const jetGrout = buildJetGroutSection(p)
     result.push(jetGrout)
