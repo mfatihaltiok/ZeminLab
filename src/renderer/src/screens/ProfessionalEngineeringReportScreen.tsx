@@ -240,8 +240,8 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
         { label: 'Kolon Çapı', value: fmt(j.columnDiameter), unit: 'm' },
         { label: 'Kolon Aralığı', value: fmt(j.spacing), unit: 'm' },
         { label: 'Yerleşim Düzeni', value: j.layout ?? 'square', unit: '' },
-        { label: 'Zemin Taşıma Gücü', value: fmt(j.qSoil), unit: 'kPa' },
-        { label: 'Kolon Taşıma Gücü', value: fmt(j.qColumn), unit: 'kPa' }
+        { label: 'Zemin Taşıma Gücü', value: fmt(stressToBase(j.qSoil, p.unitSystem)), unit: 'kPa' },
+        { label: 'Kolon Taşıma Gücü', value: fmt(stressToBase(j.qColumn, p.unitSystem)), unit: 'kPa' }
       ],
       steps,
       results: [
