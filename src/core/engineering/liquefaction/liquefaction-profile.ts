@@ -22,6 +22,8 @@ export interface LiquefactionProfileRow{
   sigmaV:number;porePressure:number;sigmaVPrime:number;ce:number;cb:number;cs:number;cr:number;cn:number;n60:number;n1_60:number;alpha:number;beta:number;n1_60f:number
   crrM75?:number;CM?:number;tauResistance?:number;rd:number;tauEarthquake?:number;FS?:number
   saturated:boolean;potentiallyLiquefiable:boolean;mandatoryAnalysis:boolean;triggerRequired:boolean
+  postLiquefactionTrigger?:'FS<1.10'|'none'
+  postLiquefactionEvaluation:'required'|'review'|'not-required'|'not-evaluable'
   status:'ANALİZ GEREKLİ'|'ANALİZ GEREKMİYOR'|'TETİKLENME DEĞERLENDİRMESİ'|'VERİ EKSİK'
   conclusion:'SIVILAŞMA RİSKİ VAR'|'SIVILAŞMA RİSKİ YOK'|'DEĞERLENDİRİLMEDİ'|'VERİ EKSİK'
   liquefactionCheck:'evaluate'|'not-evaluable';trace:SptTraceStep[]
@@ -107,7 +109,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       {symbol:'β',title:'İnce dane katsayısı',formula:'β=f(IDI)',value:beta},
       {symbol:'(N1)60f',title:'İnce dane düzeltilmiş SPT',formula:'(N1)60f=α+β(N1)60',value:n1_60f}
     ]
-    const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent:clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha,beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired}
+    const base={depth:record.depth,soil,fineContent,plasticityIndex:pi,clayContent:clayContent,waterContent,...stress,ce:npt.ce,cb:npt.cb,cs:npt.cs,cr:npt.cr,cn:npt.cn,n60:npt.n60,n1_60:npt.n1_60,alpha,beta,n1_60f,rd:rdAtDepth(record.depth),saturated,potentiallyLiquefiable,mandatoryAnalysis,triggerRequired,postLiquefactionEvaluation:'not-evaluable' as const}
     if(!stressSnapshotReady)warnings.push('SPT deney koşulları sabitlenmedi; sıvılaşma için onaylı test-zamanı σv0/u0/σ′v0 snapshotı gereklidir.')
     if(npt.hasAssumptions||!stressSnapshotReady){ warnings.push(...npt.warnings); return{...base,status:'VERİ EKSİK',conclusion:'VERİ EKSİK',liquefactionCheck:'not-evaluable',trace} }
     if(stress.covered<Math.max(0,record.depth)-1e-9){
@@ -125,7 +127,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     if(!saturated||!within20||!potentiallyLiquefiable||exemption){
       const note=!saturated?'YASS üzerinde':!within20?'20 m dışında':!potentiallyLiquefiable?'16.6.4 potansiyel zemin tanımına girmiyor':'DTS=4 istisnası'
       trace.push({symbol:'Kapsam',title:'TBDY kapsam kontrolü',formula:'16.6.1–16.6.6',value:record.depth,note})
-      return{...base,status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
+      return{...base,postLiquefactionEvaluation:'not-required',status:'ANALİZ GEREKMİYOR',conclusion:'DEĞERLENDİRİLMEDİ',liquefactionCheck:'not-evaluable',trace}
     }
     if(!scopeComplete){
       trace.push({symbol:'Kapsam',title:'16.6.1 proje kapsam verisi',formula:'DTS + Zemin grubu + sürekli tabaka/kalın mercek',value:0,note:'Kapsam girdileri tamamlanmadan sıvılaşma zorunluluğu hakkında uygunluk sonucu verilmez.'})
@@ -165,7 +167,8 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
       {symbol:'τdeprem',title:'Deprem kayma gerilmesi',formula:'0.65·(0.4SDS)·σv0·rd',value:tauEarthquake,unit:'kPa'},
       {symbol:'FS',title:'Sıvılaşmaya karşı güvenlik',formula:'Rτ/τdeprem',value:FS,note:'TBDY 16.6.9: FS≥1.10'}
     )
-    return{...base,crrM75,CM:core.CM,tauResistance,tauEarthquake,FS,status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:FS<1.10?'SIVILAŞMA RİSKİ VAR':'SIVILAŞMA RİSKİ YOK',liquefactionCheck:'evaluate',trace}
+    if(FS<1.10)warnings.push('TBDY 16.6.7, 16.6.9 ve 16.6.10: FS<1.10 nedeniyle sıvılaşma sonrası dayanım/rijitlik kaybı, taşıma gücü, oturma ve yanal yayılma etkileri ayrıca değerlendirilmelidir; bu motor kalıcı yerdeğiştirmeyi hesaplamaz.')
+    return{...base,crrM75,CM:core.CM,tauResistance,tauEarthquake,FS,postLiquefactionTrigger:FS<1.10?'FS<1.10':'none',postLiquefactionEvaluation:FS<1.10?'required':'review',status:'TETİKLENME DEĞERLENDİRMESİ',conclusion:FS<1.10?'SIVILAŞMA RİSKİ VAR':'SIVILAŞMA RİSKİ YOK',liquefactionCheck:'evaluate',trace}
   })
   if(!input.spt.length)warnings.push('SPT kaydı bulunmadığı için profil hesabı üretilemedi.')
   if(!input.layers.length)warnings.push('Zemin katmanı yok; düşey gerilme hesabı yapılamaz.')
