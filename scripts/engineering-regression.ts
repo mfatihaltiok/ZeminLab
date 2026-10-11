@@ -648,7 +648,7 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
 
 {
   // Jet Grout tam tasarım hesabı
-  const design = calculateJetGroutDesign({
+  const designInput = {
     columnDiameter: 0.6,
     spacing: 1.5,
     layout: 'square',
@@ -664,9 +664,14 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
     foundationLength: 10,
     foundationDepth: 1.5,
     verticalLoad: 5000,
+    momentX:1000,
     safetyFactorBearing: 3,
     safetyFactorSliding: 1.5
-  })
+  }
+  const design=calculateJetGroutDesign(designInput)
+  const withoutNu=calculateJetGroutDesign({...designInput,soilNu:undefined})
+  assert.equal(withoutNu.untreatedSettlement,undefined)
+  assert.ok(withoutNu.warnings.some(w=>w.includes('Poisson oranı')))
   
   // Kompozit parametreler hesaplanmalı
   assert.ok(design.areaReplacementRatio > 0)
@@ -674,7 +679,8 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.ok(design.compositeEs! > 0)
   
   // Taşıma gücü kontrolü
-  assert.ok(design.appliedStress > 0)
+  assert.ok(design.appliedStress > 50)
+  assert.ok(design.effectiveLength < 10)
   assert.ok(design.bearingCapacityUtilization >= 0)
   assert.equal(typeof design.bearingCapacitySafe, 'boolean')
   
