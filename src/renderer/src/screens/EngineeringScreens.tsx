@@ -75,7 +75,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
 export function Foundation(){
   const p=useProjectInfo(),f=p.foundationParameters,soil=p.soilParameters
   const cu=soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem)
-  const N=forceToBase(f.verticalLoad,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
+  const N=forceToBase(f.structuralWeight,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
   const ready=f.footingWidth>0&&f.footingLength>0&&N>=0&&f.foundationInterface!==undefined
   const r=ready&&f.foundationInterface?foundationChecks({
     B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,
