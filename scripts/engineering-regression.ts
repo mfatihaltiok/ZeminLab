@@ -7,7 +7,7 @@ import { calculateIdealizedSettlement } from '../src/core/engineering/idealized-
 import { stage2BearingCapacity, stage2Settlement } from '../src/core/engineering/stage2-engine.ts'
 import { bearingCapacity as classicalBearingCapacity } from '../src/core/engineering/calculation-engine.ts'
 import { stressSpread21, layerSettlement, schmertmannSettlement, jetGroutAdvanced } from '../src/core/engineering/advanced-geotech.ts'
-import { jetGroutAxialCapacity } from '../src/core/engineering/jet-grout-advanced.ts'
+import { jetGroutAxialCapacity, verifyJetGroutQC } from '../src/core/engineering/jet-grout-advanced.ts'
 import { calculateSubgradeReaction } from '../src/core/engineering/subgrade-reaction.ts'
 import { tbdy2018Liquefaction } from '../src/core/engineering/liquefaction/tbdy2018-liquefaction.ts'
 import { evaluateFoundationSystem } from '../src/core/engineering/final-foundation-design.ts'
@@ -797,6 +797,12 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.throws(()=>schmertmannSettlement(100,[{thickness:1,Es:0,Iz:0.5}]))
   assert.throws(()=>layerSettlement([{thickness:1,sigma0:100,deltaSigma:10,Cc:0.2,Es:10000}]),/Cc ve e0 birlikte/)
   assert.throws(()=>jetGroutAdvanced({columnDiameter:0.6,spacing:1.5,qSoil:-1,qColumn:1000}))
+  const qcPass=verifyJetGroutQC({requiredUcs:2000,measuredUcs:2500,requiredDiameter:0.6,measuredDiameter:0.65,requiredCoreSamples:3,measuredCoreSamples:3,continuityVerified:true})
+  assert.equal(qcPass.status,'pass')
+  const qcFail=verifyJetGroutQC({requiredUcs:2000,measuredUcs:1500,requiredDiameter:0.6,measuredDiameter:0.55,requiredCoreSamples:3,measuredCoreSamples:2,continuityVerified:false})
+  assert.equal(qcFail.status,'fail')
+  const qcMissing=verifyJetGroutQC({requiredUcs:2000,measuredUcs:2500})
+  assert.equal(qcMissing.status,'not-evaluable')
   const ks=calculateSubgradeReaction({B:2,L:4,Es:20000,nu:0.3,method:'elastic',unitSystem:'kN-m'})
   assert.ok(Number.isFinite(ks.ks)&&ks.ks>0)
   const plateClay=calculateSubgradeReaction({B:0.3048,L:0.3048,Kv1:10000,soilType:'cohesive',method:'erol-plate',unitSystem:'kN-m'})
