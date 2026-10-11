@@ -23,13 +23,15 @@ export function stage2BearingCapacity(i:Stage2BearingInput):Stage2Result<any>{
   if(V<0||!Number.isFinite(V)||!Number.isFinite(H))throw new Error('Düşey ve yatay yükler geçerli olmalıdır.')
   if(i.FS!=null&&(!Number.isFinite(i.FS)||i.FS<=0))throw new Error('Güvenlik katsayısı pozitif olmalıdır.')
   if(i.layers?.some(x=>!Number.isFinite(x.thickness)||x.thickness<=0||!Number.isFinite(x.c)||x.c<0||!Number.isFinite(x.phi)||x.phi<0||x.phi>50||!Number.isFinite(x.gamma)||x.gamma<=0))throw new Error('Taşıma gücü tabaka parametreleri geçersiz.')
+  let layerTop=i.Df
+  const mappedLayers=i.layers?.map(x=>{const layer={topDepth:layerTop,bottomDepth:layerTop+x.thickness,gamma:x.gamma,gammaSat:x.gammaSat??x.gamma,cohesion:x.c,phi:x.phi};layerTop+=x.thickness;return layer})
   if(design==='tbdy-2018'){
     const r=calculateSurfaceFoundation({
       B:i.B,L:i.L,Df:i.Df,gamma1:i.gamma,gamma2:i.gammaSat??i.gamma,c:i.c,phi:i.phi,
       verticalLoad:V,horizontalLoad:H,momentX:i.momentX??0,momentY:i.momentY??0,
       groundSlope:i.soilSlope??0,baseSlope:i.baseSlope??0,resistanceFactor:1.4,method:'TBDY-2018',
       groundwaterDepth:i.waterTableDepth,undrainedCu:i.undrainedCu,
-      layers:i.layers?.map((x,idx)=>({topDepth:i.Df+i.layers!.slice(0,idx).reduce((a,y)=>a+y.thickness,0),bottomDepth:i.Df+i.layers!.slice(0,idx+1).reduce((a,y)=>a+y.thickness,0),gamma:x.gamma,gammaSat:x.gammaSat??x.gamma,cohesion:x.c,phi:x.phi}))
+      layers:mappedLayers
     })
     return{
       value:{Nq:r.Nq,Nc:r.Nc,Ngamma:r.Ngamma,sc:r.sc,sq:r.sq,sgamma:r.sg,dc:r.dc,dq:r.dq,dgamma:r.dg,ic:r.ic,iq:r.iq,igamma:r.ig,characteristic:r.qk,designResistance:r.qt,allowableGross:undefined,qApplied:r.qo,BEffective:r.Be,LEffective:r.Le,ex:r.ex,ey:r.ey,qSurcharge:r.surcharge,resistanceFactor:1.4},
