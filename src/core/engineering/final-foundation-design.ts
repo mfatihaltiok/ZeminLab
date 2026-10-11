@@ -47,6 +47,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
   if(input.actions && !input.actions.designAction)missing.push('Temele aktarılan kuvvetlerin nihai tasarım etkisi olarak işaretlenmesi')
   if(input.actions && !input.actions.source?.trim())missing.push('Tasarım kuvvetlerinin kaynağı')
   if(!input.actions)missing.push('Yapıdan temele aktarılan nihai tasarım etkileri')
+  if(!input.surfaceLayers?.length)missing.push('Taşıma gücü nihai değerlendirmesi için yüzeyden temel altındaki etki derinliğine kadar tabakalı zemin profili')
   if(!finite(N)||!finite(Vx)||!finite(Vy)||!finite(Mx)||!finite(My))missing.push('Temele aktarılan tasarım kuvvetleri')
 
   let bearing:ReturnType<typeof calculateSurfaceFoundation>|undefined
@@ -60,7 +61,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
         gamma1:sp.unitWeight,gamma2:sp.saturatedUnitWeight,c:sp.cohesion,phi:sp.frictionAngle,
         verticalLoad:N,horizontalLoad:Math.hypot(Vx,Vy),momentX:Mx,momentY:My,
         groundSlope:sp.surfaceSlope,baseSlope:sp.foundationBaseSlope,
-        resistanceFactor:fp.resistanceFactorRv,method:'TBDY-2018',safetyFactor:fp.safetyFactor,
+        resistanceFactor:1.4,method:'TBDY-2018',
         foundationType:fp.foundationType,groundwaterDepth:sp.groundwaterDepth,
         layers:input.surfaceLayers,undrainedCu:sp.undrainedCohesion
       })
