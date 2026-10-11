@@ -159,6 +159,7 @@ export interface JetGroutAdvancedResult {
   cellArea: number
   areaReplacementRatio: number
   compositeCapacity: number
+  allowableCapacity?: number
   compositeModulus?: number
   compositeCohesion?: number
   columnLoadShare: number
@@ -189,6 +190,7 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
   const d = i.columnDiameter
   const s = i.spacing
   const layout: JetGroutLayout = i.layout ?? 'square'
+  if(layout!=='square'&&layout!=='triangular')throw new Error('Jet Grout yerleşimi kare veya üçgen olmalıdır.')
   const Ac = Math.PI * d * d / 4
   const cellArea = layout === 'triangular' ? Math.sqrt(3) * s * s / 2 : s * s
   const ar = Ac / cellArea
@@ -208,15 +210,17 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
   const columnLoadShare = n != null ? Math.min(0.98, (n * ar) / (1 + (n - 1) * ar)) : ar
   const soilLoadShare = 1 - columnLoadShare
   const treatedSettlementFactor = n != null ? 1 / (1 + (n - 1) * ar) : undefined
-  const capacityFS = i.load != null && i.foundationArea != null && i.foundationArea > 0
-    ? compositeCapacity * i.foundationArea / Math.max(i.load, 1e-9)
+  const capacityFS = i.load != null && i.load > 0 && i.foundationArea != null && i.foundationArea > 0
+    ? compositeCapacity * i.foundationArea / i.load
     : undefined
+  const allowableCapacity = i.FS != null ? compositeCapacity / i.FS : undefined
 
   return {
     areaColumn: Ac,
     cellArea,
     areaReplacementRatio: ar,
     compositeCapacity,
+    allowableCapacity,
     compositeModulus,
     compositeCohesion,
     columnLoadShare,
@@ -228,6 +232,6 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
     treatedSettlementFactor,
     layout,
     source: 'Erol & Çekinmez Bayram (2018), Jet Enjeksiyon Yöntemi, Yüksel Proje, Ankara',
-    sourceNote: 'Kompozit parametreler alan oranı üzerinden değerlendirilir. Kolon kapasitesi ve nihai tasarım, imalat doğrulaması/zemin tabakası bazlı kontroller ile ayrıca ele alınmalıdır.'
+    sourceNote: 'Kompozit parametreler alan oranı üzerinden ön değerlendirilir. '+(i.FS==null?'Güvenlik katsayısı girilmediğinden izin verilebilir kapasite üretilmedi. ':'İzin verilebilir kompozit kapasite karakteristik kapasitenin girilen FS değerine bölünmesiyle hesaplandı. ')+'Kolon kapasitesi ve nihai tasarım, imalat doğrulaması/zemin tabakası bazlı kontroller ile ayrıca ele alınmalıdır.'
   }
 }
