@@ -39,10 +39,10 @@ export function JetGroutEngineeringScreen(){
         measuredUcs:num(qcMeasuredUcs)==null?undefined:stressToBase(num(qcMeasuredUcs)!,p.unitSystem),
         requiredDiameter:num(qcRequiredDiameter),measuredDiameter:num(qcMeasuredDiameter),
         requiredCoreSamples:num(qcRequiredCoreSamples),measuredCoreSamples:num(qcMeasuredCoreSamples),
-        continuityVerified:j.qcContinuityVerified
+        continuityVerified:j.qcContinuityVerified,constructionLogsVerified:j.qcConstructionLogsVerified,testReportReviewed:j.qcTestReportReviewed
       }
     })
-  },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,projectLoad,projectArea,projectH])
+  },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed,projectLoad,projectArea,projectH])
   latestJetGroutResult=r
 
   return <Frame screen="jet-grout">
@@ -69,6 +69,8 @@ export function JetGroutEngineeringScreen(){
         <Field label="Gerekli karot adedi" value={qcRequiredCoreSamples} onChange={v=>set('qcRequiredCoreSamples',num(v))}/>
         <Field label="Alınan karot adedi" value={qcMeasuredCoreSamples} onChange={v=>set('qcMeasuredCoreSamples',num(v))}/>
         <label><input type="checkbox" checked={j.qcContinuityVerified??false} onChange={e=>set('qcContinuityVerified',e.target.checked)}/> Kolon sürekliliği saha verisiyle doğrulandı</label>
+        <label><input type="checkbox" checked={j.qcConstructionLogsVerified??false} onChange={e=>set('qcConstructionLogsVerified',e.target.checked)}/> İmalat kayıtları (basınç/debi/çekme hızı) incelendi</label>
+        <label><input type="checkbox" checked={j.qcTestReportReviewed??false} onChange={e=>set('qcTestReportReviewed',e.target.checked)}/> Laboratuvar/saha deney raporları incelendi</label>
       </div><p className="engineering-note">Kabul değerleri proje şartnamesinden girilmelidir; bu bölüm genel bir TBDY sınır değeri tanımlamaz.</p></details>
       <Metric label="Temel alanı" value={projectArea.toFixed(2)} unit="m²"/>
       <Metric label="G+Q" value={projectLoad.toFixed(2)} unit="kN"/>
