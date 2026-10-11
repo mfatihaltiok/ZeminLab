@@ -309,6 +309,7 @@ export function estimateColumnDiameter(
   soilType: 'clay' | 'silt' | 'sand' | 'gravel',
   method: 'single' | 'double' | 'triple' = 'double'
 ): { min: number; typical: number; max: number } {
+  if(!['clay','silt','sand','gravel'].includes(soilType)||!['single','double','triple'].includes(method))throw new Error('Jet Grout zemin türü veya enjeksiyon yöntemi geçersiz.')
   const table: Record<string, Record<string, { min: number; typical: number; max: number }>> = {
     clay: {
       single: { min: 0.3, typical: 0.5, max: 0.7 },
@@ -344,6 +345,8 @@ export function estimateColumnStrength(
   soilType: 'clay' | 'silt' | 'sand' | 'gravel',
   cementContent?: number // kg/m³
 ): { min: number; typical: number; max: number } {
+  if(!['clay','silt','sand','gravel'].includes(soilType))throw new Error('Jet Grout zemin türü geçersiz.')
+  if(cementContent!=null&&(!Number.isFinite(cementContent)||cementContent<=0))throw new Error('Çimento içeriği pozitif ve sonlu kg/m³ olmalıdır.')
   // Tipik değerler (cement content ~300 kg/m³)
   const baseTable: Record<string, { min: number; typical: number; max: number }> = {
     clay: { min: 1000, typical: 2500, max: 5000 },
