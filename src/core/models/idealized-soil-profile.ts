@@ -64,6 +64,8 @@ export interface IdealizedSoilProfile {
   layers: IdealizedSoilLayer[]
   methodology: string
   unitSystem?: UnitSystem
+  settlementTimeYears?: number
+  secondaryStartTimeYears?: number
   notes?: string
 }
 
