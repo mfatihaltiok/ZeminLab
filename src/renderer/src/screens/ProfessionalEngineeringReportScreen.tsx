@@ -230,10 +230,10 @@ function buildLiquefactionSection(
       subtitle: 'TBDY 2018 Bölüm 16.6 ve Ek 16B',
       method: result.method, source: result.source,
       inputs: [
-        { label: 'Sondaj', value: b.name, unit: '' },
+        { label: 'Sondaj', value: b?.name ?? '—', unit: '' },
         { label: 'DTS / Zemin Grubu', value: (p.seismic.dts ?? '—') + ' / ' + (p.geophysical.soilGroup ?? '—'), unit: '' },
         { label: 'SDS / Mw', value: fmt(sds) + ' / ' + fmt(p.seismic.magnitude), unit: '' },
-        { label: 'YASS', value: fmt(b.groundwaterDepth), unit: 'm' },
+        { label: 'YASS', value: fmt(b?.groundwaterDepth), unit: 'm' },
         { label: 'SPT satırı', value: String(result.rows.length), unit: '' }
       ],
       steps: firstTrace.slice(0, 12).map((step, i) => ({
@@ -256,7 +256,7 @@ function buildLiquefactionSection(
       id: '5', title: 'Sıvılaşma ve Sıvılaşma Sonrası Etkiler',
       subtitle: 'Hesap üretilemedi', method: 'TBDY 2018 Bölüm 16.6 + Ek 16B',
       source: 'ZeminLab sıvılaşma motoru',
-      inputs: [{ label: 'Sondaj', value: b.name, unit: '' }],
+      inputs: [{ label: 'Sondaj', value: b?.name ?? '—', unit: '' }],
       steps: [], results: [{ label: 'Hesap durumu', value: 'VERİ EKSİK / GEÇERSİZ', unit: '', status: 'warning' }],
       notes: [error instanceof Error ? error.message : 'Sıvılaşma girdileri doğrulanamadı.']
     }
