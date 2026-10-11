@@ -18,6 +18,7 @@ export interface JetGroutProjectParameters{
   EsSoil?:number
   EsColumn?:number
   foundationThickness?:number
+  soilPoissonRatio?:number
   columnFrictionAngle?:number
   interfaceCohesion?:number
   interfaceFrictionAngle?:number
