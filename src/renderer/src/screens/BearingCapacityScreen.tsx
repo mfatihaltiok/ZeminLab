@@ -16,9 +16,13 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
   const gamma1=unitWeightToBase(Number(soil.unitWeight),p.unitSystem),gamma2=unitWeightToBase(Number(soil.saturatedUnitWeight),p.unitSystem)
   const c=stressToBase(Number(soil.cohesion),p.unitSystem),phi=Number(soil.frictionAngle)
   const N=forceToBase(Number(f.structuralWeight),p.unitSystem),cu=soil.undrainedCohesion==null?undefined:stressToBase(Number(soil.undrainedCohesion),p.unitSystem)
+  const gammaW=9.80665,gwt=soil.groundwaterDepth,gammaSub=gamma2-gammaW
+  const classicalSurcharge=gwt==null?gamma1*Df:gwt<Df?gamma1*gwt+gammaSub*(Df-gwt):gamma1*Df
+  const classicalGammaBearing=gwt==null||gwt>Df+B?gamma1:gwt<=Df?gammaSub:gammaSub+((gwt-Df)/B)*(gamma1-gammaSub)
   const Vx=forceToBase(Number(f.vtX),p.unitSystem),Vy=forceToBase(Number(f.vtY),p.unitSystem),H=Math.hypot(Vx,Vy)
   const Mx=momentToBase(Number(f.momentX),p.unitSystem),My=momentToBase(Number(f.momentY),p.unitSystem)
-  const valid=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<=50&&Number.isFinite(N)&&N>=0&&Number.isFinite(FS)&&FS>0
+  const waterValid=gwt==null||(Number.isFinite(gamma2)&&gamma2>gammaW)
+  const valid=Number.isFinite(B)&&B>0&&Number.isFinite(L)&&L>0&&Number.isFinite(Df)&&Df>=0&&Number.isFinite(gamma1)&&gamma1>0&&Number.isFinite(c)&&c>=0&&Number.isFinite(phi)&&phi>=0&&phi<=50&&Number.isFinite(N)&&N>=0&&Number.isFinite(FS)&&FS>0&&waterValid
   const layered=useMemo(()=>profile?.layers.map(x=>({topDepth:x.topDepth,bottomDepth:x.bottomDepth,gamma:unitWeightToBase(x.gamma??soil.unitWeight,p.unitSystem),gammaSat:unitWeightToBase(x.gammaSat??x.gamma??soil.saturatedUnitWeight,p.unitSystem),cohesion:stressToBase(x.cohesion??soil.cohesion,p.unitSystem),phi:x.frictionAngle??soil.frictionAngle})).filter(x=>x.bottomDepth>x.topDepth),[profile,soil,p.unitSystem])
   const calculation=useMemo(()=>{
     if(!valid)return {result:null,error:'Temel, zemin veya yük girdileri tamamlanmalı.'}
@@ -30,7 +34,7 @@ export function BearingCapacityScreen({profile}:{profile?:IdealizedSoilProfile})
       }),error:null}
     }catch(e){return{result:null,error:e instanceof Error?e.message:String(e)}}
   },[valid,B,L,Df,gamma1,gamma2,c,phi,N,H,Mx,My,soil.surfaceSlope,soil.foundationBaseSlope,f.foundationType,soil.groundwaterDepth,cu,layered])
-  const generic=useMemo(()=>valid?(['Terzaghi','Meyerhof','Hansen','Vesic'] as BearingMethod[]).map(m=>({method:m,result:bearingCapacityEngine({B,L,Df,gamma:gamma1,c,phi,FS,method:m}).value})):[],[valid,B,L,Df,gamma1,c,phi,FS])
+  const generic=useMemo(()=>valid?(['Terzaghi','Meyerhof','Hansen','Vesic'] as BearingMethod[]).map(m=>({method:m,result:bearingCapacityEngine({B,L,Df,gamma:gamma1,gammaBearing:classicalGammaBearing,surcharge:classicalSurcharge,c,phi,FS,method:m}).value})):[],[valid,B,L,Df,gamma1,classicalGammaBearing,classicalSurcharge,c,phi,FS])
   const r=calculation.result?.value
   const stress=(v:number)=>stressFromBase(v,p.unitSystem)
   const force=(v:number)=>forceFromBase(v,p.unitSystem)
