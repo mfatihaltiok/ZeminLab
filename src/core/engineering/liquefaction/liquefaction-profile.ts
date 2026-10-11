@@ -51,8 +51,13 @@ function rdAtDepth(z:number){
   if(d<=30)return .744-.008*d
   return .50
 }
+function normalizedSoilCode(code:string){return code.trim().toUpperCase().replace(/İ/g,'I').replace(/[\\s_]/g,'')}
+function recognizedSoilCode(code:string){
+  const c=normalizedSoilCode(code)
+  return isClaySoilCode(c)||['SA','GRSA','SISA','CLSA','SM','SC','SI','ML','MH','SP','SW','GW','GP','GM','GC','OL','OH','PT','SAND','SILT','GRAVEL','KUM','KIL','CAKIL'].includes(c)||c.includes('KUM')||c.includes('SAND')||c.includes('GRAVEL')||c.includes('SILT')
+}
 function soilIsPotential(code:string,pi:number|undefined){
-  const c=code.trim().toUpperCase().replace(/İ/g,'I')
+  const c=normalizedSoilCode(code)
   if(pi!=null&&pi>=12)return false
   return c==='SA'||c==='GRSA'||c==='SISA'||c==='CLSA'||c==='SM'||c==='SC'||c==='SI'||c==='ML'||c==='SP'||c==='SW'||c.includes('KUM')||c.includes('SAND')
 }
@@ -98,7 +103,7 @@ export function liquefactionProfile(input:LiquefactionProfileInput):Liquefaction
     })
     const fines=fineContent; const alpha=npt.alpha??NaN,beta=npt.beta??NaN; const n1_60f=npt.n1_60f??NaN
     const saturated=record.depth>=input.gwt-1e-9,within20=record.depth<=20+1e-9
-    const classificationDataComplete=soil!=null&&soil.trim().length>0&&fineContent!=null&&pi!=null
+    const classificationDataComplete=soil!=null&&soil.trim().length>0&&recognizedSoilCode(soil)&&fineContent!=null&&pi!=null
     const potentiallyLiquefiable=classificationDataComplete&&saturated&&within20&&soilIsPotential(soil!,pi)
     const exceptionA=input.dts==='4'&&clayContent!=null&&pi!=null&&clayContent>20&&pi>10,exceptionB=input.dts==='4'&&fineContent!=null&&fineContent>35&&npt.n1_60>20,exemption=exceptionA||exceptionB
     const mandatoryAnalysis=potentiallyLiquefiable&&mandatoryByProject&&!exemption
