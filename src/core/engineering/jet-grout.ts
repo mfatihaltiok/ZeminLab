@@ -194,7 +194,7 @@ export function calculateJetGroutDesign(params: JetGroutDesignParameters): JetGr
     ? (appliedStress / compositeResult.compositeCapacity) * 100
     : Number.POSITIVE_INFINITY
   const bearingCapacitySafe = bearingCapacityUtilization <= 100 / params.safetyFactorBearing
-  if (params.groundwaterDepth == null) warnings.push('YASS bilgisi bu API girdisinde yoktur; Meyerhof ön taramasında yeraltı suyu düzeltmesi yapılmamıştır.')
+  warnings.push('Bu API girdisinde YASS parametresi bulunmadığından yeraltı suyu düzeltmesi yapılmamıştır.')
   if (bearingCapacityUtilization > 80) warnings.push('Ön tarama kullanım oranı %80 üzerindedir; geometri ve iyileştirme tasarımı yeniden değerlendirilmelidir.')
   let untreatedSettlement: number | undefined
   let treatedSettlement: number | undefined
