@@ -346,7 +346,7 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
     requiredCoreSamples:j.qcRequiredCoreSamples,measuredCoreSamples:j.qcMeasuredCoreSamples,
     continuityVerified:j.qcContinuityVerified
   }
-  const designInputsComplete=Boolean(j.columnDiameter&&j.columnDiameter>0&&j.spacing&&j.spacing>0&&j.qSoil&&j.qSoil>0&&j.qColumn&&j.qColumn>0)
+  const designInputsComplete=Boolean(j.columnDiameter&&j.columnDiameter>0&&j.spacing&&j.spacing>0&&j.qSoil&&j.qSoil>0&&j.qColumn&&j.qColumn>0&&p.foundationParameters.footingWidth>0&&p.foundationParameters.footingLength>0&&p.foundationParameters.structuralWeight>0)
   if(!designInputsComplete){
     const qc=verifyJetGroutQC(qcInput)
     return {id:'4',title:'Jet Grout Zemin İyileştirme ve Saha Kalite Kontrolü',subtitle:'Kompozit tasarım girdileri ve saha doğrulaması',method:'Ön değerlendirme / proje kabul kriterleri',source:'Erol & Çekinmez Bayram (2018); proje kalite kontrol şartnamesi',inputs:[{label:'Kolon çapı',value:fmt(j.columnDiameter),unit:'m'},{label:'Kolon aralığı',value:fmt(j.spacing),unit:'m'}],steps:[],results:[{label:'Kompozit hesap',value:'GİRDİ EKSİK',unit:'',status:'warning'},{label:'Saha kalite kontrolü',value:qc.status==='pass'?'UYGUN':qc.status==='fail'?'UYGUN DEĞİL':'VERİ EKSİK',unit:'',status:qc.status==='pass'?'ok':qc.status==='fail'?'fail':'warning'}],notes:qc.warnings}
