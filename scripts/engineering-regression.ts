@@ -810,6 +810,8 @@ import { calculateJetGroutDesign, calculateNumberOfColumns, calculateImprovement
   assert.equal(qcMissing.status,'not-evaluable')
   const ks=calculateSubgradeReaction({B:2,L:4,Es:20000,nu:0.3,method:'elastic',unitSystem:'kN-m'})
   assert.ok(Number.isFinite(ks.ks)&&ks.ks>0)
+  const ksTon=calculateSubgradeReaction({B:2,L:4,Es:20000/9.80665,nu:0.3,method:'elastic',unitSystem:'ton-m'})
+  approx(ksTon.ks,ks.ks/9.80665,1e-8)
   const plateClay=calculateSubgradeReaction({B:0.3048,L:0.3048,Kv1:10000,soilType:'cohesive',method:'erol-plate',unitSystem:'kN-m'})
   const plateSand=calculateSubgradeReaction({B:0.3048,L:0.3048,Kv1:10000,soilType:'cohesionless',method:'erol-plate',unitSystem:'kN-m'})
   approx(plateClay.ks,10000,1e-8)
