@@ -344,7 +344,7 @@ function buildJetGroutSection(p: ReturnType<typeof useProjectInfo>): ReportSecti
     measuredUcs:j.qcMeasuredUcs==null?undefined:stressToBase(j.qcMeasuredUcs,p.unitSystem),
     requiredDiameter:j.qcRequiredDiameter,measuredDiameter:j.qcMeasuredDiameter,
     requiredCoreSamples:j.qcRequiredCoreSamples,measuredCoreSamples:j.qcMeasuredCoreSamples,
-    continuityVerified:j.qcContinuityVerified
+    continuityVerified:j.qcContinuityVerified,constructionLogsVerified:j.qcConstructionLogsVerified,testReportReviewed:j.qcTestReportReviewed
   }
   const designInputsComplete=Boolean(j.columnDiameter&&j.columnDiameter>0&&j.spacing&&j.spacing>0&&j.qSoil&&j.qSoil>0&&j.qColumn&&j.qColumn>0&&p.foundationParameters.footingWidth>0&&p.foundationParameters.footingLength>0&&p.foundationParameters.structuralWeight>0)
   if(!designInputsComplete){
