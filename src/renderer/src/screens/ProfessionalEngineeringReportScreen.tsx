@@ -273,15 +273,19 @@ function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile: I
 
   try {
     const qGross = forceToBase(f.structuralWeight, p.unitSystem) / (B * L)
+    const settlementMethod=profile.settlementMethod??'burland-burbidge'
     const result = calculateIdealizedSettlement({
-      profile, method: profile.settlementMethod??'burland-burbidge', B, L, Df, qGross,
+      profile, method: settlementMethod, B, L, Df, qGross,
       groundwaterDepth: profileBorehole?.groundwaterDepth??p.soilParameters.groundwaterDepth,
       timeYears:profile.settlementTimeYears,secondaryStartTimeYears:profile.secondaryStartTimeYears
     })
+    const stressFormula=result.method==='boussinesq'?'Boussinesq dikdörtgen alan integrasyonu':result.method==='schmertmann'?'Schmertmann Iz gerinim integrasyonu':result.method==='burland-burbidge'?'Burland & Burbidge N60 tabanlı bağıntı':'2:1: Δσz=q·B·L/[(B+z)(L+z)]'
+    const immediateFormula=result.method==='schmertmann'?'si=C1·C2·C3·qnet·Iz·H/Es':result.method==='burland-burbidge'?'Burland & Burbidge korelasyonu; kohezyonlu katman konsolidasyonu ayrıca eklenir':'si=Σ(Δσz·H/M)'
     const steps: ReportCalculationStep[] = result.layers.flatMap((layer, index) => ([
-      { index: index * 3 + 1, symbol: 'Δσz', title: 'Katman ' + (index + 1) + ' gerilme artışı', formula: '2:1: Δσz=q·B·L/[(B+z)(L+z)]', value: layer.deltaSigma, unit: 'kPa', note: layer.note ?? layer.status },
-      { index: index * 3 + 2, symbol: 'si', title: 'Katman ' + (index + 1) + ' ani oturma', formula: 'si=Δσz·H·(1−ν²)/M', value: layer.immediateSettlement, unit: 'mm', note: layer.status },
-      { index: index * 3 + 3, symbol: 'sc', title: 'Katman ' + (index + 1) + ' konsolidasyon oturması', formula: 'Cc/Cr, e0 ve efektif gerilmelerle', value: layer.consolidationSettlement, unit: 'mm', note: layer.status }
+      { index: index * 4 + 1, symbol: 'Δσz', title: 'Katman ' + (index + 1) + ' gerilme artışı', formula: stressFormula, value: layer.deltaSigma, unit: 'kPa', note: layer.note ?? layer.status },
+      { index: index * 4 + 2, symbol: 'si', title: 'Katman ' + (index + 1) + ' ani oturma', formula: immediateFormula, value: layer.immediateSettlement, unit: 'mm', note: layer.status },
+      { index: index * 4 + 3, symbol: 'sc', title: 'Katman ' + (index + 1) + ' konsolidasyon oturması', formula: 'Cc/Cr, e0, σ′pc ve efektif gerilmelerle', value: layer.consolidationSettlement, unit: 'mm', note: layer.status },
+      { index: index * 4 + 4, symbol: 'ssec', title: 'Katman ' + (index + 1) + ' ikincil oturma', formula: 'Cα·H/(1+e0)·log10(t/t₁)', value: layer.secondarySettlement, unit: 'mm', note: layer.status }
     ]))
 
     return {
@@ -295,13 +299,17 @@ function buildSettlementSection(p: ReturnType<typeof useProjectInfo>, profile: I
         { label: 'Temel Uzunluğu (L)', value: fmt(L), unit: 'm' },
         { label: 'Temel Derinliği (Df)', value: fmt(Df), unit: 'm' },
         { label: 'Brüt temel basıncı (q)', value: fmt(qGross), unit: 'kPa' },
-        { label: 'Yeraltı suyu derinliği', value: fmt(p.soilParameters.groundwaterDepth), unit: 'm' },
+        { label: 'Yeraltı suyu derinliği', value: fmt(profileBorehole?.groundwaterDepth??p.soilParameters.groundwaterDepth), unit: 'm' },
+        { label: 'Hesap yöntemi', value: settlementMethod, unit: '' },
+        { label: 'Hesap süresi t', value: fmt(profile.settlementTimeYears), unit: 'yıl' },
+        { label: 'İkincil oturma başlangıcı t₁', value: fmt(profile.secondaryStartTimeYears), unit: 'yıl' },
         { label: 'Zemin profili', value: profile.status, unit: '' }
       ],
       steps,
       results: [
         { label: 'Ani oturma', value: fmt(result.totalImmediate, 2), unit: 'mm', status: result.ready ? 'ok' : 'warning' },
         { label: 'Konsolidasyon oturması', value: fmt(result.totalConsolidation, 2), unit: 'mm', status: result.ready ? 'ok' : 'warning' },
+        { label: 'İkincil oturma', value: fmt(result.totalSecondary, 2), unit: 'mm', status: result.ready ? 'ok' : 'warning' },
         { label: 'Toplam oturma', value: fmt(result.totalSettlement, 2), unit: 'mm', status: result.ready && result.totalSettlement < 25 ? 'ok' : 'warning' },
         { label: 'Hesap durumu', value: result.ready ? 'GİRDİLER TAMAM' : 'VERİ EKSİK — NİHAİ SONUÇ DEĞİL', unit: '', status: result.ready ? 'ok' : 'warning' }
       ],
