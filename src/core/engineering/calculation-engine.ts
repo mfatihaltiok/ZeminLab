@@ -188,6 +188,7 @@ export function foundationChecks(i:FoundationCheckInput){
 
 export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number;}){
   if(!Number.isFinite(i.FS)||i.FS<=0)throw new Error('Jet Grout güvenlik katsayısı pozitif olmalıdır.')
+  if(!Number.isFinite(i.qultSoil)||i.qultSoil<0||!Number.isFinite(i.qultColumn)||i.qultColumn<0)throw new Error('Jet Grout zemin/kolon nihai kapasitesi negatif olmayan sonlu değerler olmalıdır.')
   if(!Number.isFinite(i.columnStrength)||i.columnStrength<0)throw new Error('Jet Grout kolon dayanımı negatif olmayan sonlu bir değer olmalıdır.')
   if(!Number.isFinite(i.improvementFactor)||i.improvementFactor<0)throw new Error('Jet Grout iyileştirme katsayısı negatif olmayan sonlu bir değer olmalıdır.')
   const r=jetGroutComposite({columnDiameter:i.columnDiameter,spacing:i.spacing,qSoil:i.qultSoil,qColumn:i.qultColumn*i.improvementFactor,FS:i.FS})
