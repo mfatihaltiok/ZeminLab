@@ -53,8 +53,9 @@ function buildBearingSection(p: ReturnType<typeof useProjectInfo>, profile?: Ide
       }))
     })
 
-    const designEligible = result.finalDesignEligible && !(p.geophysical.soilGroup === 'ZF' && !p.geophysical.siteSpecificResponseAnalysisCompleted)
-    const designWarnings = [...result.warnings, ...(p.geophysical.soilGroup === 'ZF' && !p.geophysical.siteSpecificResponseAnalysisCompleted ? ['ZF zemin grubu için TBDY 16.5.1.3 sahaya özel zemin davranış analizi tamamlanmadan nihai tasarım uygunluğu verilemez.'] : [])]
+    const lockedProfileAvailable=Boolean(profile&&profile.status==='SABİTLENDİ'&&profile.layers.length>0)
+    const designEligible = result.finalDesignEligible && lockedProfileAvailable && !(p.geophysical.soilGroup === 'ZF' && !p.geophysical.siteSpecificResponseAnalysisCompleted)
+    const designWarnings = [...result.warnings, ...(!lockedProfileAvailable?['Nihai tasarım raporu için kilitli ve katmanları tanımlı idealize zemin profili gereklidir.']:[]), ...(p.geophysical.soilGroup === 'ZF' && !p.geophysical.siteSpecificResponseAnalysisCompleted ? ['ZF zemin grubu için TBDY 16.5.1.3 sahaya özel zemin davranış analizi tamamlanmadan nihai tasarım uygunluğu verilemez.'] : [])]
     const steps: ReportCalculationStep[] = result.steps.map((s, i) => ({
       index: i + 1,
       symbol: s.symbol,
