@@ -117,7 +117,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
     elasticity: 'Elastisite teorisi',
     '2to1-layer': '2:1 + tabaka',
     boussinesq: 'Boussinesq alan integrasyonu',
-    janbu: 'Janbu M-integrasyonu',
+    janbu: 'Janbu M-integrasyonu (doğrulanmış katsayı yolu yok)',
     schmertmann: 'Schmertmann'
   }
 
@@ -133,7 +133,7 @@ export function IdealizedSettlementScreen({ profile, boreholes = [] }: { profile
               <option value="elasticity">Yöntem 2 · Elastisite teorisi + kilde konsolidasyon</option>
               <option value="2to1-layer">Yöntem 3 · 2:1 gerilme yayılımı + tabaka</option>
               <option value="boussinesq">Yöntem 4 · Boussinesq dikdörtgen alan integrasyonu</option>
-              <option value="janbu">Yöntem 5 · Janbu M-integrasyonu</option>
+              <option value="janbu" disabled>Yöntem 5 · Janbu M-integrasyonu (doğrulanmış katsayı yolu yok)</option>
               <option value="schmertmann">Yöntem 6 · Schmertmann gerinim integrasyonu</option>
             </select>
           </label>
