@@ -24,16 +24,16 @@ export function JetGroutEngineeringScreen(){
   const layout=j.layout??'square'
   const ready=[d,spacing,soil,column].every(x=>x!==''&&Number(x)>0)&&projectLoad>0&&projectArea>0
   const qcResult=useMemo(()=>verifyJetGroutQC({requiredUcs:num(qcRequiredUcs)==null?undefined:stressToBase(num(qcRequiredUcs)!,p.unitSystem),measuredUcs:num(qcMeasuredUcs)==null?undefined:stressToBase(num(qcMeasuredUcs)!,p.unitSystem),requiredDiameter:num(qcRequiredDiameter),measuredDiameter:num(qcMeasuredDiameter),requiredCoreSamples:num(qcRequiredCoreSamples),measuredCoreSamples:num(qcMeasuredCoreSamples),continuityVerified:j.qcContinuityVerified,constructionLogsVerified:j.qcConstructionLogsVerified,testReportReviewed:j.qcTestReportReviewed}),[p.unitSystem,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed])
-  const r=useMemo(()=>{
-    if(!ready)return undefined
-    return jetGroutEngineering({
+  const computation=useMemo(()=>{
+    if(!ready)return {result:undefined,error:undefined}
+    try{return {result:jetGroutEngineering({
       columnDiameter:Number(d),spacing:Number(spacing),layout,qSoil:stressToBase(Number(soil),p.unitSystem),qColumn:stressToBase(Number(column),p.unitSystem),
-      cSoil:Number(soilC)>0?stressToBase(Number(soilC),p.unitSystem):undefined,cColumn:Number(columnC)>0?stressToBase(Number(columnC),p.unitSystem):undefined,
+      cSoil:soilC!==''&&Number.isFinite(Number(soilC))&&Number(soilC)>=0?stressToBase(Number(soilC),p.unitSystem):undefined,cColumn:columnC!==''&&Number.isFinite(Number(columnC))&&Number(columnC)>=0?stressToBase(Number(columnC),p.unitSystem):undefined,
       EsSoil:Number(soilEs)>0?stressToBase(Number(soilEs),p.unitSystem):undefined,EsColumn:Number(columnEs)>0?stressToBase(Number(columnEs),p.unitSystem):undefined,
       load:projectLoad>0?projectLoad:undefined,foundationArea:projectArea>0?projectArea:undefined,
       foundationThickness:Number(thickness)>0?Number(thickness):undefined,
       soilPoissonRatio:nu!==''&&Number.isFinite(Number(nu))&&Number(nu)>-1&&Number(nu)<0.5?Number(nu):undefined,
-      cohesion:Number(c)>0?stressToBase(Number(c),p.unitSystem):undefined,
+      cohesion:c!==''&&Number.isFinite(Number(c))&&Number(c)>=0?stressToBase(Number(c),p.unitSystem):undefined,
       frictionAngle:angle!==''&&Number.isFinite(Number(angle))&&Number(angle)>=0&&Number(angle)<=50?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH,
       qc:{
         requiredUcs:num(qcRequiredUcs)==null?undefined:stressToBase(num(qcRequiredUcs)!,p.unitSystem),
@@ -42,8 +42,9 @@ export function JetGroutEngineeringScreen(){
         requiredCoreSamples:num(qcRequiredCoreSamples),measuredCoreSamples:num(qcMeasuredCoreSamples),
         continuityVerified:j.qcContinuityVerified,constructionLogsVerified:j.qcConstructionLogsVerified,testReportReviewed:j.qcTestReportReviewed
       }
-    })
+    }),error:undefined}}catch(error){return {result:undefined,error:error instanceof Error?error.message:'Jet Grout hesabı doğrulanamadı'}}
   },[ready,d,spacing,soil,column,layout,soilEs,columnEs,soilC,columnC,thickness,nu,c,angle,qcRequiredUcs,qcMeasuredUcs,qcRequiredDiameter,qcMeasuredDiameter,qcRequiredCoreSamples,qcMeasuredCoreSamples,j.qcContinuityVerified,j.qcConstructionLogsVerified,j.qcTestReportReviewed,projectLoad,projectArea,projectH])
+  const r=computation.result,calculationError=computation.error
   latestJetGroutResult=r
 
   return <Frame screen="jet-grout">
@@ -78,12 +79,13 @@ export function JetGroutEngineeringScreen(){
       <Metric label="H" value={projectH.toFixed(2)} unit="kN"/>
     </div></Card>
 
-    {!r?<Card title="HESAP BEKLENİYOR"><div className="inline-empty">Kolon çapı, aks aralığı, zemin kapasitesi ve kolon kapasitesi girilmeden sonuç üretilmez.</div></Card>:
+    {!r?<Card title={calculationError?'GİRDİLERİ KONTROL ET':'HESAP BEKLENİYOR'}><div className="inline-empty">{calculationError??'Kolon çapı, aks aralığı, zemin kapasitesi ve kolon kapasitesi girilmeden sonuç üretilmez.'}</div></Card>:
       <><div className="metric-strip">
         <Metric label="Alan oranı" value={(r.areaReplacementRatio*100).toFixed(2)} unit="%"/>
         <Metric label="Kompozit kapasite" value={r.compositeCapacity.toFixed(2)} unit="kPa"/>
         <Metric label="Ecomp" value={r.compositeModulus?.toFixed(1)??'—'} unit="kPa"/>
         <Metric label="Kolon yük payı" value={(r.columnLoadShare*100).toFixed(1)} unit="%"/>
+        <Metric label="Karakteristik kapasite / talep" value={r.capacityFS?.toFixed(2)??'—'} unit="—"/>
         <Metric label="β" value={r.stressConcentrationFactor.toFixed(2)}/>
       </div>
       <Card title="TASARIM DURUMU"><div className="inline-empty">Sonuçlar ön tasarım ve temel/oturma yeniden değerlendirme akışında kullanılır; nihai mühendislik kararı proje verileriyle ayrıca doğrulanır.</div>{r.warnings.map((w,i)=><div className="inline-empty" key={i}>{w}</div>)}</Card><Card title="KOMPOZİT BİRİM HÜCRE"><CalculationTrace title="Hesap zinciri" source={r.source} rows={[
