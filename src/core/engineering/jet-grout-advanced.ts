@@ -154,10 +154,9 @@ export interface JetGroutQCResult { status: 'pass' | 'fail' | 'not-evaluable'; c
 
 /** Checks field measurements against project-specified acceptance criteria; it does not invent universal TBDY limits. */
 export function verifyJetGroutQC(i: JetGroutQCInput): JetGroutQCResult {
-  for(const [name,value] of [['requiredUcs',i.requiredUcs],['measuredUcs',i.measuredUcs],['requiredDiameter',i.requiredDiameter],['measuredDiameter',i.measuredDiameter],['requiredCoreSamples',i.requiredCoreSamples],['measuredCoreSamples',i.measuredCoreSamples]] as const) {
-    if(value!=null&&!Number.isFinite(value))throw new Error(name+' sonlu olmalıdır.')
-  }
-  if(i.requiredUcs!=null&&i.requiredUcs<=0||i.measuredUcs!=null&&i.measuredUcs<0||i.requiredDiameter!=null&&i.requiredDiameter<=0||i.measuredDiameter!=null&&i.measuredDiameter<=0||i.requiredCoreSamples!=null&&(!Number.isInteger(i.requiredCoreSamples)||i.requiredCoreSamples<1)||i.measuredCoreSamples!=null&&(!Number.isInteger(i.measuredCoreSamples)||i.measuredCoreSamples<0))throw new Error('Jet Grout kalite kontrol değerleri fiziksel sınırlar dışında.')
+  const values=[['requiredUcs',i.requiredUcs],['measuredUcs',i.measuredUcs],['requiredDiameter',i.requiredDiameter],['measuredDiameter',i.measuredDiameter],['requiredCoreSamples',i.requiredCoreSamples],['measuredCoreSamples',i.measuredCoreSamples]] as const
+  const invalid=values.filter(([name,value])=>value!=null&&(!Number.isFinite(value)||(name==='requiredUcs'&&value<=0)||(name==='measuredUcs'&&value<0)||(name==='requiredDiameter'&&value<=0)||(name==='measuredDiameter'&&value<=0)||(name==='requiredCoreSamples'&&(!Number.isInteger(value)||value<1))||(name==='measuredCoreSamples'&&(!Number.isInteger(value)||value<0))).map(([name])=>name)
+  if(invalid.length)return {status:'not-evaluable',checks:[],warnings:['Jet Grout kalite kontrolü için geçersiz değerler var: '+invalid.join(', ')+'.']}
   const checks:JetGroutQCCheck[]=[]
   if(i.requiredUcs!=null&&i.measuredUcs!=null)checks.push({name:'Tek eksenli basınç dayanımı',required:String(i.requiredUcs)+' kPa',measured:String(i.measuredUcs)+' kPa',passed:i.measuredUcs>=i.requiredUcs})
   if(i.requiredDiameter!=null&&i.measuredDiameter!=null)checks.push({name:'Kolon çapı',required:String(i.requiredDiameter)+' m',measured:String(i.measuredDiameter)+' m',passed:i.measuredDiameter>=i.requiredDiameter})
