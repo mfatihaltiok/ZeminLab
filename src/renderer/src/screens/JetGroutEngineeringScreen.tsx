@@ -7,7 +7,7 @@ import { CalculationTrace } from '../components/CalculationTrace'
 
 export let latestJetGroutResult:JetGroutEngineeringResult|undefined
 
-const num=(value:string)=>value===''?undefined:Number(value)
+const num=(value:string)=>{if(value.trim()==='')return undefined;const n=Number(value);return Number.isFinite(n)?n:undefined}
 
 export function JetGroutEngineeringScreen(){
   const p=useProjectInfo(),f=p.foundationParameters,j=p.jetGrout,units=projectUnits(p.unitSystem)
@@ -35,8 +35,8 @@ export function JetGroutEngineeringScreen(){
       columnFrictionAngle:Number(phi)>0?Number(phi):undefined,cohesion:Number(c)>0?Number(c):undefined,
       frictionAngle:Number(angle)>0?Number(angle):undefined,verticalLoad:projectLoad,horizontalLoad:projectH,
       qc:{
-        requiredUcs:qcRequiredUcs===''?undefined:stressToBase(Number(qcRequiredUcs),p.unitSystem),
-        measuredUcs:qcMeasuredUcs===''?undefined:stressToBase(Number(qcMeasuredUcs),p.unitSystem),
+        requiredUcs:num(qcRequiredUcs)==null?undefined:stressToBase(num(qcRequiredUcs)!,p.unitSystem),
+        measuredUcs:num(qcMeasuredUcs)==null?undefined:stressToBase(num(qcMeasuredUcs)!,p.unitSystem),
         requiredDiameter:num(qcRequiredDiameter),measuredDiameter:num(qcMeasuredDiameter),
         requiredCoreSamples:num(qcRequiredCoreSamples),measuredCoreSamples:num(qcMeasuredCoreSamples),
         continuityVerified:j.qcContinuityVerified
