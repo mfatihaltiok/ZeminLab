@@ -61,7 +61,7 @@ export function evaluateFoundationSystem(input:FinalFoundationInput):FinalFounda
         gamma1:sp.unitWeight,gamma2:sp.saturatedUnitWeight,c:sp.cohesion,phi:sp.frictionAngle,
         verticalLoad:N,horizontalLoad:Math.hypot(Vx,Vy),momentX:Mx,momentY:My,
         groundSlope:sp.surfaceSlope,baseSlope:sp.foundationBaseSlope,
-        resistanceFactor:1.4,method:'TBDY-2018',
+        resistanceFactor:fp.resistanceFactorRv,method:'TBDY-2018',
         foundationType:fp.foundationType,groundwaterDepth:sp.groundwaterDepth,
         layers:input.surfaceLayers,undrainedCu:sp.undrainedCohesion
       })
