@@ -101,6 +101,7 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
     } else if (l.Cc != null && l.e0 != null && l.sigma0 > 0 && l.Cc >= 0 && l.e0 >= 0) {
       const sigma1 = l.sigma0 + ds
       const spc = l.sigmaPc ?? l.sigma0
+      if(l.sigmaPc==null)warnings.push('Katman '+(index+1)+': σpc girilmedi; normal konsolide davranış varsayıldı.')
       if(spc>l.sigma0&&l.Cr==null)throw new Error('Aşırı konsolide katmanda σpc>σ′v0 olduğunda Cr açıkça girilmelidir; Cc yerine varsayılamaz.')
       const Cr = l.Cr ?? l.Cc
       if (spc > l.sigma0 && sigma1 > l.sigma0) {
