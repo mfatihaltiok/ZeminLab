@@ -101,8 +101,8 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
     } else if (l.Cc != null && l.e0 != null && l.sigma0 > 0 && l.Cc >= 0 && l.e0 >= 0) {
       const sigma1 = l.sigma0 + ds
       const spc = l.sigmaPc ?? l.sigma0
-      const Cr = Math.max(0, l.Cr ?? l.Cc)
-      if (l.Cr == null && l.Cc != null) warnings.push('Katmanda geri sıkışma indisi Cr girilmedi; Cc değeri Cr yerine kullanıldı. Laboratuvar verisi varsa Cr ayrıca girilmelidir.')
+      if(spc>l.sigma0&&l.Cr==null)throw new Error('Aşırı konsolide katmanda σpc>σ′v0 olduğunda Cr açıkça girilmelidir; Cc yerine varsayılamaz.')
+      const Cr = l.Cr ?? l.Cc
       if (spc > l.sigma0 && sigma1 > l.sigma0) {
         const sigmaA = Math.min(sigma1, spc)
         const sigmaB = Math.max(sigma1, spc)
