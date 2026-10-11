@@ -75,8 +75,10 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
   if(!['elastic','2:1','janbu','schmertmann','consolidation'].includes(method))throw new Error('Desteklenmeyen oturma yöntemi.')
   if(method==='schmertmann'&&(!Number.isFinite(i.schmertmannC1)||i.schmertmannC1!<=0||!Number.isFinite(i.schmertmannC2)||i.schmertmannC2!<=0))throw new Error('Schmertmann yöntemi için C1 ve C2 sonlu değerlerle girilmelidir.')
   for(const [index,layer] of i.layers.entries()){
+    for(const [name,value] of [['Es',layer.Es],['ν',layer.nu],['M',layer.M],['mv',layer.mv],['Cc',layer.Cc],['e0',layer.e0],['Cr',layer.Cr],['σpc',layer.sigmaPc],['Iz',layer.Iz]] as const)if(value!=null&&!Number.isFinite(value))throw new Error('Oturma tabakası '+(index+1)+': '+name+' sonlu olmalıdır.')
     if(!Number.isFinite(layer.thickness)||layer.thickness<=0||!Number.isFinite(layer.sigmaV0)||layer.sigmaV0<=0||!Number.isFinite(layer.deltaSigma)||layer.deltaSigma<0)throw new Error('Oturma tabakası '+(index+1)+': kalınlık, başlangıç gerilmesi veya gerilme artışı geçersiz.')
-    if(layer.nu!=null&&(!Number.isFinite(layer.nu)||layer.nu<=-1||layer.nu>=0.5))throw new Error('Oturma tabakası '+(index+1)+': Poisson oranı -1 ile 0.5 arasında olmalıdır.')
+    if(layer.nu!=null&&(layer.nu<=-1||layer.nu>=0.5))throw new Error('Oturma tabakası '+(index+1)+': Poisson oranı -1 ile 0.5 arasında olmalıdır.')
+    if(layer.mv!=null&&layer.mv<0||layer.Cc!=null&&layer.Cc<0||layer.Cr!=null&&layer.Cr<0||layer.e0!=null&&layer.e0<=-1||layer.sigmaPc!=null&&layer.sigmaPc<=0||layer.Iz!=null&&layer.Iz<0)throw new Error('Oturma tabakası '+(index+1)+': sıkışma ve etki katsayıları fiziksel sınırlar dışında.')
     if(method==='elastic'||method==='2:1'){if(!Number.isFinite(layer.Es)||layer.Es!<=0)throw new Error('Oturma tabakası '+(index+1)+': Es pozitif olmalıdır.')}
     if(method==='janbu'&&(!Number.isFinite(layer.M)||layer.M!<=0))throw new Error('Oturma tabakası '+(index+1)+': Janbu M parametresi pozitif olmalıdır.')
     if(method==='schmertmann'&&(!Number.isFinite(layer.Es)||layer.Es!<=0||!Number.isFinite(layer.Iz)||layer.Iz!<0))throw new Error('Oturma tabakası '+(index+1)+': Schmertmann Es pozitif ve Iz negatif olmayan bir değer olmalıdır.')
@@ -106,6 +108,8 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
         if(layer.mv!=null&&layer.mv>=0){s=H*layer.mv*ds;type='oedometer'}
         else if(layer.Cc!=null&&layer.e0!=null&&layer.e0>-1){
           const pc=layer.sigmaPc??sigma0,Cr=layer.Cr??layer.Cc
+          if(layer.sigmaPc==null)warnings.push('Katman '+(index+1)+': σpc girilmedi; normal konsolide davranış (σpc=σ′v0) varsayıldı.')
+          if(layer.Cr==null)warnings.push('Katman '+(index+1)+': Cr girilmedi; Cr=Cc varsayımı kullanıldı.')
           if(!Number.isFinite(pc)||pc<=0||pc<sigma0||!Number.isFinite(Cr)||Cr<0)throw new Error('Oturma tabakası '+(index+1)+': sigmaPc ve Cr geçersiz.')
           s=sigma1<=pc?H*Cr/(1+layer.e0)*Math.log10(sigma1/sigma0):H*Cr/(1+layer.e0)*Math.log10(pc/sigma0)+H*layer.Cc/(1+layer.e0)*Math.log10(sigma1/pc),type='oedometer'
         }else warnings.push('Katman '+(index+1)+': mv veya Cc/e0 eksik.')
@@ -116,7 +120,8 @@ export function stage2Settlement(i:Stage2SettlementInput):Stage2Result<any>{
   }
   const immediate=results.filter(x=>x.type!=='oedometer').reduce((a,x)=>a+x.settlement,0)
   const consolidation=results.filter(x=>x.type==='oedometer').reduce((a,x)=>a+x.settlement,0)
-  return{value:{immediate,consolidation,total:immediate+consolidation,layerResults:results,C1,C2},method,source:'Stage2 compatibility facade; authoritative geotechnical engines are preferred.',warnings,steps:[
+  if(method==='elastic'||method==='2:1')warnings.push('Elastik tabaka sonucu sadeleştirilmiş katman integrasyonudur; tam elastik yarı-uzay çözümü veya diferansiyel oturma analizinin yerine geçmez.')
+  return{value:{immediate,consolidation,total:immediate+consolidation,layerResults:results,C1,C2},method,source:'Stage2 uyumluluk katmanı; sadeleştirilmiş tabaka integrasyonu. Nihai tasarımda idealize profil motoru ve uygun kaynak yöntemi kullanılmalıdır.',warnings,steps:[
     {symbol:'Δσ',title:'Katman gerilme artışı',formula:method==='2:1'?'qBL/[(B+z)(L+z)]':'girilen katman Δσ',unit:'kPa'},
     {symbol:'si',title:'Ani oturma',formula:'Katman integrasyonu',value:immediate,unit:'m'},
     {symbol:'sc',title:'Konsolidasyon',formula:'mv·Δσ·H veya Cc/Cr',value:consolidation,unit:'m'},
