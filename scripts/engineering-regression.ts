@@ -43,7 +43,7 @@ const approx=(actual:number,expected:number,tolerance=1e-9)=>{
   assert.equal(youngOnly.layers[0].type,'not-evaluable')
   assert.ok(youngOnly.warnings.some(w=>w.includes('Es Young modülüdür')))
   assert.throws(()=>layerSettlement([{thickness:-1,sigma0:100,deltaSigma:50,Es:10000}]),/fiziksel olmayan parametre/)
-  assert.throws(()=>layerSettlement([{thickness:1,sigma0:100,deltaSigma:50,Cc:0.2,e0:0.7,sigmaPc:150}]),/Cr girilmelidir/)
+  assert.throws(()=>layerSettlement([{thickness:1,sigma0:100,deltaSigma:50,Cc:0.2,e0:0.7,sigmaPc:150}]),/Cr açıkça girilmelidir/)
 }
 
 
