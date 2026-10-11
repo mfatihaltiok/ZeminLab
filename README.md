@@ -1,41 +1,37 @@
-# FALUZMN
+# ZeminLab
 
-FALUZMN is a Windows-first geotechnical engineering desktop application built with Electron, React and TypeScript.
+ZeminLab is a Windows-first geotechnical engineering desktop application built with Electron, React, and TypeScript.
 
-## v1.0
+## Engineering scope
 
-v1.0 adds the professional output/integration layer:
+- Site investigation data, boreholes, soil layers, and laboratory results
+- SPT corrections and liquefaction assessment
+- Shallow foundation bearing resistance and settlement
+- Subgrade reaction and stress distribution
+- Jet Grout improvement screening and engineering checks
+- Engineering reports and data export
 
-- A4 PDF report export infrastructure
-- Erol 2014 and Erol 2018 local source-pack indexing
-- PaddleOCR PP-OCRv5 + Docling document-intelligence installation and offline runner
-- OCR provider settings with encrypted API-key storage
-- Electron internet/connectivity health check
-- Excel export utility
-- DXF soil-profile export utility
-- neutral SAP2000 interchange and OpenSees Tcl export adapters
+Calculations must be reviewed against TBDY 2018 and the applicable engineering literature. Literature-based methods are identified separately from code-prescribed checks. Results are decision-support outputs and require review by the responsible geotechnical engineer; site-specific parameters and field verification remain essential, particularly for ground improvement.
 
-### Belge istihbaratı\n\nFALUZMN uses two deterministic local layers: **PaddleOCR PP-OCRv5** for text recognition and **Docling 2.128.0** for document layout and table structure. Values are not inferred from fixed page coordinates. Ambiguous/conflicting candidates are rejected and the user must review OCR candidates before import. The runtime is CPU-first and prepared for offline operation. Docling's layout and TableFormer artifacts are prefetched into the application package.\n\nPaddleOCR itself can run locally, so the application does **not** require an API key for offline OCR. A remote OCR endpoint/API-key field may still be present for deployments that use a hosted OCR service. The key is stored encrypted through Electron's `safeStorage` when the operating system supports it.
+## Development
 
-### v1.0 setup
-
-From PowerShell:
+Requirements: Node.js and npm.
 
 ```powershell
-.\tools\setup_stage3.ps1
-```
-
-This creates a project-local Python runtime, installs PaddleOCR document parsing dependencies, downloads the two publisher source PDFs into the local source-pack, and indexes figure-bearing pages. The source PDFs themselves are not committed to GitHub.
-
-### Development
-
-```bash
 npm install
 npm run dev
 ```
 
-### Build Windows setup
+## Validation
 
-```bash
+```powershell
+npm run typecheck
+npm run test:engineering
+npm run build
+```
+
+## Windows build
+
+```powershell
 npm run build:win
 ```
