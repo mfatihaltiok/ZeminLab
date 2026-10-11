@@ -69,6 +69,7 @@ export interface FoundationParameters{
   passiveResistanceCharacteristic:number
   usePassiveResistance:boolean
   foundationInterface?:FoundationInterface
+  foundationTanDelta?:number
 }
 
 export interface ProjectInfo{
