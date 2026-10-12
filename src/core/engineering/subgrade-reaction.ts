@@ -31,10 +31,13 @@ export function calculateSubgradeReaction(i: SubgradeReactionInput): SubgradeRea
   if (!Number.isFinite(L) || L <= 0) throw new Error('Temel uzunluğu L m cinsinden sıfırdan büyük olmalıdır.')
 
   const unitSystem=i.unitSystem??'kN-m'
+  const method=i.method??'elastic'
+  if(unitSystem!=='kN-m'&&unitSystem!=='ton-m')throw new Error('Birim sistemi kN-m veya ton-m olmalıdır.')
+  if(method!=='q/s'&&method!=='elastic'&&method!=='erol-plate')throw new Error('Desteklenmeyen yatak katsayısı yöntemi.')
   const unit = unitSystem === 'kN-m' ? 'kN/m³' : 'tonf/m³'
   const stressUnit = unitSystem === 'kN-m' ? 'kN/m²' : 'tonf/m²'
 
-  if (i.method === 'q/s') {
+  if (method === 'q/s') {
     if (i.q == null || !Number.isFinite(i.q) || i.q < 0) {
       throw new Error(`q/s hesabında q ${stressUnit} cinsinden sıfır veya pozitif olmalıdır.`)
     }
@@ -51,7 +54,7 @@ export function calculateSubgradeReaction(i: SubgradeReactionInput): SubgradeRea
     }
   }
 
-  if (i.method === 'elastic') {
+  if (method === 'elastic') {
     if (i.Es == null || !Number.isFinite(i.Es) || i.Es <= 0) {
       throw new Error(`Elastik ks hesabı için Es > 0 ${stressUnit} gereklidir.`)
     }

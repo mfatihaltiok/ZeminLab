@@ -59,6 +59,7 @@ export interface LayerSettlementInput {
   sigma0: number
   deltaSigma: number
   Es?: number
+  M?: number
   mv?: number
   Cc?: number
   e0?: number
@@ -69,7 +70,7 @@ export interface LayerSettlementResult {
   immediate: number
   consolidation: number
   total: number
-  layers: Array<{ settlement: number; type: 'elastic' | 'oedometer' }>
+  layers: Array<{ settlement: number; type: 'elastic' | 'constrained-modulus' | 'oedometer' | 'not-evaluable' }>
   warnings: string[]
 }
 
@@ -79,9 +80,9 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
   const details: LayerSettlementResult['layers'] = []
   const warnings: string[] = []
   for (const [index,l] of layers.entries()) {
-    const values=[l.thickness,l.sigma0,l.deltaSigma,l.Es,l.mv,l.Cc,l.e0,l.Cr,l.sigmaPc]
+    const values=[l.thickness,l.sigma0,l.deltaSigma,l.Es,l.M,l.mv,l.Cc,l.e0,l.Cr,l.sigmaPc]
     if(values.some(v=>v!==undefined&&!Number.isFinite(v)))throw new Error('Oturma katmanı '+(index+1)+': parametreler sonlu olmalıdır.')
-    if(l.thickness<=0||l.deltaSigma<0||l.Es!=null&&l.Es<=0||l.mv!=null&&l.mv<0||l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<0||l.Cr!=null&&l.Cr<0||l.sigmaPc!=null&&l.sigmaPc<=0||l.sigma0!=null&&l.sigma0<=0)throw new Error('Oturma katmanı '+(index+1)+': fiziksel olmayan parametre.')
+    if(l.thickness<=0||l.deltaSigma<0||l.Es!=null&&l.Es<=0||l.M!=null&&l.M<=0||l.mv!=null&&l.mv<0||l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<0||l.Cr!=null&&l.Cr<0||l.sigmaPc!=null&&l.sigmaPc<=0||l.sigma0!=null&&l.sigma0<=0)throw new Error('Oturma katmanı '+(index+1)+': fiziksel olmayan parametre.')
     if((l.Cc!=null)!==(l.e0!=null))throw new Error('Oturma katmanı '+(index+1)+': Cc ve e0 birlikte girilmelidir.')
     if(l.Cr!=null&&l.Cc==null)throw new Error('Oturma katmanı '+(index+1)+': Cr girildiyse Cc de gereklidir.')
     if(l.Cc!=null&&l.sigma0==null)throw new Error('Oturma katmanı '+(index+1)+': Cc/e0 konsolidasyonu için σ′v0 gereklidir.')
@@ -89,9 +90,9 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
     const H = l.thickness
     const ds = l.deltaSigma
     let s = 0
-    let type: 'elastic' | 'oedometer' = 'elastic'
+    let type: 'elastic' | 'constrained-modulus' | 'oedometer' | 'not-evaluable' = 'not-evaluable'
     if (H <= 0 || ds <= 0) {
-      details.push({ settlement: 0, type })
+      details.push({ settlement: 0, type:'elastic' })
       continue
     }
     if (l.mv != null && l.mv >= 0) {
@@ -116,11 +117,13 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
       }
       consolidation += s
       type = 'oedometer'
-    } else if (l.Es != null && l.Es > 0) {
-      s = H * ds / l.Es
+    } else if (l.M != null && l.M > 0) {
+      s = H * ds / l.M
       immediate += s
+      type = 'constrained-modulus'
     } else {
-      warnings.push('Katman '+(index+1)+': pozitif Es veya mv ya da eksiksiz Cc/e0/σ′v0 parametreleri yok; katman oturması hesaplanmadı.')
+      if(l.Es!=null)warnings.push('Katman '+(index+1)+': Es Young modülüdür; 1B katman sıkışması için M (kısıtlı/ödometre modülü) gerekir. Es yerine sessizce kullanılmadı.')
+      else warnings.push('Katman '+(index+1)+': pozitif M veya mv ya da eksiksiz Cc/e0/σ′v0 parametreleri yok; katman oturması hesaplanmadı.')
     }
     details.push({ settlement: Math.max(0, s), type })
   }
@@ -128,7 +131,7 @@ export function layerSettlement(layers: LayerSettlementInput[]): LayerSettlement
 }
 
 export interface SchmertmannLayer { thickness: number; Es: number; Iz: number }
-export function schmertmannSettlement(q: number, layers: SchmertmannLayer[], C1 = 1, C2 = 1) {
+export function schmertmannSettlement(q: number, layers: SchmertmannLayer[], C1: number, C2: number) {
   if(![q,C1,C2].every(Number.isFinite)||q<0||C1<=0||C2<=0)throw new Error('Schmertmann hesabında q≥0 ve C1/C2>0 sonlu olmalıdır.')
   for(const [index,l] of layers.entries())if(![l.thickness,l.Es,l.Iz].every(Number.isFinite)||l.thickness<=0||l.Es<=0||l.Iz<0)throw new Error('Schmertmann katmanı '+(index+1)+': kalınlık/Es pozitif, Iz negatif olmayan sonlu değer olmalıdır.')
   const settlement = C1 * C2 * q * layers.reduce((sum, l) => {
@@ -159,6 +162,10 @@ export interface JetGroutAdvancedResult {
   cellArea: number
   areaReplacementRatio: number
   compositeCapacity: number
+  allowableCapacity?: number
+  appliedPressure?: number
+  designUtilization?: number
+  designAdequate?: boolean
   compositeModulus?: number
   compositeCohesion?: number
   columnLoadShare: number
@@ -189,6 +196,7 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
   const d = i.columnDiameter
   const s = i.spacing
   const layout: JetGroutLayout = i.layout ?? 'square'
+  if(layout!=='square'&&layout!=='triangular')throw new Error('Jet Grout yerleşimi kare veya üçgen olmalıdır.')
   const Ac = Math.PI * d * d / 4
   const cellArea = layout === 'triangular' ? Math.sqrt(3) * s * s / 2 : s * s
   const ar = Ac / cellArea
@@ -208,15 +216,23 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
   const columnLoadShare = n != null ? Math.min(0.98, (n * ar) / (1 + (n - 1) * ar)) : ar
   const soilLoadShare = 1 - columnLoadShare
   const treatedSettlementFactor = n != null ? 1 / (1 + (n - 1) * ar) : undefined
-  const capacityFS = i.load != null && i.foundationArea != null && i.foundationArea > 0
-    ? compositeCapacity * i.foundationArea / Math.max(i.load, 1e-9)
+  const capacityFS = i.load != null && i.load > 0 && i.foundationArea != null && i.foundationArea > 0
+    ? compositeCapacity * i.foundationArea / i.load
     : undefined
+  const allowableCapacity = i.FS != null ? compositeCapacity / i.FS : undefined
+  const appliedPressure=i.load!=null&&i.foundationArea!=null&&i.foundationArea>0?i.load/i.foundationArea:undefined
+  const designUtilization=allowableCapacity!=null&&allowableCapacity>0&&appliedPressure!=null?appliedPressure/allowableCapacity:undefined
+  const designAdequate=designUtilization!=null?designUtilization<=1:undefined
 
   return {
     areaColumn: Ac,
     cellArea,
     areaReplacementRatio: ar,
     compositeCapacity,
+    allowableCapacity,
+    appliedPressure,
+    designUtilization,
+    designAdequate,
     compositeModulus,
     compositeCohesion,
     columnLoadShare,
@@ -228,6 +244,6 @@ export function jetGroutAdvanced(i: JetGroutAdvancedInput): JetGroutAdvancedResu
     treatedSettlementFactor,
     layout,
     source: 'Erol & Çekinmez Bayram (2018), Jet Enjeksiyon Yöntemi, Yüksel Proje, Ankara',
-    sourceNote: 'Kompozit parametreler alan oranı üzerinden değerlendirilir. Kolon kapasitesi ve nihai tasarım, imalat doğrulaması/zemin tabakası bazlı kontroller ile ayrıca ele alınmalıdır.'
+    sourceNote: 'Kompozit parametreler alan oranı üzerinden ön değerlendirilir. qSoil/qColumn girdilerinin yeraltı suyu ve efektif gerilme düzeltmeleri kaynak hesabında yapılmış olmalıdır; bu model bunları ayrıca hesaplamaz. '+(i.FS==null?'Güvenlik katsayısı girilmediğinden izin verilebilir kapasite üretilmedi. ':'İzin verilebilir kompozit kapasite karakteristik kapasitenin girilen FS değerine bölünmesiyle hesaplandı. ')+'Kolon kapasitesi ve nihai tasarım, imalat doğrulaması/zemin tabakası bazlı kontroller ile ayrıca ele alınmalıdır.'
   }
 }

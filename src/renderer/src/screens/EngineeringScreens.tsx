@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { foundationChecks } from '../../core/engineering/calculation-engine'
 import { liquefactionProfile, type LiquefactionSptRecord } from '../../../core/engineering/liquefaction/liquefaction-profile'
-import { useProjectInfo } from '../../core/state/project-store'
+import { updateProjectInfo, useProjectInfo } from '../../core/state/project-store'
 import type { BoreholeRecord, LaboratoryRecord } from '../../core/models/field-data'
 import { forceToBase, momentToBase, stressToBase, unitWeightToBase } from '../../core/units/project-units'
 import { Card, Frame, Metric, Source, type ScreenId } from '../workspace/WorkspaceShell'
@@ -59,7 +59,7 @@ export function Liquefaction({boreholes=[],labs=[]}:{boreholes?:BoreholeRecord[]
   },[b,labs,p.seismic.magnitude,p.seismic.dts,sds,p.geophysical.soilGroup,p.soilParameters.liquefactionContinuousOrThickLens,p.soilParameters.saturatedUnitWeight,p.soilParameters.unitWeight,p.unitSystem,p.foundationParameters.footingDepth,p.sptCorrections,validSpt])
 
   return <Frame screen="liquefaction">
-    <Source>{SOURCE_NOTES.liquefaction} 16.6.1 kapsam koşulları, 16.6.2–16.6.6 tetiklenme koşulları ve Ek 16B hesabı aynı sonuç zincirinde gösterilir. Sıvılaşma sonrası yerdeğiştirme otomatik hesaplanmaz; FS<1.10 olduğunda 16.6.7/16.6.9/16.6.10 değerlendirmesi zorunlu olarak işaretlenir.</Source>
+    <Source>{SOURCE_NOTES.liquefaction} 16.6.1 kapsam koşulları, 16.6.2–16.6.6 tetiklenme koşulları ve Ek 16B hesabı aynı sonuç zincirinde gösterilir. Sıvılaşma sonrası yerdeğiştirme otomatik hesaplanmaz; FS&lt;1.10 olduğunda 16.6.7/16.6.9/16.6.10 değerlendirmesi zorunlu olarak işaretlenir.</Source>
     {!b?<Card title="SONDAJ GEREKLİ"><div className="inline-empty">Sıvılaşma için sondaj ve SPT verisi gerekir.</div></Card>:
       <><Card title="HESAP KAPSAMI"><div className="form-grid"><label>Sondaj<select value={b.id} onChange={e=>setSelected(e.target.value)}>{boreholes.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><Metric label="DTS" value={p.seismic.dts??'—'}/><Metric label="SDS" value={sds?.toFixed(3)??'—'}/><Metric label="Mw" value={p.seismic.magnitude??'—'}/><Metric label="YASS" value={b.groundwaterDepth??'—'}/><Metric label="SPT" value={validSpt.length}/><Metric label="CE" value={p.sptCorrections.ce.toFixed(2)}/><Metric label="CB" value={p.sptCorrections.cb.toFixed(2)}/><Metric label="CS" value={p.sptCorrections.cs.toFixed(2)}/><Metric label="CR" value="SPT başına"/></div></Card>
         {!profileInput?
@@ -78,17 +78,23 @@ export function Foundation(){
   const cu=soil.undrainedCohesion==null?undefined:stressToBase(soil.undrainedCohesion,p.unitSystem)
   const N=forceToBase(f.structuralWeight,p.unitSystem),Vx=forceToBase(f.vtX,p.unitSystem),Vy=forceToBase(f.vtY,p.unitSystem),Mx=momentToBase(f.momentX,p.unitSystem),My=momentToBase(f.momentY,p.unitSystem)
   const ready=f.footingWidth>0&&f.footingLength>0&&N>0&&f.foundationInterface!==undefined
-  const r=ready&&f.foundationInterface?foundationChecks({
-    B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,
-    cu,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
-    passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance,
-    seismic:true,
-    interfaceType:f.foundationInterface
-  }):undefined
+  const tanDeltaLimit=f.foundationInterface==='cast-in-place-soil'?0.6:f.foundationInterface==='precast-soil'?0.4:(f.foundationInterface==='concrete-concrete'||f.foundationInterface==='concrete-bedrock')?0.5:undefined
+  let r:ReturnType<typeof foundationChecks>|undefined
+  let calculationError:string|undefined
+  if(ready&&f.foundationInterface){
+    try{r=foundationChecks({
+      B:f.footingWidth,L:f.footingLength,N,Vx,Vy,Mx,My,deltaTan:f.foundationTanDelta,
+      cu,groundwaterDepth:soil.groundwaterDepth,foundationDepth:f.footingDepth,
+      passiveResistanceCharacteristic:forceToBase(f.passiveResistanceCharacteristic,p.unitSystem),usePassiveResistance:f.usePassiveResistance,
+      seismic:true,
+      interfaceType:f.foundationInterface
+    })}catch(error){calculationError=error instanceof Error?error.message:'Temel kayma hesabı doğrulanamadı'}
+  }
   return <Frame screen="foundation"><Source>{SOURCE_NOTES.foundation} TBDY 16.8.4 yatay kayma kontrolü; 16.8.4.6 YASS altında depremde Cu yaklaşımı uygulanır.</Source>
-    {!ready?<Card title="TEMEL VERİSİ BEKLENİYOR"><div className="inline-empty">B, L, yapı yükü, temel-zemin ara yüzü ve deprem kayma kontrolü girdileri tamamlanmalıdır.</div></Card>:!f.foundationInterface?<Card title="TEMEL-ZEMİN ARA YÜZÜ EKSİK"><div className="inline-empty">Kayma hesabı için temel-zemin ara yüzü seçilmelidir. Tanδ bu seçim olmadan varsayılmaz.</div></Card>:!r?<Card title="TEMEL HESABI HAZIR DEĞİL"><div className="inline-empty">Temel hesabı için gerekli veriler tamamlanmalıdır.</div></Card>:
-      <><div className="metric-strip"><Metric label="B" value={f.footingWidth.toFixed(2)} unit="m"/><Metric label="L" value={f.footingLength.toFixed(2)} unit="m"/><Metric label="Vtx" value={Vx.toFixed(2)} unit="kN"/><Metric label="Vty" value={Vy.toFixed(2)} unit="kN"/><Metric label="Rth+0.3Rpt" value={r.slidingCapacityX.toFixed(2)} unit="kN"/><Metric label="Durum" value={r.evaluable&&r.slidingSafeX&&r.slidingSafeY?'YETERLİ':'KONTROL GEREKLİ'}/></div>
-        <Card title="TBDY 2018 16.8.4"><div className="table-wrap"><table><thead><tr><th>Kontrol</th><th>Değer</th><th>Oran</th><th>Durum</th></tr></thead><tbody><tr><td>X</td><td>{Vx.toFixed(2)} / {r.slidingCapacityX.toFixed(2)}</td><td>{r.slidingUtilizationX.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeX?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr><tr><td>Y</td><td>{Vy.toFixed(2)} / {r.slidingCapacityY.toFixed(2)}</td><td>{r.slidingUtilizationY.toFixed(3)}</td><td>{r.evaluable&&r.slidingSafeY?'YETERLİ':'YETERSİZ/EKSİK'}</td></tr></tbody></table></div><div className="engineering-note">Rth={r.slidingCapacityX.toFixed(2)} kN · Rpt={r.passiveResistanceDesign.toFixed(2)} kN · mod={r.slidingMode}</div></Card>
+    <Card title="TEMEL-ZEMİN ARA YÜZÜ"><div className="form-grid"><label>tanδ (kayma sürtünme katsayısı)<input type="number" min="0" max={tanDeltaLimit} step="0.01" value={f.foundationTanDelta??''} onChange={e=>updateProjectInfo({...p,foundationParameters:{...f,foundationTanDelta:e.target.value===''?undefined:Number(e.target.value)}})}/></label></div><div className="engineering-note">tanδ proje/deney verisinden girilmelidir. Seçilen ara yüzün TBDY Tablo 16.3 üst sınırı aşılmaz; değer girilmezse sürtünme direnci kredilendirilmez.</div></Card>
+    {!ready?<Card title="TEMEL VERİSİ BEKLENİYOR"><div className="inline-empty">B, L, yapı yükü, temel-zemin ara yüzü ve deprem kayma kontrolü girdileri tamamlanmalıdır.</div></Card>:!f.foundationInterface?<Card title="TEMEL-ZEMİN ARA YÜZÜ EKSİK"><div className="inline-empty">Kayma hesabı için temel-zemin ara yüzü seçilmelidir. Tanδ bu seçim olmadan varsayılmaz.</div></Card>:!r?<Card title={calculationError?'GİRDİLERİ KONTROL ET':'TEMEL HESABI HAZIR DEĞİL'}><div className="inline-empty">{calculationError??'Temel hesabı için gerekli veriler tamamlanmalıdır.'}</div></Card>:
+      <><div className="metric-strip"><Metric label="B" value={f.footingWidth.toFixed(2)} unit="m"/><Metric label="L" value={f.footingLength.toFixed(2)} unit="m"/><Metric label="Vtx" value={Vx.toFixed(2)} unit="kN"/><Metric label="Vty" value={Vy.toFixed(2)} unit="kN"/><Metric label="Rth+0.3Rpt" value={r.slidingCapacityX.toFixed(2)} unit="kN"/><Metric label="Durum" value={!r.evaluable?'VERİ EKSİK':r.slidingSafeX&&r.slidingSafeY?'YETERLİ':'YETERSİZ'}/></div>
+        <Card title="TBDY 2018 16.8.4"><div className="table-wrap"><table><thead><tr><th>Kontrol</th><th>Değer</th><th>Oran</th><th>Durum</th></tr></thead><tbody><tr><td>X</td><td>{Vx.toFixed(2)} / {r.slidingCapacityX.toFixed(2)}</td><td>{r.slidingUtilizationX.toFixed(3)}</td><td>{!r.evaluable?'VERİ EKSİK':r.slidingSafeX?'YETERLİ':'YETERSİZ'}</td></tr><tr><td>Y</td><td>{Vy.toFixed(2)} / {r.slidingCapacityY.toFixed(2)}</td><td>{r.slidingUtilizationY.toFixed(3)}</td><td>{!r.evaluable?'VERİ EKSİK':r.slidingSafeY?'YETERLİ':'YETERSİZ'}</td></tr></tbody></table></div><div className="engineering-note">Rth={r.frictionResistanceDesign.toFixed(2)} kN · 0.3Rpt={(0.3*r.passiveResistanceDesign).toFixed(2)} kN · Rdesign={r.slidingCapacityX.toFixed(2)} kN · mod={r.slidingMode}</div></Card>
         {r.warnings.length>0&&<Card title="UYARILAR"><div className="inline-empty">{r.warnings.join(' ')}</div></Card>}</>}
   </Frame>
 }

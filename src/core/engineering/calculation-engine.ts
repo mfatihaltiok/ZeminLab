@@ -1,5 +1,6 @@
 import { calculateSurfaceFoundation, compressionContact } from './surface-foundation'
 import { effectiveStressAtDepth } from './stress-profile'
+import { jetGroutAdvanced as jetGroutComposite } from './advanced-geotech'
 
 export type BearingMethod='Terzaghi'|'Meyerhof'|'Hansen'|'Vesic'
 export interface CalculationStep{symbol:string;title:string;formula:string;value?:number;unit?:string;note?:string;source?:string}
@@ -7,14 +8,14 @@ export interface CalculationResult<T>{value:T;steps:CalculationStep[];method:str
 const rad=(d:number)=>d*Math.PI/180
 const clamp=(x:number,a:number,b:number)=>Math.max(a,Math.min(b,x))
 
-export interface BearingInput{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS:number;method:BearingMethod;waterReduction?:number;surcharge?:number;gammaBearing?:number}
+export interface BearingInput{B:number;L:number;Df:number;gamma:number;c:number;phi:number;FS?:number;method:BearingMethod;waterReduction?:number;surcharge?:number;gammaBearing?:number}
 function factors(phiDeg:number,method:BearingMethod){
   const phi=clamp(phiDeg,0,50),t=Math.tan(rad(phi))
   const Nq=phi===0?1:Math.exp(Math.PI*t)*Math.tan(Math.PI/4+rad(phi)/2)**2
-  const Nc=phi===0?5.14:(Nq-1)/Math.max(t,1e-12)
+  const Nc=phi===0?(method==='Terzaghi'?5.7:5.14):(Nq-1)/Math.max(t,1e-12)
   let Ngamma=0
   if(phi>0){
-    if(method==='Terzaghi')Ngamma=2*(Nq-1)*t
+    if(method==='Terzaghi')Ngamma=1.5*(Nq-1)*t
     else if(method==='Meyerhof')Ngamma=(Nq-1)*Math.tan(rad(1.4*phi))
     else if(method==='Hansen')Ngamma=1.5*(Nq-1)*t
     else Ngamma=2*(Nq+1)*t
@@ -33,8 +34,8 @@ function classicalFactors(method:BearingMethod,B:number,L:number,Df:number,phi:n
   return{sc,sq,sg,dc,dq,dg:1,ic:1,iq:1,ig:1,gc:1,gq:1,gg:1,bc:1,bq:1,bg:1}
 }
 export function bearingCapacity(i:BearingInput):CalculationResult<any>{
-  if(![i.B,i.L,i.Df,i.gamma,i.c,i.phi,i.FS].every(Number.isFinite))throw new Error('Taşıma gücü girdileri sonlu sayılar olmalıdır.')
-  if(i.B<=0||i.L<=0||i.Df<0||i.gamma<=0||i.c<0||i.FS<=0||i.phi<0||i.phi>50)throw new Error('Taşıma gücü girdileri fiziksel sınırlar dışında.')
+  if(![i.B,i.L,i.Df,i.gamma,i.c,i.phi].every(Number.isFinite)||i.FS!=null&&!Number.isFinite(i.FS))throw new Error('Taşıma gücü girdileri sonlu sayılar olmalıdır.')
+  if(i.B<=0||i.L<=0||i.Df<0||i.gamma<=0||i.c<0||i.FS!=null&&i.FS<=0||i.phi<0||i.phi>50)throw new Error('Taşıma gücü girdileri fiziksel sınırlar dışında.')
   if(!['Terzaghi','Meyerhof','Hansen','Vesic'].includes(i.method))throw new Error('Desteklenmeyen klasik taşıma gücü yöntemi.')
   const gammaTerm=i.waterReduction??1
   if(!Number.isFinite(gammaTerm)||gammaTerm<0||gammaTerm>1)throw new Error('Su düzeltme katsayısı 0 ile 1 arasında olmalıdır.')
@@ -43,7 +44,7 @@ export function bearingCapacity(i:BearingInput):CalculationResult<any>{
   const f=factors(i.phi,i.method),m=classicalFactors(i.method,i.B,i.L,i.Df,f.phi,f.Nq,f.Nc),q=i.surcharge??i.gamma*i.Df,gammaBearing=i.gammaBearing??i.gamma
   const ultimate=i.c*f.Nc*m.sc*m.dc*m.ic*m.gc*m.bc+q*f.Nq*m.sq*m.dq*m.iq*m.gq*m.bq+.5*gammaBearing*i.B*f.Ngamma*m.sg*m.dg*m.ig*m.gg*m.bg*gammaTerm
   const netUltimate=ultimate-q
-  const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:m.sc,sq:m.sq,sg:m.sg,dc:m.dc,dq:m.dq,dg:m.dg,ultimate,netUltimate,allowableGross:ultimate/i.FS,allowableNet:netUltimate/i.FS}
+  const value={Nq:f.Nq,Nc:f.Nc,Ngamma:f.Ngamma,sc:m.sc,sq:m.sq,sg:m.sg,dc:m.dc,dq:m.dq,dg:m.dg,ultimate,netUltimate,allowableGross:i.FS!=null?ultimate/i.FS:undefined,allowableNet:i.FS!=null?netUltimate/i.FS:undefined}
   return{value,method:i.method,source:'Klasik taşıma gücü literatür bağıntıları; sonuçlar TBDY tasarım direnci yerine klasik izin verilebilir değerler olarak raporlanır.',steps:[
     {symbol:'Nq',title:'Taşıma gücü katsayısı',formula:'Nq=exp(πtanφ)·tan²(45°+φ/2)',value:f.Nq},
     {symbol:'Nc',title:'Kohezyon katsayısı',formula:'Nc=(Nq−1)cotφ',value:f.Nc},
@@ -51,8 +52,8 @@ export function bearingCapacity(i:BearingInput):CalculationResult<any>{
     {symbol:'q',title:'Sürşarj',formula:i.surcharge!=null?'q = efektif temel seviyesi sürşarjı (YASS düzeltmeli)':'q=γDf',value:q,unit:'kPa'},
     {symbol:'γNγ',title:'Nγ terimi için birim hacim ağırlık',formula:'γ′ veya YASS düzeltmeli γ',value:gammaBearing,unit:'kN/m³'},
     {symbol:'qult',title:'Nihai taşıma gücü',formula:'Klasik genel taşıma gücü denklemi',value:ultimate,unit:'kPa'},
-    {symbol:'qallow',title:'İzin verilen gross',formula:'qult/FS',value:value.allowableGross,unit:'kPa'}
-  ]}
+    {symbol:'qallow',title:'İzin verilen gross',formula:'qult/FS',value:value.allowableGross,unit:'kPa',note:i.FS==null?'FS girilmedi; izin verilebilir değer üretilmedi.':undefined}
+  ],warnings:i.FS==null?['Klasik izin verilebilir taşıma gücü için güvenlik katsayısı açıkça girilmelidir; FS varsayılmadı.']:[]}
 }
 
 export interface TbdyBearingInput{
@@ -69,6 +70,8 @@ export function settlement(i:SettlementInput):CalculationResult<{immediate:numbe
   if(![i.B,i.q,i.Es,i.nu].every(Number.isFinite)||i.B<=0||i.q<0||i.Es<=0||i.nu<=-1||i.nu>=.5)throw new Error('Oturma girdileri geçersiz; B/Es pozitif, q negatif olmayan ve -1<ν<0.5 olmalıdır.')
   for(const [index,l] of (i.layers??[]).entries()){
     if(!Number.isFinite(l.thickness)||l.thickness<0)throw new Error('Oturma katmanı '+(index+1)+': kalınlık negatif olmayan sonlu bir değer olmalıdır.')
+    const consolidationInputs=[l.Cc,l.e0,l.sigma0,l.dSigma]
+    if(consolidationInputs.some(v=>v!==undefined)&&consolidationInputs.some(v=>v===undefined))throw new Error('Oturma katmanı '+(index+1)+': Cc, e0, sigma0 ve dSigma birlikte girilmelidir.')
     for(const [name,value] of [['Cc',l.Cc],['e0',l.e0],['sigma0',l.sigma0],['dSigma',l.dSigma]] as const)if(value!==undefined&&!Number.isFinite(value))throw new Error('Oturma katmanı '+(index+1)+': '+name+' sonlu olmalıdır.')
     if(l.Cc!=null&&l.Cc<0||l.e0!=null&&l.e0<0||l.sigma0!=null&&l.sigma0<=0||l.dSigma!=null&&l.dSigma<0)throw new Error('Oturma katmanı '+(index+1)+': konsolidasyon parametreleri geçersiz.')
   }
@@ -128,14 +131,14 @@ export function foundationChecks(i:FoundationCheckInput){
   const interfaceType=i.interfaceType??'cast-in-place-soil'
   if(interfaceProvided&&!Object.prototype.hasOwnProperty.call(interfaceLimits,interfaceType))throw new Error('Temel-zemin arayüzü geçersiz.')
   const tanLimit=interfaceProvided?interfaceLimits[interfaceType]:0
-  const rawTan=interfaceProvided?(i.deltaTan??tanLimit):0
+  const rawTan=interfaceProvided?(i.deltaTan??0):0
   if(rawTan<0||!Number.isFinite(rawTan))throw new Error('tanδ sıfır veya pozitif ve sonlu olmalıdır.')
   if(interfaceProvided&&rawTan>tanLimit+1e-9)throw new Error('Girilen tanδ, TBDY Tablo 16.3 seçilen arayüz üst sınırını aşamaz.')
   const deltaTan=rawTan
   const warnings:string[]=[]
   if(!interfaceProvided)warnings.push('Temel-zemin arayüzü seçilmedi; arayüz dayanımı kredilendirilmedi ve nihai kontrol veri eksik olarak işaretlendi.')
   if(!interfaceProvided&&i.deltaTan!=null)warnings.push('tanδ değeri arayüz sınıfı olmadan kullanılmadı.')
-  if(i.deltaTan==null&&interfaceProvided)warnings.push('tanδ girilmedi; seçilen arayüz için TBDY Tablo 16.3 üst sınırı kullanıldı. Proje özelinde deney/veri varsa doğrudan girilmelidir.')
+  if(i.deltaTan==null&&interfaceProvided)warnings.push('tanδ girilmedi; arayüz üst sınırı varsayılmadı ve sürtünme direnci kredilendirilmedi. Nihai drenajlı kayma kontrolü için proje/deney verisi girilmelidir.')
   const submerged=i.groundwaterDepth!=null&&i.foundationDepth!=null&&i.groundwaterDepth<=i.foundationDepth
   const seismic=Boolean(i.seismic)
   const groundwaterKnown=i.groundwaterDepth!=null&&i.foundationDepth!=null
@@ -171,9 +174,9 @@ export function foundationChecks(i:FoundationCheckInput){
   if(N===0&&(i.Mx!==0||i.My!==0))warnings.push('N=0 iken momentten eksantrisite hesaplanamaz.')
   if(Math.abs(ex)>i.B/6||Math.abs(ey)>i.L/6)warnings.push('Eksantrisite çekirdek dışına çıkıyor; kayma için sürtünme direncinde yalnızca gerçek basınçlı temas alanı esas alınmalıdır.')
   if(contactArea<=0)warnings.push('Temas alanı sıfırdır; sürtünme direnci ve temel temas kontrolleri geçersizdir.')
-  const requiredData=slidingMode==='data-missing'||!interfaceProvided||contactArea<=0||(i.usePassiveResistance&&rpk<=0)
+  const requiredData=slidingMode==='data-missing'||!interfaceProvided||(slidingMode==='drained-interface'&&i.deltaTan==null)||contactArea<=0||(i.usePassiveResistance&&rpk<=0)
   return{
-    ex,ey,qAvg,qMax,qMin,contactArea,effectiveWidth,effectiveLength,
+    ex,ey,qAvg,qMax,qMin,contactArea,effectiveWidth,effectiveLength,frictionResistanceDesign:rth,totalSlidingResistanceDesign:designResistance,
     horizontalResultant:vh,slidingFS:vh>0?designResistance/vh:Infinity,
     slidingCapacityX:designResistance,slidingCapacityY:designResistance,slidingCapacityResultant:designResistance,
     slidingUtilizationX:utilizationX,slidingUtilizationY:utilizationY,slidingUtilizationResultant:utilizationResultant,
@@ -184,16 +187,14 @@ export function foundationChecks(i:FoundationCheckInput){
 }
 
 export function jetGrout(i:{columnDiameter:number;spacing:number;qultSoil:number;qultColumn:number;improvementFactor:number;FS:number;columnStrength:number;}){
-  if(!Number.isFinite(i.columnDiameter)||i.columnDiameter<=0)throw new Error('Jet Grout kolon çapı pozitif olmalıdır.')
-  if(!Number.isFinite(i.spacing)||i.spacing<=0)throw new Error('Jet Grout aks aralığı pozitif olmalıdır.')
   if(!Number.isFinite(i.FS)||i.FS<=0)throw new Error('Jet Grout güvenlik katsayısı pozitif olmalıdır.')
-  if(!Number.isFinite(i.qultSoil)||i.qultSoil<0||!Number.isFinite(i.qultColumn)||i.qultColumn<0||!Number.isFinite(i.columnStrength)||i.columnStrength<0)throw new Error('Jet Grout dayanım girdileri geçerli olmalıdır.')
-  if(!Number.isFinite(i.improvementFactor)||i.improvementFactor<0)throw new Error('Jet Grout iyileştirme katsayısı negatif olamaz.')
-  const Ac=Math.PI*i.columnDiameter**2/4,cell=i.spacing**2,ratio=Ac/Math.max(cell,1e-9)
-  if(ratio>1)throw new Error('Kolon kesit alanı hücre alanını aşamaz; çap/aks aralığını kontrol edin.')
-  const composite=(1-ratio)*i.qultSoil+ratio*i.qultColumn*i.improvementFactor
-  const warnings=['Bu hesap kompozit ön modeldir; jet grout nihai tasarımı kolon geometrisi, kalite kontrol, dayanım deneyleri, süreklilik ve saha doğrulaması ile ayrıca doğrulanmalıdır.']
-  return{value:{Ac,ratio,composite,allowable:composite/i.FS,columnLoad:Ac*i.columnStrength/i.FS,screeningOnly:true},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio},{symbol:'qcomp',title:'Kompozit taşıma modeli',formula:'(1−ρ)qsoil+ρ·qcolumn·I',value:composite}],method:'Jet Grout ön model',source:'Proje kaynak paketi',warnings}
+  if(!Number.isFinite(i.qultSoil)||i.qultSoil<0||!Number.isFinite(i.qultColumn)||i.qultColumn<0)throw new Error('Jet Grout zemin/kolon nihai kapasitesi negatif olmayan sonlu değerler olmalıdır.')
+  if(!Number.isFinite(i.columnStrength)||i.columnStrength<0)throw new Error('Jet Grout kolon dayanımı negatif olmayan sonlu bir değer olmalıdır.')
+  if(!Number.isFinite(i.improvementFactor)||i.improvementFactor<0)throw new Error('Jet Grout iyileştirme katsayısı negatif olmayan sonlu bir değer olmalıdır.')
+  const r=jetGroutComposite({columnDiameter:i.columnDiameter,spacing:i.spacing,qSoil:i.qultSoil,qColumn:i.qultColumn*i.improvementFactor,FS:i.FS})
+  const Ac=r.areaColumn,ratio=r.areaReplacementRatio,composite=r.compositeCapacity
+  const warnings=['Mevcut uyumluluk API’si kanonik Jet Grout kompozit fonksiyonunu kullanır. Sonuç ön değerlendirmedir; nihai tasarım kolon geometrisi, zemin tabakaları, imalat ve saha kalite kontrolü ile doğrulanmalıdır.']
+  return{value:{Ac,ratio,composite,allowable:r.allowableCapacity!,columnLoad:Ac*i.columnStrength/i.FS,screeningOnly:true},steps:[{symbol:'Ac',title:'Kolon kesit alanı',formula:'πd²/4',value:Ac},{symbol:'ρ',title:'İyileştirme oranı',formula:'Ac/Acell',value:ratio},{symbol:'qcomp',title:'Kompozit taşıma modeli',formula:'(1−ρ)qsoil+ρ·(qcolumn·I)',value:composite}],method:'Jet Grout ön model',source:r.source,warnings}
 }
 
 export function stressAtDepth(depth:number,layers:{top:number;bottom:number;gamma:number;gammaSat:number}[],gwt:number){const r=effectiveStressAtDepth(depth,layers,gwt);return{sigmaV:r.sigmaV,sigmaVPrime:r.sigmaVPrime,u:r.porePressure}}
